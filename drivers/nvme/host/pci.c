@@ -1964,7 +1964,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	result = nvme_dev_map(dev);
 	if (result)
-		goto free;
+		goto put_pci;
 
 	INIT_WORK(&dev->reset_work, nvme_reset_work);
 	INIT_WORK(&dev->remove_work, nvme_remove_dead_ctrl_work);
@@ -1975,7 +1975,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	result = nvme_setup_prp_pools(dev);
 	if (result)
-		goto put_pci;
+		goto unmap;
 
 	result = nvme_init_ctrl(&dev->ctrl, &pdev->dev, &nvme_pci_ctrl_ops,
 			id->driver_data);
@@ -1990,9 +1990,10 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
  release_pools:
 	nvme_release_prp_pools(dev);
+ unmap:
+	nvme_dev_unmap(dev);
  put_pci:
 	put_device(dev->dev);
-	nvme_dev_unmap(dev);
  free:
 	kfree(dev->queues);
 	kfree(dev);
