@@ -340,6 +340,12 @@
 						  "dma-grant";
 			};
 		};
+
+		qcom,fan@c400 {
+			compatible = "qcom,qpnp-fan";
+			reg = <0xc400 0x100>;
+			pwms = <&pmi8998_pwm_2 0 0>;
+		};
 	};
 
 	pmi8998_lsid1: qcom,pmi8998@3 {
@@ -373,7 +379,7 @@
 			qcom,supported-sizes = <6>, <9>;
 			qcom,ramp-index = <1>;
 			#pwm-cells = <2>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		pmi8998_pwm_3: pwm@b300 {

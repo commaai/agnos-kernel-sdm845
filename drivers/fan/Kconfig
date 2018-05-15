@@ -1,0 +1,4 @@
+config KERNEL_FAN
+	tristate "Enable Fan Driver Support"
+	help
+	  Add support for fan driver.
