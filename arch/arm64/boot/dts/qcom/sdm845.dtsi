@@ -1296,6 +1296,12 @@
 		mbox-names = "qdss_clk";
 	};
 
+        clk40M: can_clock {
+                compatible = "fixed-clock";
+                #clock-cells = <0>;
+                clock-frequency = <40000000>;
+        };
+
 	ufs_ice: ufsice@1d90000 {
 		compatible = "qcom,ice";
 		reg = <0x1d90000 0x8000>;
