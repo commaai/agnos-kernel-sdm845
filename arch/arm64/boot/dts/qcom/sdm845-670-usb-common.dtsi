@@ -360,6 +360,10 @@
 		interrupt-names = "dp_hs_phy_irq", "pwr_event_irq",
 				"ss_phy_irq", "dm_hs_phy_irq";
 
+		pinctrl-names = "wcd_usbc_analog_en1_idle","wcd_usbc_analog_en1_active";
+		pinctrl-0 = <&wcd_usbc_analog_en1_idle>;
+		pinctrl-1 = <&wcd_usbc_analog_en1_active>;
+
 		USB3_GDSC-supply = <&usb30_sec_gdsc>;
 		qcom,dwc-usb3-msm-tx-fifo-size = <21288>;
 		qcom,use-pdc-interrupts;
@@ -397,6 +401,7 @@
 			reg = <0x0a800000 0xcd00>;
 			interrupts = <0 138 0>;
 			usb-phy = <&qusb_phy1>, <&usb_qmp_phy>;
+			dr_mode = "host";
 			tx-fifo-resize;
 			linux,sysdev_is_parent;
 			snps,disable-clk-gating;
@@ -429,7 +434,8 @@
 			 0x254 /* QUSB2PHY_TEST1 */
 			 0x198 /* PLL_BIAS_CONTROL_2 */
 			 0x228 /* QUSB2PHY_SQ_CTRL1 */
-			 0x22c>; /* QUSB2PHY_SQ_CTRL2 */
+			 0x22c /* QUSB2PHY_SQ_CTRL2 */
+			 0x27c>; /* QUSB2PHY_DEBUG_CTRL1 */
 
 		qcom,qusb-phy-init-seq =
 			/* <value reg_offset> */

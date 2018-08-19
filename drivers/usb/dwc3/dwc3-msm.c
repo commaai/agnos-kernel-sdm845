@@ -47,6 +47,7 @@
 #include <linux/extcon.h>
 #include <linux/reset.h>
 #include <linux/clk/qcom.h>
+#include <linux/gpio.h>
 
 #include "power.h"
 #include "core.h"
@@ -3322,6 +3323,8 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node, *dwc3_node;
 	struct device	*dev = &pdev->dev;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pinctrl_state;
 	union power_supply_propval pval = {0};
 	struct dwc3_msm *mdwc;
 	struct dwc3	*dwc;
@@ -3500,6 +3503,28 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 				goto err;
 			}
 		}
+	}
+
+	pinctrl = devm_pinctrl_get(&pdev->dev);
+	if(IS_ERR(pinctrl)) {
+		dev_err(&pdev->dev, "pinctrl get failed.\n");
+
+	} else {
+		pinctrl_state = pinctrl_lookup_state(pinctrl, "wcd_usbc_analog_en1_active");
+		if(IS_ERR(pinctrl_state)) {
+			dev_err(&pdev->dev, "pinctrl get state failed.\n");
+
+		} else {
+			ret = pinctrl_select_state(pinctrl, pinctrl_state);
+			if(ret) {
+				dev_err(&pdev->dev, "%s: disable pinctrl failed with %d\n",
+						__func__, ret);
+
+			}
+			printk("%s, pinctrl_state:%d\n", __func__, ret);
+
+		}
+
 	}
 
 	ext_hub_reset_gpio = of_get_named_gpio(node,
