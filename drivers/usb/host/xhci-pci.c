@@ -19,11 +19,15 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/acpi.h>
+#include <linux/qcom_iommu.h>
+#include <linux/io.h>
+#include <asm/dma-iommu.h>
+#include <linux/dma-mapping-fast.h>
+#include <linux/msm_dma_iommu_mapping.h>
 
 #include "xhci.h"
 #include "xhci-trace.h"
@@ -267,6 +271,54 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 	return retval;
 }
 
+#define SMMU_BASE 0x10000000
+#define SMMU_SIZE 0x40000000
+
+static struct dma_iommu_mapping* xhci_smmu_init(struct device *dev)
+{
+	int rc = 0;
+	int atomic_ctx = 1;
+	int bypass_enable = 1;
+	struct dma_iommu_mapping *mapping = NULL;
+
+	mapping = arm_iommu_create_mapping(&platform_bus_type, SMMU_BASE, SMMU_SIZE);
+	if (IS_ERR(mapping)) {
+		rc = PTR_ERR(mapping);
+		dev_err(dev, "create mapping failed, err = %d\n", rc);
+		return NULL;
+	}
+
+	rc = iommu_domain_set_attr(mapping->domain, DOMAIN_ATTR_ATOMIC, &atomic_ctx);
+	if (rc) {
+		dev_err(dev, "Set atomic attribute to SMMU failed (%d)\n", rc);
+		arm_iommu_release_mapping(mapping);
+		return NULL;
+	}
+
+	rc = iommu_domain_set_attr(mapping->domain, DOMAIN_ATTR_S1_BYPASS, &bypass_enable);
+	if (rc) {
+		dev_err(dev, "Set bypass attribute to SMMU failed (%d)\n", rc);
+		arm_iommu_release_mapping(mapping);
+		return NULL;
+	}
+
+	rc = arm_iommu_attach_device(dev, mapping);
+	if (rc) {
+		dev_err(dev, "arm_iommu_attach_device failed (%d)\n", rc);
+		arm_iommu_release_mapping(mapping);
+		return NULL;
+	}
+
+	dev_info(dev, "attached to IOMMU\n");
+	return mapping;
+}
+
+static void xhci_smmu_deinit(struct device *dev)
+{
+	arm_iommu_detach_device(dev);
+	arm_iommu_release_mapping(to_dma_iommu_mapping(dev));
+}
+
 /*
  * We need to register our own PCI probe function (instead of the USB core's
  * function) in order to create a second roothub under xHCI.
@@ -277,6 +329,9 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	struct xhci_hcd *xhci;
 	struct hc_driver *driver;
 	struct usb_hcd *hcd;
+
+	if(!xhci_smmu_init(&dev->dev))
+		return -EFAULT;
 
 	driver = (struct hc_driver *)id->driver_data;
 
@@ -327,6 +382,7 @@ put_usb3_hcd:
 dealloc_usb2_hcd:
 	usb_hcd_pci_remove(dev);
 put_runtime_pm:
+	xhci_smmu_deinit(&dev->dev);
 	pm_runtime_put_noidle(&dev->dev);
 	return retval;
 }
@@ -335,6 +391,7 @@ static void xhci_pci_remove(struct pci_dev *dev)
 {
 	struct xhci_hcd *xhci;
 
+	XHCI_FWUNLOAD(pci_get_drvdata(dev));
 	xhci = hcd_to_xhci(pci_get_drvdata(dev));
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
 	if (xhci->shared_hcd) {
@@ -462,7 +519,7 @@ static int xhci_pci_resume(struct usb_hcd *hcd, bool hibernated)
 
 	if (xhci->quirks & XHCI_PME_STUCK_QUIRK)
 		xhci_pme_quirk(hcd);
-
+	XHCI_FWRELOAD(hcd);
 	retval = xhci_resume(xhci, hibernated);
 	return retval;
 }
