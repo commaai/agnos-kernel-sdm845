@@ -11,11 +11,9 @@
  */
 
 &mdss_mdp {
-	dsi_lt8912_1080_video: qcom,mdss_dsi_lt8912_1080p_video {
-		qcom,mdss-dsi-panel-name = "lt8912 1080p video mode dsi panel";
+	dsi_dual_lt8912_video: qcom,mdss_dsi_dual_lt8912_1080p_video {
+		qcom,mdss-dsi-panel-name = "lt8912 dual 1080p video mode dsi panel";
 		qcom,mdss-dsi-panel-type = "dsi_video_mode";
-		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
-		qcom,mdss-dsi-panel-destination = "display_1";
 		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
 		qcom,mdss-dsi-lane-map = "lane_map_0123";
 		qcom,mdss-dsi-virtual-channel-id = <0>;
@@ -35,7 +33,7 @@
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 2>, <1 20>;
 		qcom,mdss-dsi-post-init-delay = <1>;
 		qcom,mdss-dsi-force-clock-lane-hs;
-		qcom,mdss-pan-physical-width-dimension = <208>;
+		qcom,mdss-pan-physical-width-dimension = <416>;
 		qcom,mdss-pan-physical-height-dimension = <117>;
 		qcom,mdss-dsi-display-timings {
 			timing@0{

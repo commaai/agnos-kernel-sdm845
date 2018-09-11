@@ -1,0 +1,1 @@
+obj-$(CONFIG_DRM_I2C_LT8912) += lt8912.o

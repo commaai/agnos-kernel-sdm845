@@ -1,0 +1,6 @@
+config DRM_I2C_LT8912
+	bool "LT8912 encoder"
+	select DRM_MIPI_DSI
+	default n
+	help
+	  Support for the Lontium Devices LT8912 DSI to HDMI encoder.

@@ -340,6 +340,32 @@
 					bias-pull-up;
 				};
 			};
+
+			pcie0_3v3_on: pcie0_3v3_on {
+				mux {
+					pins = "gpio125";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio125";
+					drive_strength = <2>;
+					bias-disable;
+					output-high;
+				};
+			};
+
+			pcie0_1v5_on: pcie0_1v5_on {
+				mux {
+					pins = "gpio6";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio6";
+					drive_strength = <2>;
+					bias-disable;
+					output-high;
+				};
+			};
 		};
 
 		pcie1 {
@@ -645,24 +671,24 @@
 		pmx_sde: pmx_sde {
 			sde_dsi_active: sde_dsi_active {
 				mux {
-					pins = "gpio6", "gpio52";
+					pins = "gpio88"/*, "gpio52"*/;
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio6", "gpio52";
+					pins = "gpio88"/*, "gpio52"*/;
 					drive-strength = <8>;   /* 8 mA */
 					bias-disable = <0>;   /* no pull */
 				};
 			};
 			sde_dsi_suspend: sde_dsi_suspend {
 				mux {
-					pins = "gpio6", "gpio52";
+					pins = "gpio88"/*, "gpio52"*/;
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio6", "gpio52";
+					pins = "gpio88"/*, "gpio52"*/;
 					drive-strength = <2>;   /* 2 mA */
 					bias-pull-down;         /* PULL DOWN */
 				};

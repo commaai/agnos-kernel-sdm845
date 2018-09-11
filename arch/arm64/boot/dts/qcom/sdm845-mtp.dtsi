@@ -85,7 +85,7 @@
 };
 
 &labibb {
-	status = "ok";
+	status = "disabled";
 	qcom,qpnp-labibb-mode = "lcd";
 };
 
@@ -129,6 +129,20 @@
 	qcom,panel-mode-gpio = <&tlmm 52 0>;
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
 	qcom,platform-te-gpio = <&tlmm 10 0>;
+};
+
+&dsi_lt8912_1080_video {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+	//qcom,mdss-dsi-mode-sel-gpio-state = "single_port";
+	//qcom,panel-mode-gpio = <&tlmm 52 0>;
+	qcom,platform-reset-gpio = <&tlmm 88 0>;
+};
+
+&dsi_dual_lt8912_video {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+	//qcom,mdss-dsi-mode-sel-gpio-state = "dual_port";
+	//qcom,panel-mode-gpio = <&tlmm 52 0>;
+	qcom,platform-reset-gpio = <&tlmm 88 0>;
 };
 
 &dsi_sim_vid {
@@ -188,12 +202,12 @@
 	qcom,platform-te-gpio = <&tlmm 10 0>;
 };
 
-&dsi_nt35597_truly_dsc_cmd_display {
+&dsi_dual_lt8912_video_display {
 	qcom,dsi-display-active;
 };
 
 &pmi8998_wled {
-	status = "okay";
+	status = "disabled";
 	qcom,led-strings-list = [01 02];
 };
 
@@ -312,7 +326,7 @@
 };
 
 &qupv3_se3_i2c {
-	status = "ok";
+	status = "disabled";
 	nq@28 {
 		compatible = "qcom,nq-nci";
 		reg = <0x28>;
@@ -322,6 +336,7 @@
 		qcom,nq-clkreq = <&pm8998_gpios 21 0x00>;
 		qcom,nq-esepwr = <&tlmm 116 0x00>;
 		interrupt-parent = <&tlmm>;
+		qcom,clk-src = "BBCLK3";
 		interrupts = <63 0>;
 		interrupt-names = "nfc_irq";
 		pinctrl-names = "nfc_active", "nfc_suspend";
@@ -329,6 +344,8 @@
 			     &nfc_enable_active
 			     &nfc_clk_default>;
 		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend>;
+		clocks = <&clock_rpmh RPMH_LN_BB_CLK3>;
+		clock-names = "ref_clk";
 	};
 };
 
@@ -349,8 +366,12 @@
 	status = "okay";
 };
 
+&pmi8998_pdphy {
+	vbus-supply = <&smb2_vbus>;
+};
+
 &ext_5v_boost {
-	status = "ok";
+	status = "disabled";
 };
 
 &usb_qmp_phy {
@@ -544,5 +565,45 @@
 };
 
 &wil6210 {
+	status = "disable";
+};
+
+&qupv3_se10_i2c {
 	status = "ok";
+	qcom,clk-freq-out = <100000>;
+	lt8912@48 {
+		compatible = "lontium,lt8912";
+		reg = <0x48>;
+		lt,index = <0>;
+		lt,reset-gpio = <&tlmm 42 0x00>;
+		lt,pwren-gpio = <&tlmm 50 0x00>;
+		lt,hpd-gpio = <&tlmm 44 0x00>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <44 0>;
+		interrupt-names = "hdmi_hpd_irq1";
+	};
+};
+
+&qupv3_se2_i2c {
+	status = "ok";
+	qcom,clk-freq-out = <100000>;
+	lt8912@48 {
+		compatible = "lontium,lt8912";
+		reg = <0x48>;
+		lt,index = <1>;
+		lt,reset-gpio = <&tlmm 42 0x00>;
+		lt,pwren-gpio = <&tlmm 50 0x00>;
+		lt,hpd-gpio = <&tlmm 52 0x00>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <52 0>;
+		interrupt-names = "hdmi_hpd_irq2";
+	};
+};
+
+&smb1355_0 {
+	status = "disabled";
+};
+
+&smb1355_1 {
+	status = "disabled";
 };

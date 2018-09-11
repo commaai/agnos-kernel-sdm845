@@ -639,10 +639,13 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 
 	dsi = &panel->mipi_device;
 
+	mutex_lock(&panel->panel_lock);
+
 	rc = mipi_dsi_dcs_set_display_brightness(dsi, bl_lvl);
 	if (rc < 0)
 		pr_err("failed to update dcs backlight:%d\n", bl_lvl);
 
+	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
 
@@ -651,20 +654,18 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 	int rc = 0;
 	struct dsi_backlight_config *bl = &panel->bl_config;
 
-	if (panel->type == EXT_BRIDGE)
-		return 0;
-
 	pr_debug("backlight type:%d lvl:%d\n", bl->type, bl_lvl);
 	switch (bl->type) {
 	case DSI_BACKLIGHT_WLED:
 		led_trigger_event(bl->wled, bl_lvl);
 		break;
 	case DSI_BACKLIGHT_DCS:
-		rc = dsi_panel_update_backlight(panel, bl_lvl);
+		dsi_panel_update_backlight(panel, bl_lvl);
 		break;
 	default:
-		pr_err("Backlight type(%d) not supported\n", bl->type);
-		rc = -ENOTSUPP;
+		//pr_err("Backlight type(%d) not supported\n", bl->type);
+		//rc = -ENOTSUPP;
+		break;
 	}
 
 	return rc;
@@ -682,12 +683,13 @@ static int dsi_panel_bl_register(struct dsi_panel *panel)
 	case DSI_BACKLIGHT_DCS:
 		break;
 	default:
-		pr_err("Backlight type(%d) not supported\n", bl->type);
-		rc = -ENOTSUPP;
-		goto error;
+		//pr_err("Backlight type(%d) not supported\n", bl->type);
+		//rc = -ENOTSUPP;
+		//goto error;
+		break;
 	}
 
-error:
+//error:
 	return rc;
 }
 
@@ -703,12 +705,13 @@ static int dsi_panel_bl_unregister(struct dsi_panel *panel)
 	case DSI_BACKLIGHT_DCS:
 		break;
 	default:
-		pr_err("Backlight type(%d) not supported\n", bl->type);
-		rc = -ENOTSUPP;
-		goto error;
+		//pr_err("Backlight type(%d) not supported\n", bl->type);
+		//rc = -ENOTSUPP;
+		//goto error;
+		break;
 	}
 
-error:
+//error:
 	return rc;
 }
 
