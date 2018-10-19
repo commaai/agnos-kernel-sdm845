@@ -1050,6 +1050,7 @@ static void handle_settled_icl_change(struct pl_data *chip)
 	else
 		vote(chip->pl_enable_votable_indirect, USBIN_I_VOTER, true, 0);
 
+	rerun_election(chip->fcc_votable);
 
 	if (IS_USBIN(chip->pl_mode)) {
 		/*
