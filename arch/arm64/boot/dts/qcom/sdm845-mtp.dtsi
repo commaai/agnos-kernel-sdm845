@@ -81,6 +81,14 @@
 			debounce-interval = <15>;
 			linux,can-disable;
 		};
+
+		force_usb_boot {
+			label = "force_usb_boot";
+			gpios = <&tlmm 57 0x0>;
+			linux,input-type = <1>;
+			linux,code = <117>;
+			debounce-interval = <15>;
+		};
 	};
 };
 
