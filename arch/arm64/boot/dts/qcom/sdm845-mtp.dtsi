@@ -90,6 +90,31 @@
 			debounce-interval = <15>;
 		};
 	};
+
+
+	leds-gpios {
+		compatible = "gpio-leds";
+		status = "okay";
+
+		bt-led_blue {
+			label = "bt-led_blue";
+			gpios = <&pm8998_gpios 5 0>;
+			default-state = "off";
+		};
+
+		wifi-led_yellow {
+			label = "wifi-led_yellow";
+			gpios = <&pm8998_gpios 9 0>;
+			default-state = "off";
+		};
+
+		user4-led_green {
+			label = "user4-led_green";
+			gpios = <&pm8998_gpios 13 0>;
+			default-state = "off";
+		};
+
+	};
 };
 
 &labibb {

@@ -3555,11 +3555,20 @@
 &pm8998_gpios {
 	key_home {
 		key_home_default: key_home_default {
-			pins = "gpio5";
+			pins = "gpio4";
 			function = "normal";
 			input-enable;
 			bias-pull-up;
 			power-source = <0>;
+		};
+	};
+
+	led_bt {
+		led_bt_default: led_bt_default {
+			pins = "gpio5";
+			function = "normal";
+			power-source = <0>;
+			output-low;
 		};
 	};
 
@@ -3593,9 +3602,18 @@
 		};
 	};
 
+	led_wifi {
+		led_wifi_default: led_wifi_default {
+			pins = "gpio9";
+			function = "normal";
+			power-source = <0>;
+			output-low;
+		};
+	};
+
 	camera_dvdd_en {
 		camera_dvdd_en_default: camera_dvdd_en_default {
-			pins = "gpio9";
+			pins = "gpio11";
 			function = "normal";
 			power-source = <0>;
 			output-low;
@@ -3605,6 +3623,15 @@
 	camera_rear_dvdd_en {
 		camera_rear_dvdd_en_default: camera_rear_dvdd_en_default {
 			pins = "gpio12";
+			function = "normal";
+			power-source = <0>;
+			output-low;
+		};
+	};
+
+	led_user4 {
+		led_user4_default: led_user4_default {
+			pins = "gpio13";
 			function = "normal";
 			power-source = <0>;
 			output-low;

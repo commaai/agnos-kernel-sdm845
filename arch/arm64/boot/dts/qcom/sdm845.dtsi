@@ -2491,7 +2491,7 @@
 		clock-names = "core", "iface";
 		clock-frequency = <25000000>;
 		qcom,ipc-gpio = <&tlmm 121 0>;
-		qcom,finger-detect-gpio = <&pm8998_gpios 5 0>;
+		qcom,finger-detect-gpio = <&pm8998_gpios 4 0>;
 	};
 
 	qcom_seecom: qseecom@86d00000 {
