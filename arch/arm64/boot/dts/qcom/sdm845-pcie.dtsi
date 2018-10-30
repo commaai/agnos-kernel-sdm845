@@ -178,10 +178,14 @@
 					0x800 0x00 0x0
 					0x808 0x03 0x0>;
 
-		pinctrl-names = "default";
+		pinctrl-names = "default", "slot_power_on";
 		pinctrl-0 = <&pcie0_clkreq_default
 			&pcie0_perst_default
 			&pcie0_wake_default>;
+		pinctrl-1 = <&pcie0_3v3_on &pcie0_1v5_on>;
+
+		3v3_gpio = <&tlmm 90 0>;
+		1v5_gpio = <&tlmm 90 0>;
 
 		perst-gpio = <&tlmm 35 0>;
 		wake-gpio = <&tlmm 37 0>;

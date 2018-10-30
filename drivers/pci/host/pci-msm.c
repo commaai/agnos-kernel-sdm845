@@ -50,7 +50,9 @@
 #include <linux/ipc_logging.h>
 #include <linux/msm_pcie.h>
 
-#define PCIE_VENDOR_ID_QCOM		0x17cb
+#define PCIE_VENDOR_ID_RCP			0x17cb
+#define PCIE_DEVICE_ID_RCP_PCIE20		0x0106
+#define PCIE_DEVICE_ID_RCP_PCIE30		0x0107
 
 #define PCIE20_L1SUB_CONTROL1		0x1E4
 #define PCIE20_PARF_DBI_BASE_ADDR       0x350
@@ -633,6 +635,7 @@ struct msm_pcie_dev_t {
 	bool				use_pinctrl;
 	struct pinctrl			*pinctrl;
 	struct pinctrl_state		*pins_default;
+	struct pinctrl_state		*pins_power_on;
 	struct pinctrl_state		*pins_sleep;
 	struct msm_pcie_device_info   pcidev_table[MAX_DEVICE_NUM];
 };
@@ -6012,6 +6015,16 @@ static int msm_pcie_probe(struct platform_device *pdev)
 			msm_pcie_dev[rc_idx].pins_default = NULL;
 		}
 
+		msm_pcie_dev[rc_idx].pins_power_on=
+			pinctrl_lookup_state(msm_pcie_dev[rc_idx].pinctrl,
+						"slot_power_on");
+		if (IS_ERR(msm_pcie_dev[rc_idx].pins_power_on)) {
+			PCIE_ERR(&msm_pcie_dev[rc_idx],
+				"PCIe: RC%d could not get pinctrl power_on state\n",
+				rc_idx);
+			msm_pcie_dev[rc_idx].pins_power_on= NULL;
+		}
+
 		msm_pcie_dev[rc_idx].pins_sleep =
 			pinctrl_lookup_state(msm_pcie_dev[rc_idx].pinctrl,
 						"sleep");
@@ -6039,6 +6052,10 @@ static int msm_pcie_probe(struct platform_device *pdev)
 	msm_pcie_sysfs_init(&msm_pcie_dev[rc_idx]);
 
 	msm_pcie_dev[rc_idx].drv_ready = true;
+	if (msm_pcie_dev[rc_idx].use_pinctrl && msm_pcie_dev[rc_idx].pins_power_on) {
+		pinctrl_select_state(msm_pcie_dev[rc_idx].pinctrl,
+				msm_pcie_dev[rc_idx].pins_power_on);
+	}
 
 	if (msm_pcie_dev[rc_idx].boot_option &
 			MSM_PCIE_NO_PROBE_ENUMERATION) {
@@ -6225,7 +6242,9 @@ static void msm_pcie_fixup_early(struct pci_dev *dev)
 	if (pci_is_root_bus(dev->bus))
 		dev->class = (dev->class & 0xff) | (PCI_CLASS_BRIDGE_PCI << 8);
 }
-DECLARE_PCI_FIXUP_EARLY(PCIE_VENDOR_ID_QCOM, PCI_ANY_ID,
+DECLARE_PCI_FIXUP_EARLY(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE20,
+			msm_pcie_fixup_early);
+DECLARE_PCI_FIXUP_EARLY(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE30,
 			msm_pcie_fixup_early);
 
 /* Suspend the PCIe link */
@@ -6334,7 +6353,9 @@ static void msm_pcie_fixup_suspend_late(struct pci_dev *dev)
 
 	mutex_unlock(&pcie_dev->recovery_lock);
 }
-DECLARE_PCI_FIXUP_SUSPEND_LATE(PCIE_VENDOR_ID_QCOM, PCI_ANY_ID,
+DECLARE_PCI_FIXUP_SUSPEND_LATE(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE20,
+			  msm_pcie_fixup_suspend_late);
+DECLARE_PCI_FIXUP_SUSPEND_LATE(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE30,
 			  msm_pcie_fixup_suspend_late);
 
 /* Resume the PCIe link */
@@ -6420,7 +6441,9 @@ static void msm_pcie_fixup_resume(struct pci_dev *dev)
 
 	mutex_unlock(&pcie_dev->recovery_lock);
 }
-DECLARE_PCI_FIXUP_RESUME(PCIE_VENDOR_ID_QCOM, PCI_ANY_ID,
+DECLARE_PCI_FIXUP_RESUME(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE20,
+				 msm_pcie_fixup_resume);
+DECLARE_PCI_FIXUP_RESUME(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE30,
 				 msm_pcie_fixup_resume);
 
 static void msm_pcie_fixup_resume_early(struct pci_dev *dev)
@@ -6442,7 +6465,9 @@ static void msm_pcie_fixup_resume_early(struct pci_dev *dev)
 
 	mutex_unlock(&pcie_dev->recovery_lock);
 }
-DECLARE_PCI_FIXUP_RESUME_EARLY(PCIE_VENDOR_ID_QCOM, PCI_ANY_ID,
+DECLARE_PCI_FIXUP_RESUME_EARLY(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE20,
+				 msm_pcie_fixup_resume_early);
+DECLARE_PCI_FIXUP_RESUME_EARLY(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP_PCIE30,
 				 msm_pcie_fixup_resume_early);
 
 int msm_pcie_pm_control(enum msm_pcie_pm_opt pm_opt, u32 busnr, void *user,

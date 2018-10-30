@@ -343,11 +343,11 @@
 
 			pcie0_3v3_on: pcie0_3v3_on {
 				mux {
-					pins = "gpio125";
+					pins = "gpio90";
 					function = "gpio";
 				};
 				config {
-					pins = "gpio125";
+					pins = "gpio90";
 					drive_strength = <2>;
 					bias-disable;
 					output-high;
@@ -356,11 +356,11 @@
 
 			pcie0_1v5_on: pcie0_1v5_on {
 				mux {
-					pins = "gpio6";
+					pins = "gpio90";
 					function = "gpio";
 				};
 				config {
-					pins = "gpio6";
+					pins = "gpio90";
 					drive_strength = <2>;
 					bias-disable;
 					output-high;
