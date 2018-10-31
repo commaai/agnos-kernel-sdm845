@@ -81,6 +81,39 @@
 			debounce-interval = <15>;
 			linux,can-disable;
 		};
+
+		force_usb_boot {
+			label = "force_usb_boot";
+			gpios = <&tlmm 57 0x0>;
+			linux,input-type = <1>;
+			linux,code = <117>;
+			debounce-interval = <15>;
+		};
+	};
+
+
+	leds-gpios {
+		compatible = "gpio-leds";
+		status = "okay";
+
+		bt-led_blue {
+			label = "bt-led_blue";
+			gpios = <&pm8998_gpios 5 0>;
+			default-state = "off";
+		};
+
+		wifi-led_yellow {
+			label = "wifi-led_yellow";
+			gpios = <&pm8998_gpios 9 0>;
+			default-state = "off";
+		};
+
+		user4-led_green {
+			label = "user4-led_green";
+			gpios = <&pm8998_gpios 13 0>;
+			default-state = "off";
+		};
+
 	};
 };
 
