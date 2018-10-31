@@ -117,6 +117,18 @@
 	};
 };
 
+&red_led {
+	linux,name = "user1-led_green";
+};
+
+&green_led {
+	linux,name = "user2-led_green";
+};
+
+&blue_led {
+	linux,name = "user3-led_green";
+};
+
 &labibb {
 	status = "disabled";
 	qcom,qpnp-labibb-mode = "lcd";
