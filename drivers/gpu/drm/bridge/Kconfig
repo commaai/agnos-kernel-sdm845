@@ -89,4 +89,6 @@ source "drivers/gpu/drm/bridge/adv7511/Kconfig"
 
 source "drivers/gpu/drm/bridge/lt8912/Kconfig"
 
+source "drivers/gpu/drm/bridge/lt9611/Kconfig"
+
 endmenu

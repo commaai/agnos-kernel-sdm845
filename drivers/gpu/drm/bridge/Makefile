@@ -12,3 +12,4 @@ obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix/
 obj-$(CONFIG_DRM_I2C_ADV7511) += adv7511/
 obj-$(CONFIG_DRM_I2C_LT8912) += lt8912/
 obj-$(CONFIG_DRM_LT_LT9611) += lt9611.o
+obj-$(CONFIG_DRM_I2C_LT9611) += lt9611/

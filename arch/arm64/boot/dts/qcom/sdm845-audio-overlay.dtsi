@@ -59,9 +59,15 @@
 
 	qcom,usbc-analog-en1-gpio = <&wcd_usbc_analog_en1_gpio>;
 	qcom,usbc-analog-en2-gpio = <&tlmm 51 0>;
-	pinctrl-names = "aud_active", "aud_sleep";
+	pinctrl-names = "aud_active", "aud_sleep",
+		"quat-mi2s-sleep", "quat-mi2s-active",
+		"quat-tdm-sleep", "quat-tdm-active";
 	pinctrl-0 = <&wcd_usbc_analog_en2_active>;
 	pinctrl-1 = <&wcd_usbc_analog_en2_idle>;
+	pinctrl-2 = <&quat_mi2s_sleep &quat_mi2s_sd0_sleep &quat_mi2s_sd1_sleep &quat_mi2s_sd2_sleep &quat_mi2s_sd3_sleep>;
+	pinctrl-3 = <&quat_mi2s_active &quat_mi2s_sd0_active &quat_mi2s_sd1_active &quat_mi2s_sd2_active &quat_mi2s_sd3_active>;
+	pinctrl-4 = <&quat_tdm_sleep &quat_tdm_din_sleep &quat_tdm_dout_sleep>;
+	pinctrl-5 = <&quat_tdm_active &quat_tdm_din_active &quat_tdm_din_active>;
 
 	qcom,wsa-max-devs = <2>;
 	qcom,wsa-devs = <&wsa881x_0211>, <&wsa881x_0212>,
