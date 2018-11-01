@@ -26,11 +26,15 @@
 #include "cam_mem_mgr.h"
 #include "cam_debug_util.h"
 #include <linux/slub_def.h>
+#include <linux/pm_qos.h>
 
 #define CAM_REQ_MGR_EVENT_MAX 30
+#define CAMERA_DISABLE_PC_LATENCY 100
+#define CAMERA_ENABLE_PC_LATENCY PM_QOS_DEFAULT_VALUE
 
 static struct cam_req_mgr_device g_dev;
 struct kmem_cache *g_cam_req_mgr_timer_cachep;
+static struct pm_qos_request cam_pm_qos_request;
 
 static int cam_media_device_setup(struct device *dev)
 {
@@ -97,12 +101,39 @@ static void cam_v4l2_device_cleanup(void)
 	g_dev.v4l2_dev = NULL;
 }
 
+static void cam_pm_qos_add_request(void)
+{
+	pm_qos_add_request(&cam_pm_qos_request, PM_QOS_CPU_DMA_LATENCY,
+		PM_QOS_DEFAULT_VALUE);
+}
+
+static void cam_pm_qos_remove_request(void)
+{
+	CAM_INFO(CAM_SENSOR, "%s: remove request", __func__);
+	pm_qos_remove_request(&cam_pm_qos_request);
+}
+
+static void cam_pm_qos_update_request(int val) {
+	CAM_INFO(CAM_SENSOR, "%s: update request %d", __func__, val);
+	pm_qos_update_request(&cam_pm_qos_request, val);
+}
+
 static int cam_req_mgr_open(struct file *filep)
 {
 	int rc;
 
 	mutex_lock(&g_dev.cam_lock);
-	if (g_dev.open_cnt >= 1) {
+
+	g_dev.open_cnt++;
+
+	if (g_dev.open_cnt == 1) {
+		CAM_INFO(CAM_CRM, "%s:%d disalbe lpm", __func__, __LINE__);
+		/* register msm_v4l2_pm_qos_request */
+		cam_pm_qos_add_request();
+		cam_pm_qos_update_request(CAMERA_DISABLE_PC_LATENCY);
+	}
+
+	if (g_dev.open_cnt > 1) {
 		rc = -EALREADY;
 		goto end;
 	}
@@ -117,10 +148,8 @@ static int cam_req_mgr_open(struct file *filep)
 	g_dev.cam_eventq = filep->private_data;
 	spin_unlock_bh(&g_dev.cam_eventq_lock);
 
-	g_dev.open_cnt++;
 	rc = cam_mem_mgr_init();
 	if (rc) {
-		g_dev.open_cnt--;
 		CAM_ERR(CAM_CRM, "mem mgr init failed");
 		goto mem_mgr_init_fail;
 	}
@@ -131,6 +160,12 @@ static int cam_req_mgr_open(struct file *filep)
 mem_mgr_init_fail:
 	v4l2_fh_release(filep);
 end:
+	if (g_dev.open_cnt <= 1) {
+		/* remove msm_v4l2_pm_qos_request */
+		cam_pm_qos_update_request(CAMERA_ENABLE_PC_LATENCY);
+		cam_pm_qos_remove_request();
+	}
+	g_dev.open_cnt--;
 	mutex_unlock(&g_dev.cam_lock);
 	return rc;
 }
@@ -160,8 +195,14 @@ static int cam_req_mgr_close(struct file *filep)
 		return -EINVAL;
 	}
 
-	cam_req_mgr_handle_core_shutdown();
 	g_dev.open_cnt--;
+	if (g_dev.open_cnt > 0) {
+		CAM_ERR(CAM_CRM, "%s:%d open_cnt %d", __func__, __LINE__, g_dev.open_cnt);
+		mutex_unlock(&g_dev.cam_lock);
+		return 0;
+	}
+
+	cam_req_mgr_handle_core_shutdown();
 	v4l2_fh_release(filep);
 
 	spin_lock_bh(&g_dev.cam_eventq_lock);
@@ -170,6 +211,11 @@ static int cam_req_mgr_close(struct file *filep)
 
 	cam_req_mgr_util_free_hdls();
 	cam_mem_mgr_deinit();
+
+	CAM_INFO(CAM_CRM, "%s:%d enable lpm", __func__, __LINE__);
+	cam_pm_qos_update_request(CAMERA_ENABLE_PC_LATENCY);
+	/* remove msm_v4l2_pm_qos_request */
+	cam_pm_qos_remove_request();
 	mutex_unlock(&g_dev.cam_lock);
 
 	return 0;
