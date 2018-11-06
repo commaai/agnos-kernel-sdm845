@@ -661,7 +661,7 @@
 		lt,reset-gpio = <&tlmm 128 0x00>;
 		/*lt,secondary-hpd-irq-gpio = <&tlmm 52 0x00>;*/
 		/*lt,receiver-enable-gpio = <&tlmm 31 0x00>;*/
-		lt,pwr-enable-gpio = <&tlmm 89 0x00>;
+		/*lt,pwr-enable-gpio = <&tlmm 89 0x00>;*/
 		lt,pwr-sys1v8-gpio = <&tlmm 89 0x00>;
 		lt,pwr-sys5v0-gpio = <&tlmm 120 0x00>;/*GPIO120_DSI_SW_SEL*/
 		/*lt,pwr-sys3v3-gpio = <&tlmm 125 0x00>;*/

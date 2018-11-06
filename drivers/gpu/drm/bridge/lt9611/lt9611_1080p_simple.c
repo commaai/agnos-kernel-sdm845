@@ -106,7 +106,7 @@ struct lt9611 {
 };
 
 static struct lt9611 *this_lt9611 = NULL;
-#define LT9611_PATTERN_TEST	(0)
+#define LT9611_PATTERN_TEST	(1)
 static void LT9611_pattern(struct lt9611 *pdata);
 
 static struct lt9611_video_cfg video_tab[] = {
@@ -834,7 +834,7 @@ static int lt9611_parse_dt(struct device *dev, struct lt9611 *pdata)
 		printk(KERN_ERR "%s: reset gpio not specified\n", __func__);
 		return -EINVAL;
 	}
-
+/*
 	pdata->receiver_enable_gpio = of_get_named_gpio(np, "lt,receiver-enable-gpio", 0);
 	if (!gpio_is_valid(pdata->receiver_enable_gpio)) {
 		printk(KERN_ERR "%s: receiver enable gpio not specified\n", __func__);
@@ -846,19 +846,19 @@ static int lt9611_parse_dt(struct device *dev, struct lt9611 *pdata)
 		printk(KERN_ERR "%s: pwr enable gpio not specified\n", __func__);
 		return -EINVAL;
 	}
-
+*/
 	pdata->pwr_sys5v0_gpio = of_get_named_gpio(np, "lt,pwr-sys5v0-gpio", 0);
 	if (!gpio_is_valid(pdata->pwr_sys5v0_gpio)) {
 		printk(KERN_ERR "%s: pwr sys5v0 gpio not specified\n", __func__);
 		return -EINVAL;
 	}
-
+/*
 	pdata->pwr_sys3v3_gpio = of_get_named_gpio(np, "lt,pwr-sys3v3-gpio", 0);
 	if (!gpio_is_valid(pdata->pwr_sys3v3_gpio)) {
 		printk(KERN_ERR "%s: pwr sys3v3 gpio not specified\n", __func__);
 		return -EINVAL;
 	}
-
+*/
 	pdata->pwr_sys1v8_gpio = of_get_named_gpio(np, "lt,pwr-sys1v8-gpio", 0);
 	if (!gpio_is_valid(pdata->pwr_sys1v8_gpio)) {
 		printk(KERN_ERR "%s: pwr sys1v8 gpio not specified\n", __func__);
@@ -875,67 +875,67 @@ static int lt9611_gpio_init(struct lt9611 *pdata)
 
 	ret = gpio_request(pdata->reset_gpio, "lt9611-reset-gpio");
 	if (!ret) {
-		printk(KERN_INFO "%s: reset gpio request success!\n", __func__);
+		printk(KERN_ERR "%s: reset gpio request success!\n", __func__);
 		gpio_direction_output(pdata->reset_gpio, 1);
 		msleep(10);
 	}
 
 	ret = gpio_request(pdata->irq_gpio, "lt9611-irq-gpio");
 	if (!ret) {
-		printk(KERN_INFO "%s: irq gpio request success!\n", __func__);
+		printk(KERN_ERR "%s: irq gpio request success!\n", __func__);
 		gpio_direction_input(pdata->irq_gpio);
 	}
-
+/*
 	ret = gpio_request(pdata->receiver_enable_gpio, "lt9611-receiver-enable-gpio");
 	if (!ret) {
-		printk(KERN_INFO "%s: receiver enable gpio request success!\n", __func__);
+		printk(KERN_ERR "%s: receiver enable gpio request success!\n", __func__);
 		gpio_direction_output(pdata->receiver_enable_gpio, 1);
 	}
 
 	ret = gpio_request(pdata->pwr_sys3v3_gpio, "lt9611-pwr-sys3v3-gpio");
 	if (!ret) {
-		printk(KERN_INFO "%s: pwr sys3v3 gpio request success!\n", __func__);
+		printk(KERN_ERR "%s: pwr sys3v3 gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_sys3v3_gpio, 1);
 	}
-
+*/
 	ret = gpio_request(pdata->pwr_sys5v0_gpio, "lt9611-pwr-sys5v0-gpio");
 	if (!ret) {
-		printk(KERN_INFO "%s: pwr sys5v0 gpio request success!\n", __func__);
+		printk(KERN_ERR "%s: pwr sys5v0 gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_sys5v0_gpio, 1);
 	}
 
 	ret = gpio_request(pdata->pwr_sys1v8_gpio, "lt9611-pwr-sys1v8-gpio");
 	if (!ret) {
-		printk(KERN_INFO "%s: pwr sys1v8 gpio request success!\n", __func__);
+		printk(KERN_ERR "%s: pwr sys1v8 gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_sys1v8_gpio, 1);
 		msleep(10);
 	}
-
+/*
 	ret = gpio_request(pdata->pwr_enable_gpio, "lt9611-pwr-enable-gpio");
 	if (!ret) {
-		printk(KERN_INFO "%s: pwr enable gpio request success!\n", __func__);
+		printk(KERN_ERR "%s: pwr enable gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_enable_gpio, 1);
 		msleep(10);
 	}
-
+*/
 	return ret;
 }
 
 static int lt9611_gpio_deinit(struct lt9611 *pdata)
 {
-	gpio_direction_output(pdata->receiver_enable_gpio, 0);
-	gpio_direction_output(pdata->pwr_enable_gpio, 0);
+//	gpio_direction_output(pdata->receiver_enable_gpio, 0);
+//	gpio_direction_output(pdata->pwr_enable_gpio, 0);
 	gpio_direction_output(pdata->pwr_sys5v0_gpio, 0);
-	gpio_direction_output(pdata->pwr_sys3v3_gpio, 0);
+//	gpio_direction_output(pdata->pwr_sys3v3_gpio, 0);
 	gpio_direction_output(pdata->pwr_sys1v8_gpio, 0);
 	gpio_direction_output(pdata->reset_gpio, 0);
 
 	gpio_free(pdata->reset_gpio);
 	gpio_free(pdata->irq_gpio);
-	gpio_free(pdata->receiver_enable_gpio);
-	gpio_free(pdata->pwr_enable_gpio);
+	//gpio_free(pdata->receiver_enable_gpio);
+//	gpio_free(pdata->pwr_enable_gpio);
 	gpio_free(pdata->pwr_sys5v0_gpio);
-	gpio_free(pdata->pwr_sys3v3_gpio);
+//	gpio_free(pdata->pwr_sys3v3_gpio);
 	gpio_free(pdata->pwr_sys1v8_gpio);
 
 	return 0;
