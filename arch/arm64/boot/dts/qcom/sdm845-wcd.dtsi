@@ -20,66 +20,66 @@
 
 			us_euro_sw_wcd_active: us_euro_sw_wcd_active {
 				mux {
-					pins = "gpio1";
+					pins = "gpio3";
 				};
 
 				config {
-					pins = "gpio1";
+					pins = "gpio3";
 					output-high;
 				};
 			};
 
 			us_euro_sw_wcd_sleep: us_euro_sw_wcd_sleep {
 				mux {
-					pins = "gpio1";
+					pins = "gpio3";
 				};
 
 				config {
-					pins = "gpio1";
+					pins = "gpio3";
 					output-low;
 				};
 			};
 
 			spkr_1_wcd_en_active: spkr_1_wcd_en_active {
 				mux {
-					pins = "gpio2";
+					pins = "gpio1";
 				};
 
 				config {
-					pins = "gpio2";
+					pins = "gpio1";
 					output-high;
 				};
 			};
 
 			spkr_1_wcd_en_sleep: spkr_1_wcd_en_sleep {
 				mux {
-					pins = "gpio2";
+					pins = "gpio1";
 				};
 
 				config {
-					pins = "gpio2";
+					pins = "gpio1";
 					input-enable;
 				};
 			};
 
 			spkr_2_wcd_en_active: spkr_2_sd_n_active {
 				mux {
-					pins = "gpio3";
+					pins = "gpio2";
 				};
 
 				config {
-					pins = "gpio3";
+					pins = "gpio2";
 					output-high;
 				};
 			};
 
 			spkr_2_wcd_en_sleep: spkr_2_sd_n_sleep {
 				mux {
-					pins = "gpio3";
+					pins = "gpio2";
 				};
 
 				config {
-					pins = "gpio3";
+					pins = "gpio2";
 					input-enable;
 				};
 			};
