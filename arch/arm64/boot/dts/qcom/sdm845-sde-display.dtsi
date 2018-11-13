@@ -32,6 +32,7 @@
 #include "dsi-panel-lt8912-1080p-video.dtsi"
 #include "dsi-panel-lt8912-dualmipi-1080p-video.dtsi"
 #include "dsi-panel-lt9611-1080p-video.dtsi"
+#include "dsi-panel-lt9611-4k-video.dtsi"
 #include <dt-bindings/clock/mdss-10nm-pll-clk.h>
 
 &soc {
@@ -585,6 +586,26 @@
 		vddio-supply = <&pm8998_l14>;
 	};
 
+	dsi_lt9611_4k_video_display: qcom,dsi-display@21 {
+		compatible = "qcom,dsi-display";
+		label = "dsi_lt9611_4k_video_display";
+		qcom,display-type = "primary";
+
+		qcom,dsi-ctrl = <&mdss_dsi0 &mdss_dsi1>;
+		qcom,dsi-phy = <&mdss_dsi_phy0 &mdss_dsi_phy1>;
+		clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
+			<&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+		clock-names = "src_byte_clk", "src_pixel_clk";
+
+		pinctrl-names = "panel_active", "panel_suspend";
+		pinctrl-0 = <&sde_dsi_active>;
+		pinctrl-1 = <&sde_dsi_suspend>;
+		qcom,platform-reset-gpio = <&tlmm 88 0>;
+
+		qcom,dsi-panel = <&dsi_lt9611_4k_video>;
+		vddio-supply = <&pm8998_l14>;
+	};
+
 	sde_wb: qcom,wb-display@0 {
 		compatible = "qcom,wb-display";
 		cell-index = <0>;
@@ -716,6 +737,20 @@
 			qcom,mdss-dsi-panel-phy-timings = [00 1e 08 07 24 22 08
 				08 05 03 04 00];
 			qcom,display-topology = <1 0 1>;
+			qcom,default-topology-index = <0>;
+		};
+	};
+};
+
+&dsi_lt9611_4k_video {
+	qcom,mdss-dsi-t-clk-post = <0x0d>;
+	qcom,mdss-dsi-t-clk-pre = <0x2f>;
+	qcom,mdss-dsi-display-timings {
+		timing@0{
+			qcom,mdss-dsi-panel-phy-timings = [00 1e 08 08 24 22 08
+				08 05 02 04 00];
+			qcom,mdss-dsi-panel-clockrate = <891000000>;
+			qcom,display-topology = <2 0 2>;
 			qcom,default-topology-index = <0>;
 		};
 	};
