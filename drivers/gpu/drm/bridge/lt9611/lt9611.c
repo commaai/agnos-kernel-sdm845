@@ -27,6 +27,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <video/lt9611.h>
+#include <linux/workqueue.h>
 
 #define CFG_HPD_INTERRUPTS	BIT(0)
 #define CFG_EDID_INTERRUPTS	BIT(1)
@@ -35,6 +36,7 @@
 
 #define EDID_SEG_SIZE	0x100
 #define AUDIO_DATA_SIZE	32
+#define DISPLAY_4K_VERTICAL_ACTIVE 0x870
 
 typedef enum {
 	MIPI_1LANE = 1,
@@ -99,15 +101,19 @@ struct lt9611 {
 	int receiver_enable_gpio;
 
 	u8 pcr_m;
-//just for debug now
 	u8 edid_buf[EDID_SEG_SIZE];
-//	u8 audio_spkr_data[AUDIO_DATA_SIZE];
+
+	bool IsDisplayOn ;
+	struct delayed_work on_work;
+
 
 };
 
 static struct lt9611 *this_lt9611 = NULL;
-#define LT9611_PATTERN_TEST	(1)
+#define LT9611_PATTERN_TEST	(0)
 static void LT9611_pattern(struct lt9611 *pdata);
+static int lt9611_i2s_init(struct lt9611 *pdata);
+
 
 static struct lt9611_video_cfg video_tab[] = {
 	{ 8,   96,  40,	640,  33, 2,  10, 480,	0, 0, 0,  25000	},//video_640x480_60Hz
@@ -130,7 +136,6 @@ static int i2c_write_byte(struct i2c_client *client, u8 addr, u8 reg, u8 val)
 		return -EINVAL;
 	}
 
-//	client->addr = addr;
 	msg.addr = addr;
 	msg.flags = 0;
 	msg.len = 2;
@@ -153,8 +158,6 @@ static int i2c_read(struct i2c_client *client, u8 addr, u8 reg, char *buf, u32 s
 		printk("%s: Invalid params\n", __func__);
 		return -EINVAL;
 	}
-
-//	client->addr = addr;
 
 	msg[0].addr = addr;
 	msg[0].flags = 0;
@@ -249,7 +252,7 @@ static int lt9611_mipi_input_analog(struct lt9611 *pdata)
 	lt9611_write(pdata, 0x08, 0x3f);   //20180420 PortB EQ
 	lt9611_write(pdata, 0x0a, 0xfe);   //port A ldo voltage set
 	lt9611_write(pdata, 0x0b, 0xbf);   //enable port A lprx
-	lt9611_write(pdata, 0x11, 0x20);   //port B rx current
+	lt9611_write(pdata, 0x11, 0x20);   //port B rx current 
 	lt9611_write(pdata, 0x12, 0x3f);   //20180420 PortB EQ
 	lt9611_write(pdata, 0x13, 0x3f);   //20180420 PortB EQ
 	lt9611_write(pdata, 0x15, 0xfe);   //port B ldo voltage set
@@ -272,13 +275,11 @@ static int lt9611_mipi_input_digital(struct lt9611 *pdata)
 	lt9611_write(pdata, 0xff, 0x82);
 	lt9611_write(pdata, 0x4f, 0x80);   //[7] = Select ad_txpll_d_clk.
 	lt9611_write(pdata, 0x50, 0x10);
-//	lt9611_write(pdata, 0x50, 0x14);   //signal port from portB
 
 	lt9611_write(pdata, 0xff, 0x83);
 	lt9611_write(pdata, 0x00, lanes);
 	lt9611_write(pdata, 0x02, 0x0a);    //settle
 
-//	lt9611_write(pdata, 0x03, 0x40);    //signal port from portB
 	lt9611_write(pdata, 0x06, 0x0a);    //settle
 	lt9611_write(pdata, 0x0a, ports);
 
@@ -369,8 +370,6 @@ static int lt9611_pll_setup(struct lt9611 *pdata)
 	lt9611_write(pdata, 0x25, 0x80); //pre-divider
 	lt9611_write(pdata, 0x26, 0x55);
 	lt9611_write(pdata, 0x2c, 0x37);
-//	lt9611_write(pdata, 0x2d, 0x99); //txpll_divx_set&da_txpll_freq_set
-//	lt9611_write(pdata, 0x2e, 0x01);
 	lt9611_write(pdata, 0x2f, 0x01);
 	lt9611_write(pdata, 0x26, 0x55);
 	lt9611_write(pdata, 0x27, 0x66);
@@ -458,7 +457,6 @@ static int lt9611_pcr_setup(struct lt9611 *pdata)
 
 	/* stage 1 */
 	lt9611_write(pdata, 0x21, 0x4a); //bit[3:0] step[11:8]
-	//lt9611_write(pdata, 0x22, 0x40);//step[7:0]
 
 	lt9611_write(pdata, 0x24, 0x31);        //bit[7:4]v/h/de mode; line for clk stb[11:8]
 	lt9611_write(pdata, 0x25, 0x30);        //line for clk stb[7:0]
@@ -875,45 +873,45 @@ static int lt9611_gpio_init(struct lt9611 *pdata)
 
 	ret = gpio_request(pdata->reset_gpio, "lt9611-reset-gpio");
 	if (!ret) {
-		printk(KERN_ERR "%s: reset gpio request success!\n", __func__);
+		printk(KERN_INFO "%s: reset gpio request success!\n", __func__);
 		gpio_direction_output(pdata->reset_gpio, 1);
 		msleep(10);
 	}
 
 	ret = gpio_request(pdata->irq_gpio, "lt9611-irq-gpio");
 	if (!ret) {
-		printk(KERN_ERR "%s: irq gpio request success!\n", __func__);
+		printk(KERN_INFO "%s: irq gpio request success!\n", __func__);
 		gpio_direction_input(pdata->irq_gpio);
 	}
 /*
 	ret = gpio_request(pdata->receiver_enable_gpio, "lt9611-receiver-enable-gpio");
 	if (!ret) {
-		printk(KERN_ERR "%s: receiver enable gpio request success!\n", __func__);
+		printk(KERN_INFO "%s: receiver enable gpio request success!\n", __func__);
 		gpio_direction_output(pdata->receiver_enable_gpio, 1);
 	}
 
 	ret = gpio_request(pdata->pwr_sys3v3_gpio, "lt9611-pwr-sys3v3-gpio");
 	if (!ret) {
-		printk(KERN_ERR "%s: pwr sys3v3 gpio request success!\n", __func__);
+		printk(KERN_INFO "%s: pwr sys3v3 gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_sys3v3_gpio, 1);
 	}
 */
 	ret = gpio_request(pdata->pwr_sys5v0_gpio, "lt9611-pwr-sys5v0-gpio");
 	if (!ret) {
-		printk(KERN_ERR "%s: pwr sys5v0 gpio request success!\n", __func__);
+		printk(KERN_INFO "%s: pwr sys5v0 gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_sys5v0_gpio, 1);
 	}
 
 	ret = gpio_request(pdata->pwr_sys1v8_gpio, "lt9611-pwr-sys1v8-gpio");
 	if (!ret) {
-		printk(KERN_ERR "%s: pwr sys1v8 gpio request success!\n", __func__);
+		printk(KERN_INFO "%s: pwr sys1v8 gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_sys1v8_gpio, 1);
 		msleep(10);
 	}
 /*
 	ret = gpio_request(pdata->pwr_enable_gpio, "lt9611-pwr-enable-gpio");
 	if (!ret) {
-		printk(KERN_ERR "%s: pwr enable gpio request success!\n", __func__);
+		printk(KERN_INFO "%s: pwr enable gpio request success!\n", __func__);
 		gpio_direction_output(pdata->pwr_enable_gpio, 1);
 		msleep(10);
 	}
@@ -927,7 +925,7 @@ static int lt9611_gpio_deinit(struct lt9611 *pdata)
 //	gpio_direction_output(pdata->pwr_enable_gpio, 0);
 	gpio_direction_output(pdata->pwr_sys5v0_gpio, 0);
 //	gpio_direction_output(pdata->pwr_sys3v3_gpio, 0);
-	gpio_direction_output(pdata->pwr_sys1v8_gpio, 0);
+//	gpio_direction_output(pdata->pwr_sys1v8_gpio, 0);
 	gpio_direction_output(pdata->reset_gpio, 0);
 
 	gpio_free(pdata->reset_gpio);
@@ -936,14 +934,16 @@ static int lt9611_gpio_deinit(struct lt9611 *pdata)
 //	gpio_free(pdata->pwr_enable_gpio);
 	gpio_free(pdata->pwr_sys5v0_gpio);
 //	gpio_free(pdata->pwr_sys3v3_gpio);
-	gpio_free(pdata->pwr_sys1v8_gpio);
+//	gpio_free(pdata->pwr_sys1v8_gpio);
 
 	return 0;
 }
 
 static irqreturn_t lt9611_interrupt_thread(int irq, void *dev_id)
 {
-#if 1
+
+
+#if 0
 	struct lt9611 *pdata = (struct lt9611*)dev_id;
 	u8 irq_flag0, irq_flag3;
 
@@ -986,7 +986,6 @@ static irqreturn_t lt9611_interrupt_thread(int irq, void *dev_id)
 
 static int lt9611_enable_interrupts(struct lt9611 *pdata, int interrupts)
 {
-#if 1
 	u8 reg_val, init_reg_val;
 
 	if (interrupts & CFG_VID_CHK_INTERRUPTS) {
@@ -1016,8 +1015,32 @@ static int lt9611_enable_interrupts(struct lt9611 *pdata, int interrupts)
 		lt9611_write(pdata, 0x07, 0xff); //clear
 		lt9611_write(pdata, 0x07, 0x3f);
 	}
-#endif
 	return 0;
+}
+
+static void lt9611_on_work_fn (struct work_struct *work)
+{
+	int ret ;
+
+	ret = lt9611_gpio_init(this_lt9611);
+	msleep(500);
+
+	lt9611_reset(this_lt9611);
+
+	ret = lt9611_read_device_rev(this_lt9611);
+	lt9611_system_init(this_lt9611);
+	lt9611_mipi_input_analog(this_lt9611);
+	lt9611_mipi_input_digital(this_lt9611);
+	lt9611_mipi_video_setup(this_lt9611);
+	lt9611_pll_setup(this_lt9611);
+	lt9611_pcr_setup(this_lt9611);
+	lt9611_pcr_start(this_lt9611);
+	lt9611_hdmi_tx_digital(this_lt9611);
+	lt9611_hdmi_tx_phy(this_lt9611);
+
+	mdelay(100);
+	lt9611_hdmi_output_enable(this_lt9611);
+	lt9611_i2s_init(this_lt9611);
 }
 
 static int lt9611_video_on(struct lt9611 *pdata)
@@ -1074,7 +1097,7 @@ static int lt9611_irq_init(struct lt9611 *pdata)
 		printk(KERN_ERR "%s: requset irq failed\n", __func__);
 	}
 
-//	lt9611_enable_interrupts(pdata, CFG_HPD_INTERRUPTS);
+	lt9611_enable_interrupts(pdata, CFG_HPD_INTERRUPTS);
 	return ret;
 }
 
@@ -1141,10 +1164,29 @@ static ssize_t lt9611_debug_store(struct device *dev,
 
 static DEVICE_ATTR(lt9611_debug, 0600, lt9611_debug_show, lt9611_debug_store);
 
+void lt9611_on(int index)
+{
+	if(!this_lt9611->IsDisplayOn)
+	{
+		schedule_delayed_work(&this_lt9611->on_work, msecs_to_jiffies(0));
+		this_lt9611->IsDisplayOn = true;
+	}
+}
+
+void lt9611_off(int index)
+{
+	if(this_lt9611->IsDisplayOn)
+	{
+		lt9611_gpio_deinit(this_lt9611);
+		this_lt9611->IsDisplayOn = false;
+	}
+}
+
 static int lt9611_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct lt9611 *pdata;
 	int ret = 0;
+	uint16_t pReferredTiming;
 
 	printk(KERN_ERR "%s: i2c addr = 0x%02x enter!\n", __func__, client->addr);
 	if (!client->dev.of_node) {
@@ -1174,9 +1216,10 @@ static int lt9611_probe(struct i2c_client *client, const struct i2c_device_id *i
 		goto err_dt_parse;
 	}
 
-	pdata->video_format_id = VIDEO_1920x1080_60HZ;
+	pdata->video_format_id = VIDEO_3840x2160_30HZ;
 	pdata->mipi_lane_counts = MIPI_4LANE;
-	pdata->mipi_port_counts = MIPI_1PORT;
+	pdata->mipi_port_counts = MIPI_2PORT;
+
 
 	lt9611_reset(pdata);
 
@@ -1193,7 +1236,21 @@ static int lt9611_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	lt9611_system_init(pdata);
 	lt9611_read_edid(pdata);
-//	lt9611_dump_edid(pdata);
+
+	pReferredTiming = pdata->edid_buf[0x3b] + ((pdata->edid_buf[0x3d] & 0xF0)<<4);
+	if(pReferredTiming == DISPLAY_4K_VERTICAL_ACTIVE)
+	{
+		pdata->video_format_id = VIDEO_3840x2160_30HZ;
+		pdata->mipi_port_counts = MIPI_2PORT;
+		printk(KERN_INFO "%s lt9611 preferred display 3840*2160\n",__func__);
+	}
+	else
+	{
+		pdata->video_format_id = VIDEO_1920x1080_60HZ;
+		pdata->mipi_port_counts = MIPI_1PORT;
+		 printk(KERN_INFO "%s lt9611 preferred display 1920*1080\n",__func__);
+	}
+	pdata->mipi_lane_counts = MIPI_4LANE;
 
 	lt9611_mipi_input_analog(pdata);
 	lt9611_mipi_input_digital(pdata);
@@ -1208,12 +1265,15 @@ static int lt9611_probe(struct i2c_client *client, const struct i2c_device_id *i
 	lt9611_hdmi_output_enable(pdata);
 	lt9611_i2s_init(pdata);
 
+	INIT_DELAYED_WORK(&pdata->on_work, lt9611_on_work_fn);
+
+	pdata->IsDisplayOn = true;
+
 	ret = device_create_file(&client->dev, &dev_attr_lt9611_debug);
 	if (ret) {
 		printk(KERN_ERR "%s: create debug sysfs fail!\n", __func__);
 		goto err_i2c_prog;
 	}
-
 	ret = lt9611_irq_init(pdata);
 	if (ret) {
 		goto err_irq;
@@ -1314,7 +1374,6 @@ static void LT9611_System_Init(struct lt9611 *pdata)
 	lt9611_write(pdata,0x1c,0x78);
 	lt9611_write(pdata,0xcb,0x69); //Timer 1
 	lt9611_write(pdata,0xcc,0x78);
-
 	/*power consumption for work*/
 	lt9611_write(pdata,0xff,0x80);
 	lt9611_write(pdata,0x04,0xf0);
@@ -1343,7 +1402,6 @@ static void LT9611_PLL(struct lt9611 *pdata, struct video_timing *video_format)
 	lt9611_write(pdata,0x26,0x55);
 	lt9611_write(pdata,0x27,0x66);
 	lt9611_write(pdata,0x28,0x88);
-
 	if(pclk > 150000) {
 		lt9611_write(pdata,0x2d,0x88);
 	} else if (pclk > 70000) {
@@ -1351,17 +1409,14 @@ static void LT9611_PLL(struct lt9611 *pdata, struct video_timing *video_format)
 	} else {
 		lt9611_write(pdata,0x2d,0xaa);
 	}
-
 	pclk = pclk / 2;
 	lt9611_write(pdata,0xff,0x82);
 	lt9611_write(pdata,0xe3,pclk / 65536);
 	pclk = pclk % 65536;
 	lt9611_write(pdata,0xe4,pclk / 256);
 	lt9611_write(pdata,0xe5,pclk % 256);
-
 	lt9611_write(pdata,0xde,0x20);
 	lt9611_write(pdata,0xde,0xe0);
-
 	lt9611_write(pdata,0xff,0x80);
 	lt9611_write(pdata,0x11,0x5a);
 	lt9611_write(pdata,0x11,0xfa);
@@ -1369,7 +1424,6 @@ static void LT9611_PLL(struct lt9611 *pdata, struct video_timing *video_format)
 	lt9611_write(pdata,0x18,0xfc);
 	lt9611_write(pdata,0x16,0xf1);
 	lt9611_write(pdata,0x16,0xf3);
-
 	/* pll lock status */
 	for(i = 0; i < 6 ; i++) {
 		lt9611_write(pdata,0xff,0x80);
@@ -1501,7 +1555,6 @@ static void LT9611_pattern(struct lt9611 *pdata)
 	//Video_Format = video_3840x2160_30Hz_vic;
 	//video = &video_3840x2160_30Hz;
 	//video = &video_1024x600_60Hz;
-
 	LT9611_System_Init(pdata);
 	LT9611_pattern_en(pdata);
 
@@ -1512,6 +1565,5 @@ static void LT9611_pattern(struct lt9611 *pdata)
 
 	LT9611_HDMI_TX_Digital(pdata);
 	LT9611_HDMI_TX_Phy(pdata);
-
 	LT9611_HDMI_Out_Enable(pdata);
 }
