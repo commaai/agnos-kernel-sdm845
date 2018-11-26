@@ -3490,6 +3490,36 @@
 			};
 		};
 
+/*for tof camera Begin*/
+		cam_tof_sensor_active: cam_tof_sensor_active {
+			/* RESET*/
+			mux {
+				pins = "gpio8";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio8";
+				bias-disable; /* No PULL */
+				drive-strength = <2>; /* 2 MA */
+			};
+		};
+
+		cam_tof_sensor_suspend: cam_tof_sensor_suspend {
+			/* RESET*/
+			mux {
+				pins = "gpio8";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio8";
+				bias-pull-down; /* PULL DOWN */
+				drive-strength = <2>; /* 2 MA */
+				output-low;
+			};
+		};
+/*for tof camera End*/
 
 		trigout_a: trigout_a {
 			mux {

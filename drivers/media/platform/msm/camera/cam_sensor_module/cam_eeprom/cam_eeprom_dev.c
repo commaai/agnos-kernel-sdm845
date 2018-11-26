@@ -465,6 +465,10 @@ static int32_t cam_eeprom_platform_driver_probe(
 
 	e_ctrl->cam_eeprom_state = CAM_EEPROM_INIT;
 
+	/*for tof camera Begin*/
+	tl_eeprom_create_node();
+	CAM_DBG(CAM_EEPROM,"wtrite file");
+	/*for tof camera End*/
 	return rc;
 free_soc:
 	kfree(soc_private);
@@ -570,6 +574,9 @@ static int __init cam_eeprom_driver_init(void)
 
 static void __exit cam_eeprom_driver_exit(void)
 {
+	/*for tof camera Begin*/
+	cam_eeprom_free_list_head(LIST_HEAD_ALL);
+	/*for tof camera End*/
 	platform_driver_unregister(&cam_eeprom_platform_driver);
 	spi_unregister_driver(&cam_eeprom_spi_driver);
 	i2c_del_driver(&cam_eeprom_i2c_driver);

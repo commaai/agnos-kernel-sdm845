@@ -13,6 +13,9 @@
 #define _CAM_EEPROM_CORE_H_
 
 #include "cam_eeprom_dev.h"
+/*for tof camera Begin*/
+#include "tl_dev_eeprom.h"
+/*for tof camera End*/
 
 int32_t cam_eeprom_driver_cmd(struct cam_eeprom_ctrl_t *e_ctrl, void *arg);
 int32_t cam_eeprom_parse_read_memory_map(struct device_node *of_node,
@@ -24,5 +27,33 @@ int32_t cam_eeprom_parse_read_memory_map(struct device_node *of_node,
  */
 void cam_eeprom_shutdown(struct cam_eeprom_ctrl_t *e_ctrl);
 
+/*for tof camera Begin*/
+/**
+ * @initial_settings: EEPROM data list_head
+ * @type: operation type
+ * @mode: sensor mode
+ *
+ * This API get EEPROM data list;
+ */
+int transmit_sensor_reg_setting_get(struct list_head *initial_settings,enum EEPROM_DATA_OP_T type,uint32_t mode);
+/**
+ * This API return EEPROM data list
+ */
+int transmit_sensor_reg_setting_ret(struct list_head *initial_settings,enum EEPROM_DATA_OP_T type,uint32_t mode);
+/**
+ * This API kfree list_head structure
+ */
+int cam_eeprom_free_list_head(enum cam_eeprom_free cmd);
+
+/**
+ * This API set whether support multi camera
+ */
+void set_whether_support_multi_camera(bool support_state);
+
+/**
+ * This API get camera state
+ */
+bool get_whether_support_multi_camera(void);
+/*for tof camera End*/
 #endif
 /* _CAM_EEPROM_CORE_H_ */

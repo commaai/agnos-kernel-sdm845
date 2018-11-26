@@ -17,6 +17,36 @@
 #include "cam_soc_util.h"
 #include "cam_trace.h"
 
+/*for tof camera Begin*/
+static bool is_tof_sensor;
+#define TOF_SENSOR_ID	(0x1EC)
+#define TOF_RESET_REG	(0xC022)
+#define TOF_GROUP_HOLD_REG	(0x0104)
+static void tof_sensor_check(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	uint16_t current_sensor_id = s_ctrl->sensordata->slave_info.sensor_id;
+
+	if(unlikely(current_sensor_id == TOF_SENSOR_ID))
+		is_tof_sensor = true;
+	else
+		is_tof_sensor = false;
+}
+
+static uint32_t op_mode = 0;
+
+int set_op_mode(uint16_t set_mode)
+{
+	if(set_mode > 1)
+		return -1;
+	op_mode = set_mode;
+	return 0;
+}
+
+uint32_t get_op_mode(void)
+{
+	return op_mode;
+}
+/*for tof camera End*/
 
 static void cam_sensor_update_req_mgr(
 	struct cam_sensor_ctrl_t *s_ctrl,
@@ -254,25 +284,46 @@ static int32_t cam_sensor_i2c_modes_util(
 	int32_t rc = 0;
 	uint32_t i, size;
 
+	/*for tof camera Begin*/
+	struct cam_sensor_i2c_reg_array *p_regarray;
+	p_regarray = i2c_list->i2c_settings.reg_setting;
+	/*for tof camera End*/
 	if (i2c_list->op_code == CAM_SENSOR_I2C_WRITE_RANDOM) {
-		rc = camera_io_dev_write(io_master_info,
-			&(i2c_list->i2c_settings));
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Failed to random write I2C settings: %d",
-				rc);
-			return rc;
+		/*for tof camera Begin*/
+		if(is_tof_sensor && (p_regarray->reg_addr == TOF_GROUP_HOLD_REG)) {
+ 			CAM_DBG(CAM_SENSOR, "write TOF_GROUP_HOLD_REG");
+			return 0;
 		}
+		/*for tof camera End*/
+			rc = camera_io_dev_write(io_master_info,
+				&(i2c_list->i2c_settings));
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"Failed to random write I2C settings: %d",
+					rc);
+				return rc;
+			}
 	} else if (i2c_list->op_code == CAM_SENSOR_I2C_WRITE_SEQ) {
 		rc = camera_io_dev_write_continuous(
 			io_master_info,
 			&(i2c_list->i2c_settings),
 			0);
+		/*for tof camera Begin*/
+		 if(is_tof_sensor && (p_regarray->reg_addr == TOF_RESET_REG)) {
+			 CAM_DBG(CAM_SENSOR, "write TOF_RSET_REG");
+		 }
+		 /*for tof camera End*/
 		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Failed to seq write I2C settings: %d",
-				rc);
-			return rc;
+			/*for tof camera Begin*/
+			if(is_tof_sensor && (p_regarray->reg_addr == TOF_RESET_REG)) {
+ 				CAM_DBG(CAM_SENSOR, "write TOF_RSET_REG, i2c will not ack.");
+				return 0;
+			}
+			/*for tof camera End*/
+				CAM_ERR(CAM_SENSOR,
+					"Failed to seq write I2C settings: %d",
+					rc);
+				return rc;
 		}
 	} else if (i2c_list->op_code == CAM_SENSOR_I2C_WRITE_BURST) {
 		rc = camera_io_dev_write_continuous(
@@ -579,6 +630,9 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 	}
 
 	mutex_lock(&(s_ctrl->cam_sensor_mutex));
+	/*for tof camera Begin*/
+	tof_sensor_check(s_ctrl);
+	/*for tof camera End*/
 	switch (cmd->op_code) {
 	case CAM_SENSOR_PROBE_CMD: {
 		if (s_ctrl->is_probe_succeed == 1) {
@@ -837,8 +891,9 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			CAM_ERR(CAM_SENSOR, "Failed CCI Config: %d", rc);
 			goto release_mutex;
 		}
-		if (s_ctrl->i2c_data.init_settings.is_settings_valid &&
-			(s_ctrl->i2c_data.init_settings.request_id == 0)) {
+		if (!is_tof_sensor &&  //for tof camera
+				 s_ctrl->i2c_data.init_settings.is_settings_valid &&
+				 (s_ctrl->i2c_data.init_settings.request_id == 0)) {
 
 			rc = cam_sensor_apply_settings(s_ctrl, 0,
 				CAM_SENSOR_PACKET_OPCODE_SENSOR_INITIAL_CONFIG);
@@ -858,6 +913,24 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 
 		if (s_ctrl->i2c_data.config_settings.is_settings_valid &&
 			(s_ctrl->i2c_data.config_settings.request_id == 0)) {
+			/*for tof camera Begin*/
+			if (is_tof_sensor) {
+			    rc = cam_sensor_apply_settings(s_ctrl, 0,
+				    CAM_SENSOR_PACKET_OPCODE_SENSOR_INITIAL_CONFIG);
+			    if (rc < 0) {
+				    CAM_ERR(CAM_SENSOR,
+					    "cannot apply init settings");
+				    goto release_mutex;
+			    }
+			    rc = delete_request(&s_ctrl->i2c_data.init_settings);
+			    if (rc < 0) {
+				     CAM_ERR(CAM_SENSOR,
+					    "Fail in deleting the Init settings");
+				     goto release_mutex;
+			    }
+			    s_ctrl->i2c_data.init_settings.request_id = -1;
+			}
+			/*for tof camera End*/
 			rc = cam_sensor_apply_settings(s_ctrl, 0,
 				CAM_SENSOR_PACKET_OPCODE_SENSOR_CONFIG);
 			if (rc < 0) {
@@ -1010,23 +1083,60 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 	uint64_t top = 0, del_req_id = 0;
 	struct i2c_settings_array *i2c_set = NULL;
 	struct i2c_settings_list *i2c_list;
+	/*for tof camera Begin*/
+	enum EEPROM_DATA_OP_T op_code = EEPROM_INIT_DATA;
 
+	CAM_INFO(CAM_SENSOR, "is_tof_sensor %d,  red_id=%d, opcode=%d",
+			is_tof_sensor, req_id, opcode);
+	/*for tof camera Begin*/
 	if (req_id == 0) {
 		switch (opcode) {
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMON: {
 			i2c_set = &s_ctrl->i2c_data.streamon_settings;
+			/*for tof camera Begin*/
+			if(is_tof_sensor) {
+				i2c_set->request_id = 0;
+				i2c_set->is_settings_valid = 1;
+				op_code = EEPROM_STREAMON_DATA;
+				transmit_sensor_reg_setting_get(&i2c_set->list_head,op_code,op_mode);
+			}
+			/*for tof camera End*/
 			break;
 		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_INITIAL_CONFIG: {
 			i2c_set = &s_ctrl->i2c_data.init_settings;
+			/*for tof camera Begin*/
+			if(is_tof_sensor) {
+				i2c_set->request_id = 0;
+				i2c_set->is_settings_valid = 1;
+				op_code = EEPROM_INIT_DATA;
+				transmit_sensor_reg_setting_get(&i2c_set->list_head,op_code,op_mode);
+			}
+			/*for tof camera End*/
 			break;
 		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_CONFIG: {
 			i2c_set = &s_ctrl->i2c_data.config_settings;
+			/*for tof camera Begin*/
+			if(is_tof_sensor) {
+				i2c_set->request_id = 0;
+				i2c_set->is_settings_valid = 1;
+				op_code = EEPROM_CONFIG_DATA;
+				transmit_sensor_reg_setting_get(&i2c_set->list_head,op_code,op_mode);
+			}
+			/*for tof camera End*/
 			break;
 		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMOFF: {
 			i2c_set = &s_ctrl->i2c_data.streamoff_settings;
+			/*for tof camera Begin*/
+			if(is_tof_sensor) {
+				i2c_set->request_id = 0;
+				i2c_set->is_settings_valid = 1;
+				op_code = EEPROM_STREAMOFF_DATA;
+				transmit_sensor_reg_setting_get(&i2c_set->list_head,op_code,op_mode);
+			}
+			/*for tof camera End*/
 			break;
 		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_UPDATE:
@@ -1048,6 +1158,15 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 				}
 			}
 		}
+		/*for tof camera Begin*/
+		if(is_tof_sensor &&
+				(opcode == CAM_SENSOR_PACKET_OPCODE_SENSOR_INITIAL_CONFIG ||
+				 opcode == CAM_SENSOR_PACKET_OPCODE_SENSOR_CONFIG ||
+				 opcode == CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMON ||
+				 opcode == CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMOFF)) {
+			transmit_sensor_reg_setting_ret(&i2c_set->list_head,op_code,op_mode);
+		}
+		/*for tof camera End*/
 	} else {
 		offset = req_id % MAX_PER_FRAME_ARRAY;
 		i2c_set = &(s_ctrl->i2c_data.per_frame[offset]);
