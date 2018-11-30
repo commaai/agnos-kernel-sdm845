@@ -465,10 +465,6 @@ static int32_t cam_eeprom_platform_driver_probe(
 
 	e_ctrl->cam_eeprom_state = CAM_EEPROM_INIT;
 
-	/*for tof camera Begin*/
-	tl_eeprom_create_node();
-	CAM_DBG(CAM_EEPROM,"wtrite file");
-	/*for tof camera End*/
 	return rc;
 free_soc:
 	kfree(soc_private);

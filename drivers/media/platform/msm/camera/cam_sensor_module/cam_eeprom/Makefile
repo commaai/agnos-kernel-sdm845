@@ -11,5 +11,5 @@ ccflags-y += -Idrivers/media/platform/msm/camera/cam_smmu/
 
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_eeprom_dev.o cam_eeprom_core.o cam_eeprom_soc.o
 #for tof camera Begin#
-obj-$(CONFIG_SPECTRA_CAMERA) += cam_eeprom_offload.o
+obj-$(CONFIG_SPECTRA_CAMERA) += cam_eeprom_offload.o cam_eeprom_toflist.o
 #for tof camera End#

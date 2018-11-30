@@ -654,7 +654,7 @@ static TL_E_RESULT cam_eeprom_format_calibration_mode_data_read(
     }
     for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->timing.read_size);i++){
 		p_eep->timing.read_size[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_READ_SIZE + i * 2);
+			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_READ_SIZE0 + i * 2);
     }
     for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->timing.roi);i++){
 		p_eep->timing.roi[i] =
@@ -773,7 +773,7 @@ static TL_E_RESULT tl_dev_eeprom_check_module_type(uint16_t mod_type)
 	  }
     return TL_E_SUCCESS;
 }
-/*
+#if 0
 void show(uint16_t *p_cmn,uint32_t pup_size)
 {
 	int i;
@@ -784,7 +784,7 @@ void show(uint16_t *p_cmn,uint32_t pup_size)
 		,TL_EEPROM_OFST_VAL(p_cmn,i * 2));
 	}
 }
-*/
+#endif
 tl_dev_eeprom_pup* cam_eeprom_module_offload(
 		struct cam_eeprom_ctrl_t *e_ctrl,
 		uint8_t *mapdata)
@@ -838,26 +838,27 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 		CAM_ERR(CAM_EEPROM,"failed. pup_size == 0U");
 		goto free_kz;
 	}
+	tof_eeprom->pup_size = pup_size/2;
 	//pup
-//	memcpy(tof_eeprom->pup_data,p_cmn
-//	+ TL_EEPROM_OFFSET(TL_EEPROM_PUP_TOP),pup_size);
-//	CAM_ERR(CAM_EEPROM,"pup_size = %#x",pup_size);
 /*
-	for(i = 0; i < pup_size;i++){
+	memcpy(tof_eeprom->pup_data,p_cmn
+	+ TL_EEPROM_OFFSET(TL_EEPROM_PUP_TOP),pup_size);
+*/
+/*
+	for(i = 0; i < pup_size/2;i++){
 	camera_io_dev_read(&(e_ctrl->io_master_info)
 			,TL_EEPROM_PUP_TOP + (i*2),&reg_val
 			,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
 		tof_eeprom->pup_data[i] = reg_val;
 	}
 */
-
-	for(i = 0; i < pup_size;i++){
+#if 1
+	for(i = 0; i < pup_size/2;i++){
 		tof_eeprom->pup_data[i]
 			= TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_PUP_TOP + i * 2);
 	}
-	//tof_eeprom->gpo_out_stby_value
-	//	= tof_eeprom->pup_data[pup_size - 1];
-//	show(p_cmn,pup_size);
+#endif
+	// show(p_cmn,pup_size);
  	 /* check CHECK_SUM value */
 	tl_ret = tl_dev_eeprom_calc_chksum(
 			p_cmn, tof_eeprom->pup_data, pup_size);

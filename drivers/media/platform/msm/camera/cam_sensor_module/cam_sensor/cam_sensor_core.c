@@ -28,7 +28,7 @@ static void tof_sensor_check(struct cam_sensor_ctrl_t *s_ctrl)
 
 	if(unlikely(current_sensor_id == TOF_SENSOR_ID))
 		is_tof_sensor = true;
-	else
+	else 
 		is_tof_sensor = false;
 }
 
@@ -1099,6 +1099,7 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 				i2c_set->is_settings_valid = 1;
 				op_code = EEPROM_STREAMON_DATA;
 				transmit_sensor_reg_setting_get(&i2c_set->list_head,op_code,op_mode);
+
 			}
 			/*for tof camera End*/
 			break;
@@ -1111,6 +1112,7 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 				i2c_set->is_settings_valid = 1;
 				op_code = EEPROM_INIT_DATA;
 				transmit_sensor_reg_setting_get(&i2c_set->list_head,op_code,op_mode);
+
 			}
 			/*for tof camera End*/
 			break;
@@ -1168,6 +1170,7 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 		}
 		/*for tof camera End*/
 	} else {
+
 		offset = req_id % MAX_PER_FRAME_ARRAY;
 		i2c_set = &(s_ctrl->i2c_data.per_frame[offset]);
 		if (i2c_set->is_settings_valid == 1 &&
