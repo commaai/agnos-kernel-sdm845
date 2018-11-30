@@ -1566,6 +1566,7 @@ static void mcp25xxfd_gpio_set(struct gpio_chip *chip, unsigned int offset,
 	struct mcp25xxfd_priv *priv = gpiochip_get_data(chip);
 	u32 mask = (offset) ? MCP25XXFD_IOCON_LAT1 : MCP25XXFD_IOCON_LAT0;
 
+	pr_err("mcp25xxfd_gpio_set MCP25XXFD_IOCON_LAT%s:%d ",(offset) ? 1:0,value);
 	/* only handle gpio 0/1 */
 	if (offset > 1)
 		return;
@@ -1621,6 +1622,7 @@ static int mcp25xxfd_gpio_direction_output(struct gpio_chip *chip,
 	u32 mask_stby = (offset) ?
 		0 : MCP25XXFD_IOCON_XSTBYEN;
 
+	pr_err("mcp25xxfd_gpio_set MCP25XXFD_IOCON_LAT%d:%d ",(offset) ? 1:0,value);
 	/* only handle gpio 0/1 */
 	if (offset > 1)
 		return -EINVAL;
@@ -3824,11 +3826,14 @@ static int mcp25xxfd_open(struct net_device *net)
 	struct spi_device *spi = priv->spi;
 	int ret;
 
+	//pr_err("mcp25xxfd_open start\n");
 	ret = open_candev(net);
 	if (ret) {
 		dev_err(&spi->dev, "unable to set initial baudrate!\n");
 		return ret;
 	}
+
+	mcp25xxfd_gpio_direction_output(&priv->gpio,0, 0);
 
 	mcp25xxfd_power_enable(priv->transceiver, 1);
 
@@ -3911,7 +3916,7 @@ static int mcp25xxfd_stop(struct net_device *net)
 	struct spi_device *spi = priv->spi;
 
 	close_candev(net);
-
+	mcp25xxfd_gpio_direction_output(&priv->gpio,0, 1);
 	kfree(priv->spi_transmit_fifos);
 	priv->spi_transmit_fifos = NULL;
 

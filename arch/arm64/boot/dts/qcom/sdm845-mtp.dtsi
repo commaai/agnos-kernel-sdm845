@@ -399,7 +399,7 @@
 		reg = <0>;
 		clocks = <&clk40M>;
 		interrupt-parent = <&tlmm>;
-		interrupts = <34 0>;
+		interrupts = <104 0>;
 		interrupt-names = "can_irq";
 		spi-max-frequency = <10000000>;
 		gpio-controller;

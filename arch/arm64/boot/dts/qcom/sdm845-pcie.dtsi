@@ -466,7 +466,7 @@
 			&pcie1_wake_default>;
 
 		perst-gpio = <&tlmm 102 0>;
-		wake-gpio = <&tlmm 104 0>;
+		/*wake-gpio = <&tlmm 104 0>;*/
 
 		gdsc-vdd-supply = <&pcie_1_gdsc>;
 		vreg-1.8-supply = <&pm8998_l26>;
