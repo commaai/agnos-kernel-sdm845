@@ -333,6 +333,7 @@
 		cell-index = <1>;
 		reg = <0x1>;
 		compatible = "qcom,eeprom";
+		TOF-eeprom = <1>;
 		/*if the regulator is NULL, camera probe would fail*/
 		cam_vio-supply = <&pm8998_lvs1>;
 		cam_clk-supply = <&titan_top_gdsc>;

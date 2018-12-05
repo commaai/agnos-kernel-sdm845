@@ -48,7 +48,7 @@ enum {
 #define TL_EEPROM_MODE_AREA_SIZE        (624U)
 
 /* size of Power-Up Sequence area(maximum) [byte]   */
-#define TL_EEPROM_PUP_AREA_MAX_SIZE     (7777U)
+#define TL_EEPROM_PUP_AREA_MAX_SIZE     (7618U)
 
 
 /* start address of common area */
@@ -184,7 +184,8 @@ enum {
 
 #define TL_EEPROM_RATE_ADJUST          (0x0180U)    /* rate adjust */
 #define TL_EEPROM_ALIGN                (0x0186U)    /* align */
-#define TL_EEPROM_READ_SIZE            (0x019CU)    /* read size */
+#define TL_EEPROM_READ_SIZE0           (0x019CU)    /* read size0 */
+#define TL_EEPROM_READ_SIZE3           (0x01A0U)    /* read size3 */
 #define TL_EEPROM_ROI                  (0x01AAU)    /* ROI */
 
 #define TL_EEPROM_GRID                 (0x01C0U)    /* grid conversion */

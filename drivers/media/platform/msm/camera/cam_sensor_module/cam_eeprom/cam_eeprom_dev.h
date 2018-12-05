@@ -28,7 +28,7 @@
 #include <cam_subdev.h>
 #include "cam_soc_util.h"
 /*for tof camera Begin*/
-#include "tl_dev_sensor_config.h"
+#include "tl_dev_eeprom_map.h"
 /*for tof camera End*/
 
 #define DEFINE_MSM_MUTEX(mutexname) \
@@ -39,6 +39,7 @@
 #define MSM_EEPROM_MEMORY_MAP_MAX_SIZE         80
 #define MSM_EEPROM_MAX_MEM_MAP_CNT             8
 #define MSM_EEPROM_MEM_MAP_PROPERTIES_CNT      8
+#define TL_MODE_MAX                          2
 
 enum cam_eeprom_state {
 	CAM_EEPROM_INIT,
@@ -313,10 +314,8 @@ struct cam_eeprom_config_exp_data {
 struct cam_eeprom_list_head {
 	struct list_head list_head_init;
 	int    initial;
-	struct list_head list_head_config[EEPROM_MODE_DATA_NUM];
-	int    resolution[EEPROM_MODE_DATA_NUM];
-	struct list_head list_head_config_other;
-	int    other;
+	struct list_head list_head_config[TL_MODE_MAX];
+	int    resolution[TL_MODE_MAX];
 	struct list_head list_head_streamon;
 	int streamon;
 	struct list_head list_head_streamoff;
@@ -328,7 +327,6 @@ enum cam_eeprom_free {
 	LIST_HEAD_ALL,
 	LIST_HEAD_INITIAL,
 	LIST_HEAD_RESOLUTION,
-	LIST_HEAD_OTHER,
 	LIST_HEAD_STREAMON,
 	LIST_HEAD_STREAMOFF,
 };
