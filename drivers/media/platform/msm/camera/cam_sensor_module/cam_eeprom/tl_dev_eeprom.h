@@ -16,6 +16,7 @@
 #include "cam_eeprom_dev.h"
 #include "cam_eeprom_core.h"
 #include "cam_sensor_core.h"
+#include "../cam_temperature/cam_temp_dev.h"
 /*--------------------------------------------------------------------
     definitions
 --------------------------------------------------------------------*/
@@ -302,13 +303,21 @@ typedef struct {
     tl_dev_rom_common   cmn;                /* common TOF device info */
     tl_dev_rom_mode     mode[TL_E_MODE_MAX];  /* data of each mode */
 } tl_dev_eeprom;
+
+typedef struct {
+	TL_E_MODE mode;
+	uint16_t ini_ofst_delay;
+	uint16_t idle_delay;
+}TL_ModeParam;
+
 /*------------------------*/
 /* ALL                    */
 /*------------------------*/
 /* EEPROM data for device control */
 typedef struct {
     tl_dev_eeprom                   eeprom;
-    uint16_t                        pup_data[TL_EEPROM_PUP_AREA_MAX_SIZE];          /* Power-Up Sequenece data */
+	 /* Power-Up Sequenece data */
+    uint16_t                        pup_data[TL_EEPROM_PUP_AREA_MAX_SIZE];
 	bool                            list_create;
     uint16_t                        pup_size;
 	uint16_t                        gpo_out_stby_value;
@@ -320,5 +329,6 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(struct cam_eeprom_ctrl_t *e_ctrl,ui
 int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *tof_eeprom);
 
 void tl_eeprom_create_node(void);
+void cam_eeprom_free_kobj(void);
 
 #endif /* H_TL_DEV_EEPROM */

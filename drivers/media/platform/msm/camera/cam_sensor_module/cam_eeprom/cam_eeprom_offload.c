@@ -1,13 +1,16 @@
 #include "tl_dev_eeprom.h"
+#include <linux/kobject.h>
 
-struct kobject *eeprom_kobj;
-tl_dev_eeprom_pup *tof_eeprom;
+struct kobject *eeprom_kobj = NULL;
+tl_dev_eeprom_pup *tof_eeprom = NULL;
 
 ssize_t eeprom_show(struct kobject *kobj,
 		struct kobj_attribute *attr,char *ubuf)
 {
-	memcpy(ubuf,&(tof_eeprom->eeprom),sizeof(tl_dev_eeprom));
-	return sizeof(tl_dev_eeprom);
+	uint16_t count;
+	count = sizeof(tl_dev_eeprom);
+	memcpy(ubuf,&(tof_eeprom->eeprom),count);
+	return count;
 }
 
 ssize_t mode_show(struct kobject *kobj,
@@ -15,21 +18,22 @@ ssize_t mode_show(struct kobject *kobj,
 {
 	uint32_t mode,count;
 	mode = get_op_mode();
+
 	if(mode < TL_E_MODE_MAX)
 	{
 		switch(mode){
 		case 0:
-			count = sizeof("mode near");
-			snprintf(ubuf,count,"%s","mode near");
+			count = sizeof("0");
+			snprintf(ubuf,count,"%d",mode);
 			break;
 		case 1:
-			count = sizeof("mode far");
-			snprintf(ubuf,count,"%s","mode far");
+			count = sizeof("1");
+			snprintf(ubuf,count,"%d",mode);
 			break;
 		default:
-			count = sizeof("mode error");
+			count = sizeof("error");
 			CAM_ERR(CAM_EEPROM,"error mode");
-			snprintf(ubuf,count,"%s","mode error");
+			snprintf(ubuf,count,"%s","error");
 			break;
 		}
 	} else {
@@ -45,6 +49,7 @@ ssize_t multi_show(struct kobject *kobj,
 {
 	uint32_t count;
 	bool multi_camera;
+
 	multi_camera = get_whether_support_multi_camera();
 	if(multi_camera == false)
 	{
@@ -61,31 +66,50 @@ ssize_t multi_show(struct kobject *kobj,
 ssize_t temperature_show(struct kobject *kobj,
 		struct kobj_attribute *attr,char *ubuf)
 {
-	CAM_ERR(CAM_EEPROM,"temperature show");
-	return sizeof(tl_dev_eeprom);
+	uint16_t temperature;
+	uint16_t count;
+
+	temperature = read_tof_temperature();
+	count = 8;
+	snprintf(ubuf,count,"%d.%d",temperature/100,temperature%100);
+	return count;
+}
+
+ssize_t temperature_store(struct kobject *kobj,
+		struct kobj_attribute *attr,const char *ubuf,size_t count)
+{
+	switch(*ubuf){
+	case 'n':
+	case 'N':
+		init_temperature_setting(0);
+		break;
+	case 'y':
+	case 'Y':
+		init_temperature_setting(1);
+		break;
+	default:
+		CAM_ERR(CAM_EEPROM,"nodeset mode error(correct value n/N y/Y)");
+		break;
+	}
+	read_tof_temperature();
+	return count;
 }
 
 ssize_t mode_store(struct kobject *kobj,
 		struct kobj_attribute *attr,const char *ubuf,size_t count)
 {
 	switch(*ubuf){
-	case 'n':
+	case '0':
 		set_op_mode(0);
 		break;
-	case 'N':
-		set_op_mode(0);
-		break;
-	case 'f':
-		set_op_mode(1);
-		break;
-	case 'F':
+	case '1':
 		set_op_mode(1);
 		break;
 	default:
 		CAM_ERR(CAM_EEPROM,"nodeset mode error(correct value n/N f/F)");
 		break;
 	}
-	return 1;
+	return count;
 }
 
 ssize_t multi_store(struct kobject *kobj,
@@ -94,17 +118,15 @@ ssize_t multi_store(struct kobject *kobj,
 	switch(*ubuf){
 	case '0':
 		set_whether_support_multi_camera(false);
-		CAM_ERR(CAM_EEPROM," set multi camera false");
 		break;
 	case '1':
 		set_whether_support_multi_camera(true);
-		CAM_ERR(CAM_EEPROM," set multi camera true");
 		break;
 	default:
 		CAM_ERR(CAM_EEPROM,"multi camera mode error(correct value 0/1)");
 		break;
 	}
-	return 1;
+	return count;
 }
 
 struct kobj_attribute eeprom_kobj_attr_eeprom_bin
@@ -112,7 +134,7 @@ struct kobj_attribute eeprom_kobj_attr_eeprom_bin
 struct kobj_attribute eeprom_kobj_attr_mode
 	= __ATTR(mode,0664,mode_show,mode_store);
 struct kobj_attribute eeprom_kobj_attr_temperature
-	= __ATTR(temperature,0664,temperature_show,NULL);
+	= __ATTR(temperature,0664,temperature_show,temperature_store);
 struct kobj_attribute eeprom_kobj_attr_multi_state
 	= __ATTR(multi_state,0664,multi_show,multi_store);
 
@@ -157,7 +179,13 @@ struct attribute_group eeprom_attr_grp[] = {
 
 void tl_eeprom_create_node(void) {
 	int ret,i;
-	eeprom_kobj = kobject_create_and_add("TOFeeprom",NULL);
+
+	if(eeprom_kobj){
+		CAM_ERR(CAM_EEPROM,"has been create file");
+		return;
+	}
+
+	eeprom_kobj = kobject_create_and_add("TOFsensor",NULL);
 	if(eeprom_kobj == NULL){
 		return;
 	}
@@ -178,6 +206,12 @@ static void cam_eeprom_format_data_cnv_u16_c(uint16_t *p_in16,
 		*(p_out8 + (i * 2U) + 1U) = (char)((tmp & 0x00FFU));
    }
 
+}
+
+void cam_eeprom_free_kobj(void)
+{
+	kobject_put(eeprom_kobj);
+	eeprom_kobj = NULL;
 }
 
 static void cam_eeprom_format_data_cnv_u16_i64(uint16_t *p_in16,
@@ -785,6 +819,53 @@ void show(uint16_t *p_cmn,uint32_t pup_size)
 	}
 }
 #endif
+
+static int cam_eeprom_tl_atoi(char *buf,int size)
+{
+	int num = 0;
+	int i = 0;
+	for(i = 0;i < size;i++){
+		if(buf[i] >= '0' && buf[i] <= '9'){
+			num = num*10 + (buf[i] - '0');
+		} else {
+			return num;
+		}
+	}
+	return num;
+}
+
+static int cam_eeprom_read_init_data_from_file(tl_dev_eeprom_pup *tof_eeprom,uint32_t pup_size)
+{
+	char *buf = NULL;
+	struct file *fp;
+	uint16_t data;
+ 	int i;
+	mm_segment_t fs;
+	loff_t pos;
+
+	fp = filp_open("/usr/bin/eeprommodule002",O_RDWR,0644);
+	if(IS_ERR(fp)){
+		CAM_ERR(CAM_EEPROM,"open file /usr/bin/eeprommodule002 error");
+		return -1;
+	}
+	fs = get_fs();
+	set_fs(KERNEL_DS);
+	pos = 0;
+	buf = kzalloc(sizeof(char) * 7,GFP_KERNEL);
+	if(buf == NULL)
+		return -1;
+	for(i = 0;i < pup_size/2;i++){
+		memset(buf,0,sizeof(char)*7);
+		vfs_read(fp,buf,sizeof(char) * 7,&pos);
+		data = cam_eeprom_tl_atoi(buf,7);
+		tof_eeprom->pup_data[i] = data;
+	}
+	filp_close(fp,NULL);
+	set_fs(fs);
+	kfree(buf);
+	return 0;
+}
+
 tl_dev_eeprom_pup* cam_eeprom_module_offload(
 		struct cam_eeprom_ctrl_t *e_ctrl,
 		uint8_t *mapdata)
@@ -798,6 +879,10 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 	if(e_ctrl->cal_data.num_data == 0){
 		CAM_ERR(CAM_EEPROM,"failed,OTP/EEPROM empty");
 		return NULL;
+	}
+	if(tof_eeprom){
+		kfree(tof_eeprom);
+		tof_eeprom = NULL;
 	}
 	tof_eeprom = kzalloc(sizeof(tl_dev_eeprom_pup),GFP_KERNEL);
 	if(tof_eeprom == NULL)
@@ -840,24 +925,12 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 	}
 	tof_eeprom->pup_size = pup_size/2;
 	//pup
-/*
+
 	memcpy(tof_eeprom->pup_data,p_cmn
 	+ TL_EEPROM_OFFSET(TL_EEPROM_PUP_TOP),pup_size);
-*/
-/*
-	for(i = 0; i < pup_size/2;i++){
-	camera_io_dev_read(&(e_ctrl->io_master_info)
-			,TL_EEPROM_PUP_TOP + (i*2),&reg_val
-			,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
-		tof_eeprom->pup_data[i] = reg_val;
-	}
-*/
-#if 1
-	for(i = 0; i < pup_size/2;i++){
-		tof_eeprom->pup_data[i]
-			= TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_PUP_TOP + i * 2);
-	}
-#endif
+
+	// read initial data from rom file if necessary
+	// cam_eeprom_read_init_data_from_file(tof_eeprom,pup_size);
 	// show(p_cmn,pup_size);
  	 /* check CHECK_SUM value */
 	tl_ret = tl_dev_eeprom_calc_chksum(
