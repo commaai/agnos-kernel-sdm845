@@ -34,6 +34,8 @@
 
 #define SYNC_LINK_SOF_CNT_MAX_LMT 1
 
+#define MAXIMUM_LINKS_PER_SESSION 4
+
 /**
  * enum crm_workq_task_type
  * @codes: to identify which type of task is present
