@@ -39,6 +39,9 @@
 #include <linux/usb.h>
 #include <linux/crc32.h>
 #include <linux/if_vlan.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
 #include <linux/usb/usbnet.h>
@@ -1433,11 +1436,62 @@ static int access_eeprom_mac(struct usbnet *dev, u8 *buf, u8 offset, int wflag)
 	return 0;
 }
 
+const   char* persist_mac_file = "/persist/lan_mac.bin";
+static char buf[] ="xxxxxxxxxxxx";
+static char buf1[24];
+
+ int hex2num(char c)
+ {
+	 if (c>='0' && c<='9') return c - '0';
+	 if (c>='a' && c<='z') return c - 'a' + 10;
+	 if (c>='A' && c<='Z') return c - 'A' + 10;
+
+	 return 0;
+ }
+
+ int str2mac(char * szMac, u8 * pMac)
+ {
+	 char * pTemp = szMac;
+	 int i;
+
+	 for (i = 0;i < 6;++i)
+	 {
+		 pMac[i] = hex2num(*pTemp++) * 16;
+		 pMac[i] += hex2num(*pTemp++);
+	 }
+	 return 0;
+ }
+
+ int  read_mac_addr(u8 *addr)
+ {
+	 struct file *fp;
+	 mm_segment_t fs;
+	 loff_t pos;
+	 //printk("mac_addr:");
+	 fp =filp_open(persist_mac_file,O_RDWR ,0644);
+	 if (IS_ERR(fp)){
+		 printk("open file error \n");
+		 return -1;
+	 }
+	 fs =get_fs();
+	 set_fs(KERNEL_DS);
+	 pos =0;
+	 vfs_read(fp,buf1, sizeof(buf), &pos);
+
+	 str2mac(buf1,addr);
+	 //printk("mac_addr:%s \n",addr);
+	 filp_close(fp,NULL);
+	 set_fs(fs);
+	 return 0;
+ }
+
 static int ax88179_check_ether_addr(struct usbnet *dev)
 {
 	unsigned char *tmp = (unsigned char*)dev->net->dev_addr;
 	u8 default_mac[6] = {0, 0x0e, 0xc6, 0x81, 0x79, 0x01};
 	u8 default_mac_178a[6] = {0, 0x0e, 0xc6, 0x81, 0x78, 0x01};
+
+	read_mac_addr(dev->net->dev_addr);
 
 	if (((*((u8*)tmp) == 0) && (*((u8*)tmp + 1) == 0) && (*((u8*)tmp + 2) == 0)) ||
 	    !is_valid_ether_addr((u8*)tmp) ||
