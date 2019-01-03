@@ -607,4 +607,15 @@ config USB_NET_CH9200
 	  To compile this driver as a module, choose M here: the
 	  module will be called ch9200.
 
+ config USB_NET_EM7565
+        tristate "Sierra Wireless EM7565 USB LTE module support"
+        depends on USB_USBNET
+        help
+          Choose this option if you have a USB LTE module with a
+          Sierra Wireless EM7565 chipset.
+
+          To compile this driver as a module, choose M here: the
+          module will be called em7565
+
+
 endif # USB_NET_DRIVERS
