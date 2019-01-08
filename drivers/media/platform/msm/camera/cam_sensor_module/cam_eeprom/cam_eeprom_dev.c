@@ -572,6 +572,8 @@ static void __exit cam_eeprom_driver_exit(void)
 {
 	/*for tof camera Begin*/
 	cam_eeprom_free_list_head(LIST_HEAD_ALL);
+	cam_eeprom_free_kobj();
+	CAM_ERR(CAM_EEPROM, "exit eeprom");
 	/*for tof camera End*/
 	platform_driver_unregister(&cam_eeprom_platform_driver);
 	spi_unregister_driver(&cam_eeprom_spi_driver);

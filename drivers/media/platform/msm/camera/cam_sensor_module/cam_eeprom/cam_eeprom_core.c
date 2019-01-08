@@ -704,6 +704,7 @@ static int32_t cam_eeprom_pkt_parse(struct cam_eeprom_ctrl_t *e_ctrl, void *arg)
 	struct cam_packet              *csl_packet = NULL;
 	/*for tof camera Begin*/
 	tl_dev_eeprom_pup			   *tof_eeprom_ctrl = NULL;
+	int                            ret = 0;
 	/*for tof camera End*/
 	struct cam_eeprom_soc_private  *soc_private =
 		(struct cam_eeprom_soc_private *)e_ctrl->soc_info.soc_private;
@@ -772,24 +773,24 @@ static int32_t cam_eeprom_pkt_parse(struct cam_eeprom_ctrl_t *e_ctrl, void *arg)
 		}
 
 		e_ctrl->cam_eeprom_state = CAM_EEPROM_CONFIG;
-		CAM_ERR(CAM_EEPROM,"begin read mem");
 		rc = cam_eeprom_read_memory(e_ctrl, &e_ctrl->cal_data);
 		if (rc) {
 			CAM_ERR(CAM_EEPROM,
 				"read_eeprom_memory failed");
 			goto power_down;
 		}
-		CAM_ERR(CAM_EEPROM,"end read mem");
 		/*for tof camera Begin*/
-		CAM_ERR(CAM_EEPROM,"begin offload");
 		if(if_tof_sensor_check(e_ctrl)){
-			tof_eeprom_ctrl = cam_eeprom_module_offload(e_ctrl,e_ctrl->cal_data.mapdata);
+			CAM_INFO(CAM_EEPROM,"is tof sensor");
+			tof_eeprom_ctrl
+				= cam_eeprom_module_offload(e_ctrl,e_ctrl->cal_data.mapdata);
 			if(tof_eeprom_ctrl != NULL){
-				cam_eeprom_create_list(e_ctrl,tof_eeprom_ctrl);
-//				tl_eeprom_create_node();
-				}
+				ret = cam_eeprom_create_list(e_ctrl,tof_eeprom_ctrl);
+				if(ret == 0){
+					tl_eeprom_create_node();
+					}
+			}
 		}
-		CAM_INFO(CAM_EEPROM,"end offload");
 		/*for tof camera End*/
 
 		rc = cam_eeprom_get_cal_data(e_ctrl, csl_packet);
@@ -869,7 +870,6 @@ void cam_eeprom_shutdown(struct cam_eeprom_ctrl_t *e_ctrl)
 int32_t cam_eeprom_driver_cmd(struct cam_eeprom_ctrl_t *e_ctrl, void *arg)
 {
 	int                            rc = 0;
-	int                            ret = 0;
 	struct cam_eeprom_query_cap_t  eeprom_cap = {0};
 	struct cam_control            *cmd = (struct cam_control *)arg;
 

@@ -277,7 +277,7 @@ static int32_t cam_sensor_i2c_pkt_parse(struct cam_sensor_ctrl_t *s_ctrl,
 	return rc;
 }
 
-static int32_t cam_sensor_i2c_modes_util(
+int32_t cam_sensor_i2c_modes_util(
 	struct camera_io_master *io_master_info,
 	struct i2c_settings_list *i2c_list)
 {

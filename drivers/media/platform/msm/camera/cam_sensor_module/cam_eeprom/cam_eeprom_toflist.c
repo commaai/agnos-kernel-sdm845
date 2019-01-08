@@ -18,6 +18,7 @@ int transmit_sensor_reg_setting_get(struct list_head *reg_settings
 		,enum EEPROM_DATA_OP_T type
 		,uint32_t mode)
 {
+//	CAM_INFO(CAM_EEPROM,"get EEPROM data");
 	if(mode < TL_E_MODE_MAX)
 	{
 		if(type == EEPROM_INIT_DATA &&
@@ -638,16 +639,40 @@ static int read_eeprom_config_reg_addr(struct cam_eeprom_ctrl_t *e_ctrl
 	return 0;
 }
 
+
+static TL_ModeParam * cam_eeprom_tl_mode_param(uint32_t mode,
+		uint16_t vd_ini_ofst_adr_num,uint16_t vd_ini_ofst,uint16_t idle_num,uint16_t idle)
+{
+	TL_ModeParam *modeparam = NULL;
+
+	modeparam = (TL_ModeParam *)kzalloc(sizeof(TL_ModeParam),GFP_KERNEL);
+	if(modeparam == NULL)
+		return NULL;
+	modeparam->mode = mode;
+	if(vd_ini_ofst_adr_num == 0)
+		modeparam->ini_ofst_delay = 0;
+	else
+		modeparam->ini_ofst_delay = vd_ini_ofst;
+	if(idle_num == 0)
+		modeparam->idle_delay = 0;
+	else
+		modeparam->idle_delay = idle;
+
+	return modeparam;
+}
+
 static int read_eeprom_config_reg_data(struct cam_eeprom_ctrl_t *e_ctrl
 		,struct cam_eeprom_exp_reg_data *reg_data_array
 		,uint32_t mode)
 {
-	uint32_t addr_temp,i,reg_val,clk;
+	uint32_t addr_temp,i,reg_val,clk,afe_val;
 	uint32_t pls_num = 0;
 	int32_t tmp,dmy_hd,exp_hd,hd;
 	struct cam_eeprom_config_exp_data prm;
 	uint32_t eeprom_mode_addr;
-	uint32_t IdlePeri;
+	uint16_t IdlePeri,idle_delay,idle_num,ini_ofst_delay;
+	int dummy;
+	TL_ModeParam *mode_param = NULL;
 
 	eeprom_mode_addr
 		= TL_EEPROM_MODE_TOP(mode);
@@ -731,32 +756,28 @@ static int read_eeprom_config_reg_data(struct cam_eeprom_ctrl_t *e_ctrl
 	camera_io_dev_read(&(e_ctrl->io_master_info)
 			,eeprom_mode_addr+TL_EEPROM_IDLE_PERI_NUM,&reg_val
 			,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
-	prm.idle = reg_val;
-	if(prm.idle > 4){
+	idle_num = reg_val;
+	if(reg_val > 4){
 		return -1;
 	}
-	for(i = 0;i < prm.idle;i++){
+	if(reg_val == 0){
+		IdlePeri = 0;
+	} else {
 		camera_io_dev_read(&(e_ctrl->io_master_info)
-				,eeprom_mode_addr+TL_EEPROM_IDLE_PERI_ADR1+i*2,
+				,eeprom_mode_addr+TL_EEPROM_IDLE_PERI_ADR1,
 				&reg_val
 				,CAMERA_SENSOR_I2C_TYPE_WORD
 				,CAMERA_SENSOR_I2C_TYPE_WORD);
 		if(reg_val == 0){
-			prm.idle = reg_val;
-		} else {
-			prm.Idle[i] = reg_val;
-		}
-	}
-	if(prm.idle == 0)
-		IdlePeri = 0;
-	else{
-		camera_io_dev_read(&(e_ctrl->io_master_info)
-				,prm.Idle[0],&reg_val
-				,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
-		if(reg_val == 0)
 			IdlePeri = 0;
-		else
-		IdlePeri = reg_val + 2;
+		} else {
+		camera_io_dev_read(&(e_ctrl->io_master_info)
+				,reg_val,
+				&afe_val
+				,CAMERA_SENSOR_I2C_TYPE_WORD
+				,CAMERA_SENSOR_I2C_TYPE_WORD);
+			IdlePeri = afe_val + 2;
+		}
 	}
 
 	tmp = pls_num*prm.exp_val/40;
@@ -786,23 +807,45 @@ static int read_eeprom_config_reg_data(struct cam_eeprom_ctrl_t *e_ctrl
 		reg_data_array->ccd_dummy_data = dmy_hd-IdlePeri;
 		reg_data_array->start_v_data = exp_hd+TL_AFE_START_V_OFFSET;
 		reg_data_array->vd_length_data = prm.vd_duration-2;
+		addr_temp = prm.vd_ini_ofst;
 	} else {
-		prm.idle = (prm.idle == 0)?0:(prm.idle - 2U);
+		mode_param = cam_eeprom_tl_mode_param(mode,
+				prm.vd_ini_ofst_adr_num,
+				prm.vd_ini_ofst,idle_num,
+				prm.idle);
+
+		idle_delay = mode_param->idle_delay;
+		ini_ofst_delay = mode_param->ini_ofst_delay;
+
+		prm.idle = (idle_delay == 0)?0:(idle_delay - 2U);
 		reg_data_array->read_size2_data
-			= prm.vd_ini_ofst + exp_hd + TL_AFE_READ_SIZE_OFFSET + prm.idle;
-		reg_data_array->ccd_dummy_data = prm.vd_duration + dmy_hd - prm.idle;
+			= prm.vd_ini_ofst + exp_hd + TL_AFE_READ_SIZE_OFFSET + idle_delay;
+		reg_data_array->ccd_dummy_data = prm.vd_duration + dmy_hd - idle_delay;
 		reg_data_array->start_v_data = exp_hd + TL_AFE_START_V_OFFSET;
 		reg_data_array->vd_length_data = (prm.vd_duration * 2) - 2;
+		addr_temp = ini_ofst_delay;
+		dummy = prm.vd_duration - exp_hd + exp_hd +
+			TL_AFE_READ_SIZE_OFFSET - ini_ofst_delay - idle_delay;
+		CAM_ERR(CAM_EEPROM,"dummy = %d",dummy);
 	}
 	camera_io_dev_read(&(e_ctrl->io_master_info)
 			,eeprom_mode_addr+TL_EEPROM_VD_INI_OFST_ADR_NUM,&reg_val
 			,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
 	prm.vd_ini_ofst_adr_num = reg_val;
+#if 0
 	if((prm.vd_ini_ofst >= 2) && prm.vd_ini_ofst_adr_num > 0){
 		addr_temp = prm.vd_ini_ofst - 1;
 		reg_data_array->vd_ini_ofst_data = addr_temp;
 	}
-
+#endif
+	if(prm.vd_ini_ofst_adr_num > 0){
+		if(addr_temp >= 2){
+			addr_temp = addr_temp -1;
+			reg_data_array->vd_ini_ofst_data = addr_temp;
+		} else {
+			reg_data_array->vd_ini_ofst_data = 0;
+		}
+	}
 	return 0;
 }
 
@@ -1251,7 +1294,7 @@ static int cam_eeprom_list_mode_data_offload(
 	camera_io_dev_read(&(e_ctrl->io_master_info)
 			,TL_EEPROM_TAL_MODE,&tal
 			,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
-	if(tal == 0U){
+	if(tal != 0U){
 		i2c_list = list_node_create(
 				&cam_eeprom_list_head.list_head_config[mode],2);
 		if(i2c_list == NULL)
@@ -1599,7 +1642,7 @@ static int cam_eeprom_list_stream_off(struct cam_eeprom_ctrl_t *e_ctrl,
 
 int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *tof_eeprom)
 {
-	int i,ret,rc = 0;
+	int i,ret;
 //init data list
 	if(cam_eeprom_list_head.initial != 1) {
 		ret = cam_eeprom_list_init_setting_data(tof_eeprom);
@@ -1610,6 +1653,8 @@ int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *t
 			return -1;
 		}
 		CAM_INFO(CAM_EEPROM,"create tof camera initial list success");
+	} else {
+		return -1;
 	}
 	for(i = 0;i < TL_E_MODE_MAX; i++){
 //common data list
@@ -1631,6 +1676,8 @@ int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *t
 				return -1;
 			}
 			CAM_INFO(CAM_EEPROM,"create tof camera mode[%d] list success",i);
+		} else {
+			return -1;
 		}
 	}
 	if(cam_eeprom_list_head.streamon != 1) {
@@ -1643,6 +1690,8 @@ int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *t
 			return -1;
 		}
 			CAM_INFO(CAM_EEPROM,"create tof camera stream on list success");
+	} else {
+		return -1;
 	}
 	if(cam_eeprom_list_head.streamoff != 1) {
 		ret = cam_eeprom_list_stream_off(e_ctrl,
@@ -1655,7 +1704,9 @@ int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *t
 			return -1;
 		}
 		CAM_INFO(CAM_EEPROM,"create tof camera stream off list success");
+	} else {
+		return -1;
 	}
-	return rc;
+	return 0;
 }
 /*for tof camera End*/

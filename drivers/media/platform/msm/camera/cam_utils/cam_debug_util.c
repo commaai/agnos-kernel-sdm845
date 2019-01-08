@@ -86,6 +86,9 @@ const char *cam_get_module_name(unsigned int module_id)
 	case CAM_OIS:
 		name = "CAM-OIS";
 		break;
+	case CAM_TEMPERATURE:
+		name = "CAM-TEMPERATURE";
+		break;
 	default:
 		name = "CAM";
 		break;
