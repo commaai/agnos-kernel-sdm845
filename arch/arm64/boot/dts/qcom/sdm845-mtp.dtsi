@@ -460,6 +460,33 @@
 	status = "ok";
 };
 
+&qupv3_se2_spi {
+	status = "ok";
+	invensense_icm@0 {
+		compatible = "invensense,icm42600";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <10 0>;
+		interrupt-names = "inv_irq";
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <0>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		invenux_type = "none";
+		inven,read_only_slave_type = "none";
+		//pinctrl-names = "inv_active","inv_suspend";
+		//pinctrl-0 = <&inv_int_active>;
+		//pinctrl-1 = <&inv_int_suspend>;
+		status= "ok";
+	};
+
+
+};
+
 &usb1 {
 	status = "okay";
 	extcon = <&extcon_usb1>;
@@ -700,7 +727,7 @@
 		lt,video-format-id = <4>;
 		lt,mipi-lanes-type = <0>;//4 lane
 		lt,mipi-ports-type = <0>;//single port
-	
+
 	};
 };
 
