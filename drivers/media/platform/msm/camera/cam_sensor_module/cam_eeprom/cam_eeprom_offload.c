@@ -196,6 +196,11 @@ void tl_eeprom_create_node(void) {
 	}
 }
 
+struct kobject * check_kobj(void)
+{
+	return eeprom_kobj;
+}
+
 static void cam_eeprom_format_data_cnv_u16_c(uint16_t *p_in16,
 		char *p_out8, uint16_t u16_num)
 {
@@ -766,9 +771,9 @@ static TL_E_RESULT cam_eeprom_format_calibration_mode_data_read(
 
 	tof_eeprom->control_value = p_eep->pls_mod.control;
 
-    memcpy((void*)p_eep->pls_mod.val,
-			(void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_PLS_MOD_VAL)),
-			TL_EEPROM_ARY_SIZE(p_eep->pls_mod.val) * sizeof(uint16_t));
+   // memcpy((void*)p_eep->pls_mod.val,
+	//		(void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_PLS_MOD_VAL)),
+	//		TL_EEPROM_ARY_SIZE(p_eep->pls_mod.val) * sizeof(uint16_t));
     for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->pls_mod.val);i++){
 		p_eep->pls_mod.val[i]
 			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_PLS_MOD_VAL + i * 2);
@@ -868,32 +873,58 @@ static int cam_eeprom_read_init_data_from_file(tl_dev_eeprom_pup *tof_eeprom,uin
 
 tl_dev_eeprom_pup* cam_eeprom_module_offload(
 		struct cam_eeprom_ctrl_t *e_ctrl,
-		uint8_t *mapdata)
+		uint8_t *mapdata,int cmd)
 {
-	uint32_t e_size,tmp_vc,pup_size;//,reg_val;
-	int      i;
+	uint32_t e_size,tmp_vc,pup_size,idle_size;
+	int      i,j;
 	uint16_t *p_cmn = (uint16_t *)mapdata;
+	uint16_t *p_init = (uint16_t *)mapdata;
 	tl_dev_rom_common *p_eep = NULL;
 	TL_E_RESULT tl_ret = TL_E_SUCCESS;
 
+
+	if(cmd == 0){
+		tof_eeprom = kzalloc(sizeof(tl_dev_eeprom_pup),GFP_KERNEL);
+		if(tof_eeprom == NULL)
+			return NULL;
+
+		e_size = e_ctrl->cal_data.num_data/2;
+
+		for(i = 0; i <(int)e_size; i++){
+			*(p_cmn + i)
+				= (uint16_t)((uint16_t)(*(p_cmn + i) & 0x00FFU) << 8U)
+				| ((uint16_t)(*(p_cmn + i) & 0xFF00U) >> 8U);
+			tof_eeprom->p_cmn_mode[i] = *(p_cmn + i);
+		}
+#if 0
+		tof_eeprom->afe_reg.revision_addr = 0xC0FFU;
+		for(j = 0;j < TL_E_MODE_MAX;j++){
+			idle_size = TL_EEPROM_OFST_VAL(p_cmn+TL_EEPROM_MODE_TOP(j),TL_EEPROM_IDLE_PERI_NUM);
+			for(i = 0;i < idle_size;i++){
+				tof_eeprom->afe_reg.idle_reg[j].addr[i]
+					= TL_EEPROM_OFST_VAL(p_cmn+TL_EEPROM_MODE_TOP(j),TL_EEPROM_IDLE_PERI_ADR1 + i * 2);
+			}
+			tof_eeprom->afe_reg.idle_reg[j].size = idle_size;
+		}
+#endif
+		return NULL;
+	}
+
+	if(cmd == 1){
+		p_cmn = &tof_eeprom->p_cmn_mode[0];
+	}
 	if(e_ctrl->cal_data.num_data == 0){
 		CAM_ERR(CAM_EEPROM,"failed,OTP/EEPROM empty");
 		return NULL;
 	}
-	if(tof_eeprom){
-		kfree(tof_eeprom);
-		tof_eeprom = NULL;
-	}
-	tof_eeprom = kzalloc(sizeof(tl_dev_eeprom_pup),GFP_KERNEL);
-	if(tof_eeprom == NULL)
-		return NULL;
+
 	p_eep = &(tof_eeprom->eeprom.cmn);
 	e_size = e_ctrl->cal_data.num_data/2;
 
 	for(i = 0; i <(int)e_size; i++){
-		*(p_cmn + i)
-			= (uint16_t)((uint16_t)(*(p_cmn + i) & 0x00FFU) << 8U)
-			| ((uint16_t)(*(p_cmn + i) & 0xFF00U) >> 8U);
+		*(p_init + i)
+			= (uint16_t)((uint16_t)(*(p_init + i) & 0x00FFU) << 8U)
+			| ((uint16_t)(*(p_init + i) & 0xFF00U) >> 8U);
 	}
 	//check version
 	tl_ret = tl_dev_eeprom_check_map_version(
@@ -901,7 +932,7 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 	if(tl_ret != TL_E_SUCCESS){
 		CAM_ERR(CAM_EEPROM,"failed check map version = %#x",
 				(TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_MAP_VER)));
-//		goto free_kz;
+		goto free_kz;
 	}
 	//check module type
 	tl_ret = tl_dev_eeprom_check_module_type(
@@ -926,8 +957,7 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 	tof_eeprom->pup_size = pup_size/2;
 	//pup
 
-	memcpy(tof_eeprom->pup_data,p_cmn
-	+ TL_EEPROM_OFFSET(TL_EEPROM_PUP_TOP),pup_size);
+	memcpy(tof_eeprom->pup_data,p_init,pup_size);
 
 	// read initial data from rom file if necessary
 	// cam_eeprom_read_init_data_from_file(tof_eeprom,pup_size);
@@ -953,9 +983,9 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
   	 }
 	}
 	for(i = 0; i <(int)e_size; i++){
-		*(p_cmn + i)
-			= (uint16_t)((uint16_t)(*(p_cmn + i) & 0x00FFU) << 8U)
-			| ((uint16_t)(*(p_cmn + i) & 0xFF00U) >> 8U);
+		*(p_init + i)
+			= (uint16_t)((uint16_t)(*(p_init + i) & 0x00FFU) << 8U)
+			| ((uint16_t)(*(p_init + i) & 0xFF00U) >> 8U);
 	}
 
 	return tof_eeprom;

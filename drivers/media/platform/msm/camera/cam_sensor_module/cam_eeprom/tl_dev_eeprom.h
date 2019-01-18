@@ -217,6 +217,7 @@ typedef struct {
     uint16_t    tof_seq_ini_ofst;   /* Offset from the positive edge of HD to the start of exposure */
 	uint16_t    idle_peri_num;      /* Number of idle*/
 	uint16_t    idle_peri_adr[4];   /* Each addr of idle*/
+    uint16_t    afe_idle_val[4];
 } tl_dev_rom_exp_prm;
 
 /* mode : nonlinear correction */
@@ -316,6 +317,7 @@ typedef struct {
 /* EEPROM data for device control */
 typedef struct {
     tl_dev_eeprom                   eeprom;
+	uint16_t                        p_cmn_mode[TL_EEPROM_CMN_AREA_MAX_SIZE];
 	 /* Power-Up Sequenece data */
     uint16_t                        pup_data[TL_EEPROM_PUP_AREA_MAX_SIZE];
 	bool                            list_create;
@@ -324,11 +326,12 @@ typedef struct {
     uint16_t                        control_value;
 } tl_dev_eeprom_pup;
 
-tl_dev_eeprom_pup* cam_eeprom_module_offload(struct cam_eeprom_ctrl_t *e_ctrl,uint8_t *mapdata);
+tl_dev_eeprom_pup* cam_eeprom_module_offload(struct cam_eeprom_ctrl_t *e_ctrl,uint8_t *mapdata,int cmd);
 
 int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *tof_eeprom);
 
 void tl_eeprom_create_node(void);
 void cam_eeprom_free_kobj(void);
+struct kobject * check_kobj(void);
 
 #endif /* H_TL_DEV_EEPROM */

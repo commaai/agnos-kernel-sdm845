@@ -465,6 +465,10 @@ static int32_t cam_eeprom_platform_driver_probe(
 
 	e_ctrl->cam_eeprom_state = CAM_EEPROM_INIT;
 
+	if(if_tof_sensor_check(e_ctrl)){
+		cam_eeprom_parse_read_memory_map(e_ctrl->soc_info.dev->of_node,e_ctrl);
+		e_ctrl->userspace_probe = true;
+	}
 	return rc;
 free_soc:
 	kfree(soc_private);

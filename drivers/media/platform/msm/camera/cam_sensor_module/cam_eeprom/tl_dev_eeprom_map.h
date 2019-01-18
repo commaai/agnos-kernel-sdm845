@@ -48,7 +48,9 @@ enum {
 #define TL_EEPROM_MODE_AREA_SIZE        (624U)
 
 /* size of Power-Up Sequence area(maximum) [byte]   */
-#define TL_EEPROM_PUP_AREA_MAX_SIZE     (7618U)
+#define TL_EEPROM_PUP_AREA_MAX_SIZE     (4041U)
+#define TL_EEPROM_CMN_AREA_MAX_SIZE     (1080U)
+#define TL_EEPROM_AFE_ADDR_MAX_SIZE     (5U)
 
 
 /* start address of common area */

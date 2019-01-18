@@ -139,11 +139,16 @@ int cam_eeprom_spi_parse_of(struct cam_sensor_spi_client *spi_dev)
 int cam_eeprom_parse_dt_memory_map(struct device_node *node,
 	struct cam_eeprom_memory_block_t *data)
 {
-	int       i, rc = 0;
+	int       i, tof,rc = 0;
 	char      property[PROPERTY_MAXSIZE];
 	uint32_t  count = MSM_EEPROM_MEM_MAP_PROPERTIES_CNT;
 	struct    cam_eeprom_memory_map_t *map;
 
+	rc = of_property_read_u32(node, "TOF-eeprom",
+		&tof);
+	if (tof == 1) {
+		count = 6;
+	}
 	snprintf(property, PROPERTY_MAXSIZE, "num-blocks");
 	rc = of_property_read_u32(node, property, &data->num_map);
 	if (rc < 0) {

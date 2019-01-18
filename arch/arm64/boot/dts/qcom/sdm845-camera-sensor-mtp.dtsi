@@ -339,6 +339,14 @@
 		cell-index = <1>;
 		reg = <0x1>;
 		compatible = "qcom,eeprom";
+		eeprom-name = "pana_addi9033";
+		slave-addr = <0xac>;
+		num-blocks = <1>;
+		i2c-freq-mode = <1>;
+
+		page0 = <0 0x0 2 0x0 1 0>;
+		poll0 = <0 0x0 2 0x0 1 0>;
+		mem0 = <0x870 0x0 2 0x0 1 0>;
 		TOF-eeprom = <1>;
 		/*if the regulator is NULL, camera probe would fail*/
 		cam_vio-supply = <&pm8998_lvs1>;
@@ -361,6 +369,11 @@
 		gpio-req-tbl-flags = <1 0>;
 		gpio-req-tbl-label = "CAMIF_MCLK1","CAM_RESET1";
 		cci-master = <0>;
+		qcom,cam-power-seq-type ="cam_reset","cam_vio","cam_clk","cam_reset";
+		qcom,cam-power-seq-val = "cam_reset","cam_vio"
+			,"cam_mclk","cam_reset";
+		qcom,cam-power-seq-cfg-val = <0 1 24000000 1>;
+		qcom,cam-power-seq-delay = <1 0 1 18>;
 		status = "ok";
 		clocks = <&clock_camcc CAM_CC_MCLK1_CLK>;
 		clock-names = "cam_clk";
