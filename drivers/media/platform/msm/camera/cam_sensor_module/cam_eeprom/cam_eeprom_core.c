@@ -106,6 +106,54 @@ static int cam_eeprom_read_memory(struct cam_eeprom_ctrl_t *e_ctrl,
 		}
 
 		if (emap[j].mem.valid_size) {
+			//spit cci consequence read op large size into many small
+			//blocks(e.g 50) for rpmh timeout and system dump.
+#if 1
+#define 		ONCE_READ  50
+			int i;
+			int counter = emap[j].mem.valid_size / ONCE_READ +1;
+			uint32_t *step_arrary = kzalloc(sizeof(uint32_t)*counter, GFP_KERNEL);
+
+			uint32_t addr = emap[j].mem.addr;
+			uint8_t * tmp = memptr;
+
+			for(i = 0; i< counter; i++)
+				step_arrary[i] = ONCE_READ;
+
+			step_arrary[counter-1] = emap[j].mem.valid_size % ONCE_READ;
+			CAM_INFO(CAM_EEPROM,"====split [%d] blocks=====\n",counter);
+			for(i = 0; i< counter; i++){
+				if(step_arrary[i] ==0)
+					break;
+				rc = camera_io_dev_read_seq(&e_ctrl->io_master_info,
+						addr, tmp,
+						emap[j].mem.addr_type,
+						emap[j].mem.data_type,
+						step_arrary[i]);
+				if (rc) {
+					CAM_ERR(CAM_EEPROM, "read failed rc %d",
+							rc);
+					return rc;
+				}
+
+				addr += step_arrary[i];
+				tmp += step_arrary[i];
+				msleep(1);
+			}
+
+			kfree(step_arrary);
+#else
+			rc = camera_io_dev_read_seq(&e_ctrl->io_master_info,
+				emap[j].mem.addr, memptr,
+				emap[j].mem.addr_type,
+				emap[j].mem.data_type,
+				emap[j].mem.valid_size);
+			if (rc) {
+				CAM_ERR(CAM_EEPROM, "read failed rc %d",
+					rc);
+				return rc;
+			}
+#endif
 			rc = camera_io_dev_read_seq(&e_ctrl->io_master_info,
 				emap[j].mem.addr, memptr,
 				emap[j].mem.addr_type,
