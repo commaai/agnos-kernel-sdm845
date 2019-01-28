@@ -18,18 +18,20 @@
 #include "cam_trace.h"
 
 /*for tof camera Begin*/
-static bool is_tof_sensor;
+//static bool is_tof_sensor;
 #define TOF_SENSOR_ID	(0x1EC)
 #define TOF_RESET_REG	(0xC022)
 #define TOF_GROUP_HOLD_REG	(0x0104)
-static void tof_sensor_check(struct cam_sensor_ctrl_t *s_ctrl)
+static bool tof_sensor_check(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	uint16_t current_sensor_id = s_ctrl->sensordata->slave_info.sensor_id;
 
-	if(unlikely(current_sensor_id == TOF_SENSOR_ID))
-		is_tof_sensor = true;
+	if(current_sensor_id == TOF_SENSOR_ID)
+		//is_tof_sensor = true;
+		return true;
 	else 
-		is_tof_sensor = false;
+		//is_tof_sensor = false;
+		return false;
 }
 
 static uint32_t op_mode = 0;
@@ -283,6 +285,10 @@ int32_t cam_sensor_i2c_modes_util(
 {
 	int32_t rc = 0;
 	uint32_t i, size;
+	struct cam_sensor_ctrl_t *s_ctrl;
+	
+	s_ctrl = container_of(io_master_info,struct cam_sensor_ctrl_t,io_master_info);
+	bool is_tof_sensor = tof_sensor_check(s_ctrl);
 
 	/*for tof camera Begin*/
 	struct cam_sensor_i2c_reg_array *p_regarray;
@@ -616,6 +622,8 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 	struct cam_sensor_power_setting *pd = NULL;
 	struct cam_sensor_power_ctrl_t *power_info =
 		&s_ctrl->sensordata->power_info;
+	bool is_tof_sensor;
+
 	if (!s_ctrl || !arg) {
 		CAM_ERR(CAM_SENSOR, "s_ctrl is NULL");
 		return -EINVAL;
@@ -628,6 +636,8 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			return -EINVAL;
 		}
 	}
+
+	is_tof_sensor = tof_sensor_check(s_ctrl);
 
 	mutex_lock(&(s_ctrl->cam_sensor_mutex));
 	/*for tof camera Begin*/
@@ -948,7 +958,12 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			s_ctrl->i2c_data.config_settings.request_id = -1;
 		}
 	}
-		break;
+
+	CAM_INFO(CAM_SENSOR,
+		"CAM_INIF_DEV Success, sensor_id:0x%x,sensor_slave_addr:0x%x",
+		s_ctrl->sensordata->slave_info.sensor_id,
+		s_ctrl->sensordata->slave_info.sensor_slave_addr);
+        break;
 	default:
 		CAM_ERR(CAM_SENSOR, "Invalid Opcode: %d", cmd->op_code);
 		rc = -EINVAL;
@@ -1085,6 +1100,7 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 	struct i2c_settings_list *i2c_list;
 	/*for tof camera Begin*/
 	enum EEPROM_DATA_OP_T op_code = EEPROM_INIT_DATA;
+	bool is_tof_sensor = tof_sensor_check(s_ctrl);
 
 	CAM_INFO(CAM_SENSOR, "is_tof_sensor %d,  red_id=%d, opcode=%d",
 			is_tof_sensor, req_id, opcode);
