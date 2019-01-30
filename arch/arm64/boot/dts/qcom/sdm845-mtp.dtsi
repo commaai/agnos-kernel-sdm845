@@ -420,7 +420,7 @@
 		//vcc-supply = <&pm8953_s3>;
 		reset-gpios = <&tlmm 12 0x00>;
 		irq-gpios = <&tlmm 24 0x00>;
-		vcc1-gpios = <&tlmm 69 0x00>;
+		//vcc1-gpios = <&tlmm 69 0x00>;
 		//vcc2-gpios = <&tlmm 63 0x00>;
 		//status = "disabled";
 		status = "ok";

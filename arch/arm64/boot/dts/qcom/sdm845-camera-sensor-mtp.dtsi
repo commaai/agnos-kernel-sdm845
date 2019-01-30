@@ -334,6 +334,58 @@
 		clock-rates = <24000000>;
 	};
 */
+
+//altek>>
+	eeprom_front: qcom,eeprom@2 {
+		cell-index = <2>;
+		reg = <0x2>;
+		compatible = "qcom,eeprom";
+		cam_vio-supply = <&pm8998_lvs1>;
+		//cam_vana-supply = <&pmi8998_bob>;
+		//cam_vdig-supply = <&camera_ldo>;
+		cam_clk-supply = <&titan_top_gdsc>;
+		//cam_vaf-supply = <&actuator_regulator>;
+		regulator-names = "cam_vio", "cam_clk";// "cam_vaf"; "cam_vana", "cam_vdig",
+			
+		rgltr-cntrl-support;
+		rgltr-min-voltage = <0 0>;//<0 3312000 1050000 0 2800000>;
+		rgltr-max-voltage = <0 0>;//<0 3600000 1050000 0 2800000>;
+		rgltr-load-current = <0 0>;//<0 80000 105000 0 0>;
+		gpio-no-mux = <0>;
+		pinctrl-names = "cam_default", "cam_suspend", "cam_miniisps";
+		pinctrl-0 = <&cam_sensor_mclk1_active
+                               &cam_sensor_miniisp_active>;
+				 //&cam_sensor_front_active>;
+		pinctrl-1 = <&cam_sensor_mclk1_suspend
+                                 &cam_sensor_miniisp_suspend>;
+				 //&cam_sensor_front_suspend>;
+		gpios = <&tlmm 15 0>,
+			<&tlmm 69 0>;
+			//<&tlmm 8 0>;
+                gpio-custom2 = <1>;
+		//gpio-reset = <1>;
+		//gpio-vana = <2>;
+		gpio-req-tbl-num = <0 1>; //<0 1 2>;
+		gpio-req-tbl-flags = <1 0>;//<1 0 0>;
+		gpio-req-tbl-label = "CAMIF_MCLK2",
+                                       "CAM_CUSTOM2";	//label for miniisp power
+					//"CAM_RESET2",
+					//"CAM_VANA2";
+		//sensor-position = <1>;
+		sensor-position-roll = <270>;
+		sensor-position-pitch = <0>;
+		sensor-position-yaw = <0>;
+
+		sensor-mode = <0>;
+		cci-master = <1>;
+		status = "ok";
+		clocks = <&clock_camcc CAM_CC_MCLK2_CLK>;
+		clock-names = "cam_clk";
+		clock-cntl-level = "turbo";
+		clock-rates = <24000000>;
+	};
+//altek<<
+
 /*for tof camera Begin*/
 	eeprom_tof_position1: qcom,eeprom@1 {
 		cell-index = <1>;
@@ -483,7 +535,7 @@
 		sensor-position-roll = <270>;
 		sensor-position-pitch = <0>;
 		sensor-position-yaw = <0>;
-		//eeprom-src = <&eeprom_front>;
+		eeprom-src = <&eeprom_front>;
 		//actuator-src = <&actuator_front>;
 		//led-flash-src = <&led_flash_front>;
 		cam_vio-supply = <&pm8998_lvs1>;
@@ -496,17 +548,21 @@
 		rgltr-max-voltage = <0 0>;
 		rgltr-load-current = <0 0>;
 		gpio-no-mux = <0>;
-		pinctrl-names = "cam_default", "cam_suspend";
-		pinctrl-0 = <&cam_sensor_mclk2_active>;
-				// &cam_sensor_front_active>;
-		pinctrl-1 = <&cam_sensor_mclk2_suspend>;
+		pinctrl-names = "cam_default", "cam_suspend", "cam_miniisps";
+		pinctrl-0 = <&cam_sensor_mclk2_active
+                             &cam_sensor_miniisp_active>;	//cam_sensor_miniisp_active for miniisp power hi				// &cam_sensor_front_active>;
+		pinctrl-1 = <&cam_sensor_mclk2_suspend
+                             &cam_sensor_miniisp_suspend>;	//cam_sensor_miniisp_suspend for miniisp power low
 				// &cam_sensor_front_suspend>;
-		gpios = <&tlmm 15 0>;
-		//	<&tlmm 28 0>;
+		gpios = <&tlmm 15 0>,
+                        <&tlmm 69 0>;	//gpio 69 for miniisp power
+		//	<&tlmm 28 0>;                        
 		//gpio-reset = <1>;
-		gpio-req-tbl-num = <0>;
-		gpio-req-tbl-flags = <1>;
-		gpio-req-tbl-label = "CAMIF_MCLK2";
+                gpio-custom2 = <1>;
+		gpio-req-tbl-num = <0 1>;
+		gpio-req-tbl-flags = <1 0>;
+		gpio-req-tbl-label = "CAMIF_MCLK2",
+                                     "CAM_CUSTOM2";	//label for miniisp power
 					//"CAM_RESET2";
 		sensor-mode = <0>;
 		cci-master = <1>;

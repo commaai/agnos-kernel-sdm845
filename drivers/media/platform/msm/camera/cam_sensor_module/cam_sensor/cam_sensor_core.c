@@ -1165,9 +1165,32 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 		if (i2c_set->is_settings_valid == 1) {
 			list_for_each_entry(i2c_list,
 				&(i2c_set->list_head), list) {
+
+		///ALTEK_TAG_HwMiniISP>>>
+				if((i2c_list->i2c_settings.size > 0) &&
+					(i2c_list->i2c_settings.reg_setting[0].reg_addr == 0xABCD) && 
+					(i2c_list->i2c_settings.reg_setting[0].reg_data == 0xEF) )
+					{
+						CAM_DBG(CAM_SENSOR,
+						"line:%d ALTEK_AL6100 skip cci cmd. slave_addr:0x%x, sensor_id:0x%x, total_tbl_size[%d], reg_addr[1]=0x%x, reg_data[1]=0x%x",
+						__LINE__, 
+						s_ctrl->sensordata->slave_info.sensor_slave_addr,
+				        s_ctrl->sensordata->slave_info.sensor_id,
+						i2c_list->i2c_settings.size,
+						i2c_list->i2c_settings.reg_setting[1].reg_addr,
+						i2c_list->i2c_settings.reg_setting[1].reg_data
+						);
+						goto SKIP_CCI_CASE1;
+
+					}
+		///ALTEK_TAG_HwMiniISP<<<
+
 				rc = cam_sensor_i2c_modes_util(
 					&(s_ctrl->io_master_info),
 					i2c_list);
+///ALTEK_TAG_HwMiniISP>>>
+SKIP_CCI_CASE1:
+///ALTEK_TAG_HwMiniISP<<<
 				if (rc < 0) {
 					CAM_ERR(CAM_SENSOR,
 						"Failed to apply settings: %d",
@@ -1193,9 +1216,31 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 			i2c_set->request_id == req_id) {
 			list_for_each_entry(i2c_list,
 				&(i2c_set->list_head), list) {
+
+		///ALTEK_TAG_HwMiniISP>>>
+				if((i2c_list->i2c_settings.size > 0) &&
+					(i2c_list->i2c_settings.reg_setting[0].reg_addr == 0xABCD) && 
+					(i2c_list->i2c_settings.reg_setting[0].reg_data == 0xEF) )
+					{
+						CAM_DBG(CAM_SENSOR,
+						"line:%d ALTEK_AL6100 skip cci cmd. slave_addr:0x%x, sensor_id:0x%x, total_tbl_size[%d], reg_addr[1]=0x%x, reg_data[1]=0x%x",
+						__LINE__, 
+						s_ctrl->sensordata->slave_info.sensor_slave_addr,
+				        s_ctrl->sensordata->slave_info.sensor_id,
+						i2c_list->i2c_settings.size,
+						i2c_list->i2c_settings.reg_setting[1].reg_addr,
+						i2c_list->i2c_settings.reg_setting[1].reg_data
+						);
+						goto SKIP_CCI_CASE2;
+
+					}
+		///ALTEK_TAG_HwMiniISP<<<
 				rc = cam_sensor_i2c_modes_util(
 					&(s_ctrl->io_master_info),
 					i2c_list);
+///ALTEK_TAG_HwMiniISP>>>
+SKIP_CCI_CASE2:
+///ALTEK_TAG_HwMiniISP<<<
 				if (rc < 0) {
 					CAM_ERR(CAM_SENSOR,
 						"Failed to apply settings: %d",

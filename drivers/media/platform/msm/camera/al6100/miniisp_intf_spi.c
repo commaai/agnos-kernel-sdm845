@@ -542,8 +542,8 @@ static int mini_isp_intf_spi_probe(struct spi_device *spi)
 	misp_info("%s -success", __func__);
 	fsm = altek_statefsmcreate();
 	altek_state = fsm;
-	mini_isp_poweron();
-	mini_isp_get_chip_id(CHIP_ID_ADDR, NULL);
+	//mini_isp_poweron();
+	//mini_isp_get_chip_id(CHIP_ID_ADDR, NULL);
 	//mini_isp_poweroff();
 	goto probe_done;
 

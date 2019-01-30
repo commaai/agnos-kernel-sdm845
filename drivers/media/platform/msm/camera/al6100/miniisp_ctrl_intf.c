@@ -386,13 +386,13 @@ long handle_ControlFlowCmd_CHI(unsigned int cmd, unsigned long arg) {
 
 				mini_isp_drv_set_sensor_mode(1,4,0,0,0);  // Set sensor mode
 				//projector control
-				control_param.led_on_off = 1;
-				control_param.control_mode = 3;
+				control_param.led_on_off = 3;
 				control_param.led_power_level = 255;
 				control_param.control_projector_id = 0;
 				mini_isp_drv_led_power_control(&control_param);
 				mini_isp_drv_preview_stream_on_off(1,1); // open preview
 				mini_isp_drv_isp_ae_control_mode_on_off(1);
+
 			}
 			break;
 		case IOCTL_ISP_RUN_TASK_STOP:
@@ -407,6 +407,7 @@ long handle_ControlFlowCmd_CHI(unsigned int cmd, unsigned long arg) {
 				mini_isp_drv_active_ae(&active_ae);
 				mini_isp_drv_set_output_format(0,0); // set depth output resolution:
                                                       // 0: Disable depth function (Depth engine is disable)
+				mini_isp_poweroff();				
 			}
 		break;
 		default:

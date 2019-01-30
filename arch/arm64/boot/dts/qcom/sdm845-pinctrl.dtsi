@@ -3461,6 +3461,36 @@
 			};
 		};
 
+                ///ALTEK_TAG_HwMiniISP>>>
+		cam_sensor_miniisp_active: cam_sensor_miniisp_active {
+			/* miniisp power up */
+			mux {
+				pins = "gpio69";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio69";
+				bias-disable; /* No PULL */
+				drive-strength = <2>; /* 2 MA */
+			};
+		};
+
+		cam_sensor_miniisp_suspend: cam_sensor_miniisp_suspend {
+			/* miniisp power down */
+			mux {
+				pins = "gpio69";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio69";
+				bias-disable; /* No PULL */
+				drive-strength = <2>; /* 2 MA */
+			};
+		};
+		///ALTEK_TAG_HwMiniISP<<<
+
 		cam_res_mgr_active: cam_res_mgr_active {
 			/* AVDD_LDO*/
 			mux {

@@ -40,7 +40,7 @@
 
 /*define for gpio*/
 /*vcc1 : if no use, set NULL*/
-#define VCC1_GPIO "vcc1-gpios" /*"vcc1-gpios"*/
+#define VCC1_GPIO NULL/*"vcc1-gpios"*/
 
 /*vcc2 : if no use, set NULL*/
 #define VCC2_GPIO NULL/*"vcc2-gpios"*/
