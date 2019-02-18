@@ -2,7 +2,7 @@
 /**
  * @file    tl_dev_eeprom.h
  * @brief   load EEPROM for device control
- * @copyright    Panasonic Corporation.
+ * @copyright    Thundersoft Corporation.
  */
 /********************************************************************/
 
@@ -294,7 +294,38 @@ typedef struct {
     tl_dev_rom_pls_mod      pls_mod;            /* Duty modulation of TOF pulse */
 } tl_dev_rom_mode;
 
+typedef enum {
+	TL_E_IMAGE_TYPE_VGA_DEPTH_QVGA_IR_BG = 1,	/*!< VGA depth image and QVGA IR image, BG data */
+	TL_E_IMAGE_TYPE_QVGA_DEPTH_IR_BG,			/*!< QVGA depth image, IR image and BG data */
+	TL_E_IMAGE_TYPE_VGA_DEPTH_IR,				/*!< VGA depth image and IR image */
+	TL_E_IMAGE_TYPE_VGA_IR_QVGA_DEPTH,			/*!< VGA IR image and QVGA depth image */
+	TL_E_IMAGE_TYPE_VGA_IR_BG,					/*!< VGA IR image and BG data */
+} TL_E_IMAGE_TYPE;
 
+/*----------------------*/
+/* For exposure setting */
+/*----------------------*/
+typedef struct {
+	uint16_t	long_val;		/* number of lumine(long) */
+	uint16_t	short_val;		/* number of lumine(short) */
+	uint16_t	lms_val;		/* number of lumine(lms) */
+	uint16_t	read_size2;		/* when to start output */
+	uint16_t	ccd_dummy;		/* ccd dummy transfer */
+	uint16_t	chkr_start_v;	        /* Vsync timing */
+	uint16_t    idle;
+	uint16_t    ini_ofst;
+} tl_afe_exp_val;
+
+typedef struct {
+    uint16_t           afe_revision;       /* afe_revision:0xC0FF*/
+} tl_dev_afe;
+
+typedef struct {
+    TL_E_MODE           mode;                   /*!< Ranging mode */
+	tl_afe_exp_val      p_exp;         				/* afe exposure value */
+	TL_E_IMAGE_TYPE     image_type_output_sel;  	/* image output setting(default) */
+	TL_E_BOOL 			external_sync;
+} tl_transmit_kernel;
 
 /*------------------------*/
 /* ALL                    */
@@ -303,13 +334,20 @@ typedef struct {
 typedef struct {
     tl_dev_rom_common   cmn;                /* common TOF device info */
     tl_dev_rom_mode     mode[TL_E_MODE_MAX];  /* data of each mode */
+    tl_dev_afe          afe_val;            /* afe value */
 } tl_dev_eeprom;
 
 typedef struct {
-	TL_E_MODE mode;
-	uint16_t ini_ofst_delay;
-	uint16_t idle_delay;
-}TL_ModeParam;
+	uint16_t           size;
+	uint16_t           addr[TL_EEPROM_AFE_ADDR_MAX_SIZE];     /* 0xc0ff(1) idle(4) */
+	uint16_t           data[TL_EEPROM_AFE_ADDR_MAX_SIZE];     /* 0xc0ff(1) idle(4) */
+}tl_dev_mode_idle_reg;
+
+typedef struct {
+	uint16_t           revision_addr;
+	uint16_t           revision_data;
+	tl_dev_mode_idle_reg idle_reg[TL_E_MODE_MAX];
+}tl_dev_afe_reg;
 
 /*------------------------*/
 /* ALL                    */
@@ -317,21 +355,28 @@ typedef struct {
 /* EEPROM data for device control */
 typedef struct {
     tl_dev_eeprom                   eeprom;
+	tl_dev_afe_reg                  afe_reg;
+	tl_transmit_kernel              *tl_sensor_setting;
 	uint16_t                        p_cmn_mode[TL_EEPROM_CMN_AREA_MAX_SIZE];
 	 /* Power-Up Sequenece data */
     uint16_t                        pup_data[TL_EEPROM_PUP_AREA_MAX_SIZE];
-	bool                            list_create;
     uint16_t                        pup_size;
-	uint16_t                        gpo_out_stby_value;
+    uint16_t                        gpo_out_stby_value;
     uint16_t                        control_value;
 } tl_dev_eeprom_pup;
 
 tl_dev_eeprom_pup* cam_eeprom_module_offload(struct cam_eeprom_ctrl_t *e_ctrl,uint8_t *mapdata,int cmd);
 
-int cam_eeprom_create_list(struct cam_eeprom_ctrl_t *e_ctrl,tl_dev_eeprom_pup *tof_eeprom);
+int cam_eeprom_create_list(tl_dev_eeprom_pup *tof_eeprom,tl_transmit_kernel *tl_sensor_setting);
 
+void tl_dev_fill_afe_reg(struct cam_sensor_ctrl_t *s_ctrl);
 void tl_eeprom_create_node(void);
 void cam_eeprom_free_kobj(void);
+extern int cam_res_mgr_gpio_set_value(unsigned int gpio, int value);
+bool tof_sensor_check_sync(void);
+void cam_eeprom_set_gpio_value(uint16_t gpio,uint16_t delay);
+uint16_t cam_sensor_get_fps(void);
+
 struct kobject * check_kobj(void);
 
 #endif /* H_TL_DEV_EEPROM */

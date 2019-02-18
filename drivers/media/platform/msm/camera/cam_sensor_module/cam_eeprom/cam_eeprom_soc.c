@@ -139,7 +139,7 @@ int cam_eeprom_spi_parse_of(struct cam_sensor_spi_client *spi_dev)
 int cam_eeprom_parse_dt_memory_map(struct device_node *node,
 	struct cam_eeprom_memory_block_t *data)
 {
-	int       i, tof,rc = 0;
+	int       i, tof = 0, rc = 0;
 	char      property[PROPERTY_MAXSIZE];
 	uint32_t  count = MSM_EEPROM_MEM_MAP_PROPERTIES_CNT;
 	struct    cam_eeprom_memory_map_t *map;
@@ -149,6 +149,7 @@ int cam_eeprom_parse_dt_memory_map(struct device_node *node,
 	if (tof == 1) {
 		count = 6;
 	}
+
 	snprintf(property, PROPERTY_MAXSIZE, "num-blocks");
 	rc = of_property_read_u32(node, property, &data->num_map);
 	if (rc < 0) {
@@ -156,7 +157,6 @@ int cam_eeprom_parse_dt_memory_map(struct device_node *node,
 			rc);
 		return rc;
 	}
-
 	map = kzalloc((sizeof(*map) * data->num_map), GFP_KERNEL);
 	if (!map) {
 		rc = -ENOMEM;

@@ -187,140 +187,12 @@ struct cam_eeprom_ctrl_t {
 	char device_name[20];
 };
 
-/*for tof camera Begin*/
-struct cam_eeprom_exposure_addr {
-	uint32_t long_addr[15];
-	uint32_t long_num;
-	uint32_t short_addr[4];
-	uint32_t short_num;
-	uint32_t lms_addr[4];
-	uint32_t lms_num;
-};
-
-struct cam_eeprom_ccd_dummy_addr {
-	uint32_t addr[4];
-	uint32_t addr_num;
-};
-
-struct cam_eeprom_vd_ini_ofst_addr {
-	uint32_t addr[4];
-	uint32_t vd_ini_ofst_num;
-};
-
-struct cam_eeprom_exp_reg_addr{
-	struct cam_eeprom_exposure_addr exp_addr;
-	uint32_t read_size2_addr;
-	struct cam_eeprom_ccd_dummy_addr ccd_dummy_addr;
-	uint32_t start_v_addr;
-	uint32_t vd_length_addr;
-	struct cam_eeprom_vd_ini_ofst_addr vd_ini_ofst_addr;
-};
-
-struct cam_eeprom_exp_reg_data{
-	uint32_t exp_long_data;
-	uint32_t exp_short_data;
-	uint32_t exp_lms_data;
-	uint32_t read_size2_data;
-	uint32_t ccd_dummy_data;
-	uint32_t start_v_data;
-	uint32_t vd_length_data;
-	uint32_t vd_ini_ofst_data;
-};
-
-struct cam_eeprom_config_common{
-	uint32_t reg_addr_from;
-	uint32_t data_size;
-	uint32_t reg_addr_to;
-	uint32_t op_code;
-};
-
-enum EEPROM_CONFIG_DATA_LIST{
-	EEPROM_CONFIG1_DATA_LIST,
-	EEPROM_CONFIG2_DATA_LIST,
-};
-
-enum eeprom_config_common_data  {
-		TL_AFE_SHD_OFFSET = 0,
-		TL_AFE_SHD,
-		TL_AFE_SHD_X0,
-		TL_AFE_SHD_XPWR,
-		TL_AFE_SHD_Y0,
-		TL_AFE_SHD_YPWR,
-		TL_AFE_DFCT_PIX_TH_TBL,
-		TL_AFE_DFCT,
-		TL_AFE_SHP_LOC,
-		TL_AFE_SHD_LOC,
-		TL_AFE_OUTPUT,
-		TL_AFE_OUTPUTSELR,
-		TL_AFE_VC,
-		TL_AFE_GRID3,
-		TL_AFE_IR_GAIN_GMM,
-		TL_AFE_IR_GMM,
-		TL_AFE_IR_GMM_Y,
-		TL_AFE_CHKR_UPPRTH,
-		TL_AFE_CHKR_LWRTH,
-		TL_AFE_CHKR_START_V,
-		TL_AFE_CHKR_START_H,
-		TL_AFE_CHKR_SIZE_H,
-		TL_AFE_CHKR_UPRERR_H,
-		TL_AFE_CHKR_UPRERR_V,
-		TL_AFE_CHKR_LWRERR_H,
-		TL_AFE_CHKR_LWRERR_V,
-		TL_AFE_CHKR_DET_ENA,
-};
-enum eeprom_config_mode_data  {
-		TL_AFE_NLR_OFFSET = 0,
-		TL_AFE_NLR_X0,
-		TL_AFE_NLR_XPWR,
-		TL_AFE_ZERO_OFFSET,
-		TL_AFE_DEPTH_SLOPE,
-		TL_AFE_DEPTH3_SLOPE,
-		TL_AFE_RATE_ADJUST,
-		TL_AFE_ALIGN,
-		TL_AFE_READ_SIZE0,
-		TL_AFE_READ_SIZE3,
-		TL_AFE_ROI,
-		TL_AFE_GRID,
-		TL_AFE_RAWNR_XPWR,
-		TL_AFE_RAWNR_BLTBL,
-		TL_AFE_RAWNR_MED,
-		TL_AFE_SAT_TH,
-		TL_AFE_RAWNR_BKTBL,
-		TL_AFE_CORING,
-		TL_AFE_CORB,
-		TL_AFE_CORF,
-		TL_AFE_DEPTH1,
-		TL_AFE_CONTROL,
-		TL_AFE_PLS_MOD_CTRL,
-		TL_AFE_PLS_MOD_VAL,
-};
-
-struct cam_eeprom_config_exp_data {
-	uint16_t exp_max;
-	uint16_t exp_val;
-	uint16_t tof_seq_ini_ofst;
-	uint16_t ld_pls_duty;
-	uint16_t num_clk_in_hd;
-	uint16_t beta_num;
-	uint16_t tof_emt_period_ofst;
-	uint16_t vd_duration;
-	uint16_t vd_ini_ofst;
-	uint16_t num_hd_in_readout;
-	uint16_t vd_ini_ofst_adr_num;
-	uint16_t idle;
-	uint16_t Idle[4];
-};
-
 struct cam_eeprom_list_head {
 	struct list_head list_head_init;
-	int    initial;
-	struct list_head list_head_config[TL_MODE_MAX];
-	int    resolution[TL_MODE_MAX];
+	struct list_head list_head_config;
 	struct list_head list_head_streamon;
-	int streamon;
 	struct list_head list_head_streamoff;
-	int streamoff;
-	enum EEPROM_CONFIG_DATA_LIST list_chioce;
+	bool   list_state;
 };
 
 enum cam_eeprom_free {
@@ -330,6 +202,7 @@ enum cam_eeprom_free {
 	LIST_HEAD_STREAMON,
 	LIST_HEAD_STREAMOFF,
 };
+
 /*for tof camera End*/
 
 int32_t cam_eeprom_update_i2c_info(struct cam_eeprom_ctrl_t *e_ctrl,

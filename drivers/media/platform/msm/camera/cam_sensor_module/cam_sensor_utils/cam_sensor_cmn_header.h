@@ -386,7 +386,8 @@ struct msm_camera_gpio_conf {
 
 /*for tof camera  Begin*/
 enum EEPROM_DATA_OP_T{
-	EEPROM_INIT_DATA = 10,
+	EEPROM_DEFAULT_DATA = 0,
+	EEPROM_INIT_DATA,
 	EEPROM_CONFIG_DATA,
 	EEPROM_STREAMON_DATA,
 	EEPROM_STREAMOFF_DATA,

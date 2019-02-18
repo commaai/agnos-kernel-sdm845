@@ -2,7 +2,7 @@
 /**
  * @file    tl_dev_eeprom_map.h
  * @brief   EEPROM device address mapping
- * @copyright    Panasonic Corporation.
+ * @copyright    Thundersoft Corporation.
  */
 /********************************************************************/
 #ifndef H_TL_DEV_EEPROM_MAP

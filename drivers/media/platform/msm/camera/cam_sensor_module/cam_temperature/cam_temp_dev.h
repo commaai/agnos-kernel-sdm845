@@ -34,7 +34,3 @@ struct cam_tmp_ctrl {
 int init_temperature_setting(int cmd);
 int read_tof_temperature(void);
 
-extern int32_t cam_sensor_i2c_modes_util(
-	struct camera_io_master *io_master_info,
-	struct i2c_settings_list *i2c_list);
-

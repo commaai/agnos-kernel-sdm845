@@ -72,6 +72,11 @@ struct intf_params {
 	struct cam_req_mgr_crm_cb *crm_cb;
 };
 
+struct tof_sensor_rstb_thread {
+	struct task_struct *rstb_thread;
+	uint16_t delay;
+};
+
 /**
  * struct cam_sensor_ctrl_t: Camera control structure
  * @pdev: Platform device
@@ -113,6 +118,7 @@ struct cam_sensor_ctrl_t {
 	char device_name[20];
 	uint32_t streamon_count;
 	uint32_t streamoff_count;
+	struct tof_sensor_rstb_thread rstb_sync;
 };
 
 #endif /* _CAM_SENSOR_DEV_H_ */

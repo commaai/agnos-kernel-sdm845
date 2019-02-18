@@ -4,64 +4,97 @@
 struct kobject *eeprom_kobj = NULL;
 tl_dev_eeprom_pup *tof_eeprom = NULL;
 
+bool tof_sensor_check_sync(void)
+{
+	if(tof_eeprom == NULL)
+		return false;
+	if(tof_eeprom->tl_sensor_setting == NULL)
+		return false;
+	return tof_eeprom->tl_sensor_setting->external_sync;
+}
+
+uint16_t cam_sensor_get_fps(void)
+{
+	TL_E_MODE mode;
+	uint16_t fps;
+
+	if(tof_eeprom == NULL)
+		return 0;
+	if(tof_eeprom->tl_sensor_setting == NULL)
+		return 0;
+	mode = tof_eeprom->tl_sensor_setting->mode;
+	fps = tof_eeprom->eeprom.mode[mode].info.fps;
+	return fps;
+}
+
+void tl_dev_fill_afe_reg(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	int    i,j;
+	uint32_t 	addr,reg_val;
+
+	if(tof_eeprom == NULL)
+		return ;
+	addr = tof_eeprom->afe_reg.revision_addr;
+	camera_io_dev_read(&(s_ctrl->io_master_info)
+		,addr,&reg_val
+		,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
+	tof_eeprom->afe_reg.revision_data = reg_val;
+
+	if(s_ctrl != NULL){
+		for(j = 0;j < TL_E_MODE_MAX;j++){
+			for(i = 0;i < tof_eeprom->afe_reg.idle_reg[j].size;i++){
+				addr = tof_eeprom->afe_reg.idle_reg[j].addr[i];
+				camera_io_dev_read(&(s_ctrl->io_master_info)
+					,addr,&reg_val
+					,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
+				tof_eeprom->afe_reg.idle_reg[j].data[i] = reg_val;
+			}
+		}
+	}
+}
+
 ssize_t eeprom_show(struct kobject *kobj,
 		struct kobj_attribute *attr,char *ubuf)
 {
+
 	uint16_t count;
-	count = sizeof(tl_dev_eeprom);
-	memcpy(ubuf,&(tof_eeprom->eeprom),count);
-	return count;
-}
+	int i,j;
 
-ssize_t mode_show(struct kobject *kobj,
-		struct kobj_attribute *attr,char *ubuf)
-{
-	uint32_t mode,count;
-	mode = get_op_mode();
-
-	if(mode < TL_E_MODE_MAX)
-	{
-		switch(mode){
-		case 0:
-			count = sizeof("0");
-			snprintf(ubuf,count,"%d",mode);
-			break;
-		case 1:
-			count = sizeof("1");
-			snprintf(ubuf,count,"%d",mode);
-			break;
-		default:
-			count = sizeof("error");
-			CAM_ERR(CAM_EEPROM,"error mode");
-			snprintf(ubuf,count,"%s","error");
-			break;
+	if(tof_eeprom != NULL){
+		tof_eeprom->eeprom.afe_val.afe_revision =
+			tof_eeprom->afe_reg.revision_data;
+		for(j = 0;j < TL_E_MODE_MAX;j++){
+			for(i = 0;i < tof_eeprom->afe_reg.idle_reg[j].size;i++){
+				tof_eeprom->eeprom.mode[j].exp_prm.afe_idle_val[i]
+					= tof_eeprom->afe_reg.idle_reg[j].data[i];
+			}
 		}
+		count = sizeof(tl_dev_eeprom);
+		memcpy(ubuf,&(tof_eeprom->eeprom),count);
 	} else {
-		count = sizeof("mode error");
-		CAM_ERR(CAM_EEPROM,"mode > mode MAX");
-		snprintf(ubuf,count,"%s","mode error");
+		CAM_ERR(CAM_EEPROM,"tof eeprom == NULL");
+		count = 0;
 	}
 	return count;
 }
 
-ssize_t multi_show(struct kobject *kobj,
-		struct kobj_attribute *attr,char *ubuf)
+ssize_t config_store(struct kobject *kobj,
+		struct kobj_attribute *attr,const char *ubuf,size_t count)
 {
-	uint32_t count;
-	bool multi_camera;
-
-	multi_camera = get_whether_support_multi_camera();
-	if(multi_camera == false)
-	{
-		count = sizeof("not support multi camera ");
-		snprintf(ubuf,count,"%s","not support multi camera");
+	tl_transmit_kernel *tl_ubuf = NULL;
+	tl_ubuf = kzalloc(sizeof(tl_transmit_kernel),GFP_KERNEL);
+	if(tl_ubuf == NULL)
+		return -1;
+	memcpy(tl_ubuf,ubuf,count);
+	tof_eeprom->tl_sensor_setting = tl_ubuf;
+	if(tof_eeprom != NULL){
+		cam_eeprom_create_list(tof_eeprom,tl_ubuf);
 	} else {
-		count = sizeof("support multi camera ");
-		snprintf(ubuf,count,"%s","support multi camera");
+		CAM_ERR(CAM_EEPROM,"tof eeprom == NULL");
+		count = 0;
 	}
 	return count;
 }
-
 
 ssize_t temperature_show(struct kobject *kobj,
 		struct kobj_attribute *attr,char *ubuf)
@@ -71,7 +104,7 @@ ssize_t temperature_show(struct kobject *kobj,
 
 	temperature = read_tof_temperature();
 	count = 8;
-	snprintf(ubuf,count,"%d.%d",temperature/100,temperature%100);
+	snprintf(ubuf,count,"%d",temperature);
 	return count;
 }
 
@@ -95,101 +128,51 @@ ssize_t temperature_store(struct kobject *kobj,
 	return count;
 }
 
-ssize_t mode_store(struct kobject *kobj,
-		struct kobj_attribute *attr,const char *ubuf,size_t count)
-{
-	switch(*ubuf){
-	case '0':
-		set_op_mode(0);
-		break;
-	case '1':
-		set_op_mode(1);
-		break;
-	default:
-		CAM_ERR(CAM_EEPROM,"nodeset mode error(correct value n/N f/F)");
-		break;
-	}
-	return count;
-}
-
-ssize_t multi_store(struct kobject *kobj,
-		struct kobj_attribute *attr,const char *ubuf,size_t count)
-{
-	switch(*ubuf){
-	case '0':
-		set_whether_support_multi_camera(false);
-		break;
-	case '1':
-		set_whether_support_multi_camera(true);
-		break;
-	default:
-		CAM_ERR(CAM_EEPROM,"multi camera mode error(correct value 0/1)");
-		break;
-	}
-	return count;
-}
-
 struct kobj_attribute eeprom_kobj_attr_eeprom_bin
 	=__ATTR(eeprom_bin,0664,eeprom_show,NULL);
-struct kobj_attribute eeprom_kobj_attr_mode
-	= __ATTR(mode,0664,mode_show,mode_store);
+struct kobj_attribute eeprom_kobj_attr_config
+	= __ATTR(config,0664,NULL,config_store);
 struct kobj_attribute eeprom_kobj_attr_temperature
 	= __ATTR(temperature,0664,temperature_show,temperature_store);
-struct kobj_attribute eeprom_kobj_attr_multi_state
-	= __ATTR(multi_state,0664,multi_show,multi_store);
 
 struct attribute *eeprom_attr[] = {
 	&eeprom_kobj_attr_eeprom_bin.attr,
 	NULL,
 };
-
-struct attribute *mode_attr[] = {
-	&eeprom_kobj_attr_mode.attr,
+struct attribute *config_attr[] = {
+	&eeprom_kobj_attr_config.attr,
 	NULL,
 };
-
 struct attribute *temperature_attr[] = {
 	&eeprom_kobj_attr_temperature.attr,
 	NULL,
 };
 
-struct attribute *multi_attr[] = {
-	&eeprom_kobj_attr_multi_state.attr,
-	NULL,
-};
 struct attribute_group eeprom_attr_grp[] = {
 	{
 		.name = "eepromdata",
 		.attrs = eeprom_attr,
 	},
 	{
-		.name = "mode",
-		.attrs = mode_attr,
+		.name = "config",
+		.attrs = config_attr,
 	},
 	{
 		.name = "temperature",
 		.attrs = temperature_attr,
 	},
-	{
-		.name = "multicamera",
-		.attrs = multi_attr,
-	},
 	{},
 };
 
-void tl_eeprom_create_node(void) {
+void tl_eeprom_create_node(void)
+{
 	int ret,i;
-
-	if(eeprom_kobj){
-		CAM_ERR(CAM_EEPROM,"has been create file");
-		return;
-	}
 
 	eeprom_kobj = kobject_create_and_add("TOFsensor",NULL);
 	if(eeprom_kobj == NULL){
 		return;
 	}
-	for(i = 0; i < 4;i++){
+	for(i = 0; i < 3;i++){
 	ret = sysfs_create_group(eeprom_kobj,&eeprom_attr_grp[i]);
 	if(ret)
 		kobject_put(eeprom_kobj);
@@ -294,7 +277,7 @@ static TL_E_RESULT tl_dev_eeprom_calc_chksum(
 
     return TL_E_SUCCESS;
 }
-#if 1
+
 static uint16_t tl_dev_eeprom_calc_fps(tl_dev_rom_exp_prm *p_exp_prm)
 {
     uint32_t vd = 0;
@@ -334,12 +317,10 @@ static uint16_t tl_dev_eeprom_calc_fps(tl_dev_rom_exp_prm *p_exp_prm)
 
     return ifps;
 }
-#endif
 
 void cam_eeprom_format_calibration_common_data_read(
 		tl_dev_rom_common *p_eep, uint16_t *p_cmn)
 {
-    uint16_t i;
     /* cam_type */
     cam_eeprom_format_data_cnv_u16_c(p_cmn +
 			TL_EEPROM_OFFSET(TL_EEPROM_MOD_NAME),
@@ -406,49 +387,29 @@ void cam_eeprom_format_calibration_common_data_read(
 			p_eep->lens.distortion_prm,
 			TL_EEPROM_ARY_SIZE(p_eep->lens.distortion_prm));
     /* shading */
-//    memcpy((void*)p_eep->shading.offset,
-//    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_SHD_OFFSET)),
-//    TL_EEPROM_ARY_SIZE(p_eep->shading.offset) * sizeof(uint16_t));
+    memcpy((void*)p_eep->shading.offset,
+    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_SHD_OFFSET)),
+    TL_EEPROM_ARY_SIZE(p_eep->shading.offset) * sizeof(uint16_t));
     p_eep->shading.shd
 		= TL_EEPROM_OFST_VAL(p_cmn, TL_EEPROM_SHD);
     p_eep->shading.x0
 		= TL_EEPROM_OFST_VAL(p_cmn, TL_EEPROM_SHD_X0);
-//    memcpy((void*)p_eep->shading.xpwr,
-//    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_SHD_XPWR)),
-//    TL_EEPROM_ARY_SIZE(p_eep->shading.xpwr) * sizeof(uint16_t));
+    memcpy((void*)p_eep->shading.xpwr,
+    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_SHD_XPWR)),
+    TL_EEPROM_ARY_SIZE(p_eep->shading.xpwr) * sizeof(uint16_t));
     p_eep->shading.y0
 		= TL_EEPROM_OFST_VAL(p_cmn, TL_EEPROM_SHD_Y0);
-//    memcpy((void*)p_eep->shading.ypwr, (void*)(p_cmn +
-//    TL_EEPROM_OFFSET(TL_EEPROM_SHD_YPWR)),
-//    TL_EEPROM_ARY_SIZE(p_eep->shading.ypwr) * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->shading.offset);i++){
-		p_eep->shading.offset[i] =
-			TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_SHD_OFFSET + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->shading.xpwr);i++){
-		p_eep->shading.xpwr[i] =
-			TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_SHD_XPWR + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->shading.ypwr);i++){
-		p_eep->shading.ypwr[i] =
-			TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_SHD_YPWR + i * 2);
-    }
+    memcpy((void*)p_eep->shading.ypwr, (void*)(p_cmn +
+    TL_EEPROM_OFFSET(TL_EEPROM_SHD_YPWR)),
+    TL_EEPROM_ARY_SIZE(p_eep->shading.ypwr) * sizeof(uint16_t));
 
     /* dfct */
-//    memcpy((void*)p_eep->dfct.dfct_pix_th_tbl
-//    , (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_DFCT_PIX_TH_TBL)),
-//    TL_EEPROM_ARY_SIZE(p_eep->dfct.dfct_pix_th_tbl) * sizeof(uint16_t));
-//    memcpy((void*)p_eep->dfct.dfct, (void*)(p_cmn +
-//    TL_EEPROM_OFFSET(TL_EEPROM_DFCT)),
-//    TL_EEPROM_ARY_SIZE(p_eep->dfct.dfct) * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->dfct.dfct_pix_th_tbl);i++){
-		p_eep->dfct.dfct_pix_th_tbl[i]
-			= TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_DFCT_PIX_TH_TBL + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->dfct.dfct);i++){
-		p_eep->dfct.dfct[i]
-			= TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_DFCT + i * 2);
-    }
+    memcpy((void*)p_eep->dfct.dfct_pix_th_tbl
+    , (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_DFCT_PIX_TH_TBL)),
+    TL_EEPROM_ARY_SIZE(p_eep->dfct.dfct_pix_th_tbl) * sizeof(uint16_t));
+    memcpy((void*)p_eep->dfct.dfct, (void*)(p_cmn +
+    TL_EEPROM_OFFSET(TL_EEPROM_DFCT)),
+    TL_EEPROM_ARY_SIZE(p_eep->dfct.dfct) * sizeof(uint16_t));
 
     /* timing_mipi */
     p_eep->timing_mipi.shp_loc
@@ -469,20 +430,12 @@ void cam_eeprom_format_calibration_common_data_read(
     /* ir */
     p_eep->ir.ir1
 		= TL_EEPROM_OFST_VAL(p_cmn, TL_EEPROM_IR1);
-//    memcpy((void*)p_eep->ir.ir_gmm,
-//    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_IR_GMM)),
-//    TL_EEPROM_ARY_SIZE(p_eep->ir.ir_gmm)   * sizeof(uint16_t));
-//    memcpy((void*)p_eep->ir.ir_gmm_y,
-//    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_IR_GMM_Y)),
-//    TL_EEPROM_ARY_SIZE(p_eep->ir.ir_gmm_y) * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->ir.ir_gmm);i++){
-		p_eep->ir.ir_gmm[i]
-			= TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_IR_GMM + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->ir.ir_gmm_y);i++){
-		p_eep->ir.ir_gmm_y[i]
-			= TL_EEPROM_OFST_VAL(p_cmn,TL_EEPROM_IR_GMM_Y + i * 2);
-    }
+    memcpy((void*)p_eep->ir.ir_gmm,
+    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_IR_GMM)),
+    TL_EEPROM_ARY_SIZE(p_eep->ir.ir_gmm)   * sizeof(uint16_t));
+    memcpy((void*)p_eep->ir.ir_gmm_y,
+    (void*)(p_cmn + TL_EEPROM_OFFSET(TL_EEPROM_IR_GMM_Y)),
+    TL_EEPROM_ARY_SIZE(p_eep->ir.ir_gmm_y) * sizeof(uint16_t));
 
     /* chkr */
     p_eep->chkr.upprth
@@ -552,27 +505,15 @@ static TL_E_RESULT cam_eeprom_format_calibration_mode_data_read(
 		= (uint8_t)((tmp & 0x00F0U) >> 4U);
     p_eep->exp_addr.lms_num
 		= (uint8_t) (tmp & 0x000FU);
-//    memcpy((void*)p_eep->exp_addr.long_addr,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_EXP_ADDR_LONG)),
-//    TL_EEPROM_ARY_SIZE(p_eep->exp_addr.long_addr)  * sizeof(uint16_t));
-//    memcpy((void*)p_eep->exp_addr.short_addr,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_EXP_ADDR_SHORT)),
-//    TL_EEPROM_ARY_SIZE(p_eep->exp_addr.short_addr) * sizeof(uint16_t));
-//    memcpy((void*)p_eep->exp_addr.lms_addr,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_EXP_ADDR_LMS)),
-//    TL_EEPROM_ARY_SIZE(p_eep->exp_addr.lms_addr)   * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->exp_addr.long_addr);i++){
-		p_eep->exp_addr.long_addr[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_EXP_ADDR_LONG + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->exp_addr.short_addr);i++){
-		p_eep->exp_addr.short_addr[i] =
-			TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_EXP_ADDR_SHORT + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->exp_addr.lms_addr);i++){
-		p_eep->exp_addr.lms_addr[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_EXP_ADDR_LMS + i * 2);
-    }
+    memcpy((void*)p_eep->exp_addr.long_addr,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_EXP_ADDR_LONG)),
+    TL_EEPROM_ARY_SIZE(p_eep->exp_addr.long_addr)  * sizeof(uint16_t));
+    memcpy((void*)p_eep->exp_addr.short_addr,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_EXP_ADDR_SHORT)),
+    TL_EEPROM_ARY_SIZE(p_eep->exp_addr.short_addr) * sizeof(uint16_t));
+    memcpy((void*)p_eep->exp_addr.lms_addr,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_EXP_ADDR_LMS)),
+    TL_EEPROM_ARY_SIZE(p_eep->exp_addr.lms_addr)   * sizeof(uint16_t));
 
     if(p_eep->exp_addr.long_num >
 			(uint8_t)TL_EEPROM_ARY_SIZE(p_eep->exp_addr.long_addr)){
@@ -590,25 +531,22 @@ static TL_E_RESULT cam_eeprom_format_calibration_mode_data_read(
     /* AFE address of dummy transfer */
     p_eep->ccd_addr.addr_num
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_DMMY_TRNS_NUM);
-//    memcpy((void*)p_eep->ccd_addr.addr,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_DMMY_TRNS_ADR)),
-//    TL_EEPROM_ARY_SIZE(p_eep->ccd_addr.addr) * sizeof(uint16_t));
+	memcpy((void*)p_eep->ccd_addr.addr,
+			(void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_DMMY_TRNS_ADR)),
+    TL_EEPROM_ARY_SIZE(p_eep->ccd_addr.addr) * sizeof(uint16_t));
     if(p_eep->ccd_addr.addr_num >
 			(uint16_t)TL_EEPROM_ARY_SIZE(p_eep->ccd_addr.addr)){
         return TL_E_ERR_SYSTEM;
     }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->ccd_addr.addr);i++){
-		p_eep->ccd_addr.addr[i] =
-			TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_DMMY_TRNS_ADR + i * 2);
-    }
+
     /* Parameters of exposure setting */
     p_eep->exp_prm.vd_ini_ofst
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_VD_INI_OFST);
     p_eep->exp_prm.vd_ini_ofst_adr_num
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_VD_INI_OFST_ADR_NUM);
-//    memcpy((void*)p_eep->exp_prm.vd_init_ofst_adr,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_VD_INIT_OFST_ADR)),
-//    TL_EEPROM_ARY_SIZE(p_eep->exp_prm.vd_init_ofst_adr) * sizeof(uint16_t));
+    memcpy((void*)p_eep->exp_prm.vd_init_ofst_adr,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_VD_INIT_OFST_ADR)),
+    TL_EEPROM_ARY_SIZE(p_eep->exp_prm.vd_init_ofst_adr) * sizeof(uint16_t));
     p_eep->exp_prm.ld_pls_duty
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_LD_PLS_DUTY);
     p_eep->exp_prm.vd_duration
@@ -631,133 +569,74 @@ static TL_E_RESULT cam_eeprom_format_calibration_mode_data_read(
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_TOF_SEQ_INI_OFST);
 	p_eep->exp_prm.idle_peri_num
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_IDLE_PERI_NUM);
-    //memcpy((void*)p_eep->exp_prm.idle_peri_adr, (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_IDLE_PERI_ADR1)), TL_EEPROM_ARY_SIZE(p_eep->exp_prm.idle_peri_adr) * sizeof(uint16_t));
+    memcpy((void*)p_eep->exp_prm.idle_peri_adr, (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_IDLE_PERI_ADR1)), TL_EEPROM_ARY_SIZE(p_eep->exp_prm.idle_peri_adr) * sizeof(uint16_t));
+
     if(p_eep->exp_prm.vd_ini_ofst_adr_num >
 			(uint16_t)TL_EEPROM_ARY_SIZE(p_eep->exp_prm.vd_init_ofst_adr)){
         return TL_E_ERR_SYSTEM;
     }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->exp_prm.vd_init_ofst_adr);i++){
-		p_eep->exp_prm.vd_init_ofst_adr[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_VD_INIT_OFST_ADR + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->exp_prm.idle_peri_adr);i++){
-		p_eep->exp_prm.idle_peri_adr[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_IDLE_PERI_ADR1 + i * 2);
-    }
-
     /* nonlinear correction */
-//    memcpy((void*)p_eep->nlr.offset,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_NLR_OFFSET)),
-//    TL_EEPROM_ARY_SIZE(p_eep->nlr.offset) * sizeof(uint16_t));
+    memcpy((void*)p_eep->nlr.offset,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_NLR_OFFSET)),
+    TL_EEPROM_ARY_SIZE(p_eep->nlr.offset) * sizeof(uint16_t));
     p_eep->nlr.x0
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_NLR_X0);
-//    memcpy((void*)p_eep->nlr.xpwr,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_NLR_XPWR)),
-//    TL_EEPROM_ARY_SIZE(p_eep->nlr.xpwr)   * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->nlr.offset);i++){
-		p_eep->nlr.offset[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_NLR_OFFSET + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->nlr.xpwr);i++){
-		p_eep->nlr.xpwr[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_NLR_XPWR + i * 2);
-    }
+    memcpy((void*)p_eep->nlr.xpwr,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_NLR_XPWR)),
+    TL_EEPROM_ARY_SIZE(p_eep->nlr.xpwr)   * sizeof(uint16_t));
 
-    /* depth correction */
+	/* depth correction */
     p_eep->depth.depth0
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_DEPTH0);
     p_eep->depth.depth2
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_DEPTH2);
     p_eep->depth.depth3
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_DEPTH3);
-    /* AFE timing control */
-//    memcpy((void*)p_eep->timing.rate_adjust,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RATE_ADJUST)),
-//    TL_EEPROM_ARY_SIZE(p_eep->timing.rate_adjust) * sizeof(uint16_t));
-//    memcpy((void*)p_eep->timing.align,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_ALIGN)),
-//    TL_EEPROM_ARY_SIZE(p_eep->timing.align)       * sizeof(uint16_t));
-//    memcpy((void*)p_eep->timing.read_size,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_READ_SIZE)),
-//    TL_EEPROM_ARY_SIZE(p_eep->timing.read_size)   * sizeof(uint16_t));
-//    memcpy((void*)p_eep->timing.roi,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_ROI)),
-//    TL_EEPROM_ARY_SIZE(p_eep->timing.roi)         * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->timing.rate_adjust);i++){
-		p_eep->timing.rate_adjust[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_RATE_ADJUST + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->timing.align);i++){
-		p_eep->timing.align[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_ALIGN + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->timing.read_size);i++){
-		p_eep->timing.read_size[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_READ_SIZE0 + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->timing.roi);i++){
-		p_eep->timing.roi[i] =
-			TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_ROI + i * 2);
-    }
+
+	/* AFE timing control */
+    memcpy((void*)p_eep->timing.rate_adjust,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RATE_ADJUST)),
+    TL_EEPROM_ARY_SIZE(p_eep->timing.rate_adjust) * sizeof(uint16_t));
+    memcpy((void*)p_eep->timing.align,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_ALIGN)),
+    TL_EEPROM_ARY_SIZE(p_eep->timing.align)       * sizeof(uint16_t));
+    memcpy((void*)p_eep->timing.read_size,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_READ_SIZE0)),
+    TL_EEPROM_ARY_SIZE(p_eep->timing.read_size)   * sizeof(uint16_t));
+    memcpy((void*)p_eep->timing.roi,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_ROI)),
+    TL_EEPROM_ARY_SIZE(p_eep->timing.roi)         * sizeof(uint16_t));
 
     /* grid conversion */
-//    memcpy((void*)p_eep->grid.grid,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_GRID)),
-//    TL_EEPROM_ARY_SIZE(p_eep->grid.grid) * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->grid.grid);i++){
-		p_eep->grid.grid[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_GRID + i * 2);
-    }
+    memcpy((void*)p_eep->grid.grid,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_GRID)),
+    TL_EEPROM_ARY_SIZE(p_eep->grid.grid) * sizeof(uint16_t));
 
     /* RAW noise reduction */
-//    memcpy((void*)p_eep->raw_nr.xpwr,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RAWNR_XPWR)),
-//    TL_EEPROM_ARY_SIZE(p_eep->raw_nr.xpwr)   * sizeof(uint16_t));
-//    memcpy((void*)p_eep->raw_nr.bl_tbl,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RAWNR_BL_TBL)),
-//    TL_EEPROM_ARY_SIZE(p_eep->raw_nr.bl_tbl) * sizeof(uint16_t));
+    memcpy((void*)p_eep->raw_nr.xpwr,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RAWNR_XPWR)),
+    TL_EEPROM_ARY_SIZE(p_eep->raw_nr.xpwr)   * sizeof(uint16_t));
+    memcpy((void*)p_eep->raw_nr.bl_tbl,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RAWNR_BL_TBL)),
+    TL_EEPROM_ARY_SIZE(p_eep->raw_nr.bl_tbl) * sizeof(uint16_t));
     p_eep->raw_nr.med
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_RAWNR_MED);
     p_eep->raw_nr.sat_th
 		= TL_EEPROM_OFST_VAL(p_mode, TL_EEPROM_RAWNR_SAT_TH);
-//    memcpy((void*)p_eep->raw_nr.bk_tbl,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RAWNR_BK_TBL)),
-//    TL_EEPROM_ARY_SIZE(p_eep->raw_nr.bk_tbl) * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->raw_nr.xpwr);i++){
-		p_eep->raw_nr.xpwr[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_RAWNR_XPWR + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->grid.grid);i++){
-		p_eep->raw_nr.bl_tbl[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_RAWNR_BL_TBL + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->raw_nr.bk_tbl);i++){
-		p_eep->raw_nr.bk_tbl[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_RAWNR_BK_TBL + i * 2);
-    }
+    memcpy((void*)p_eep->raw_nr.bk_tbl,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_RAWNR_BK_TBL)),
+    TL_EEPROM_ARY_SIZE(p_eep->raw_nr.bk_tbl) * sizeof(uint16_t));
 
     /* coring */
-//    memcpy((void*)p_eep->coring.cor,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_COR)),
-//    TL_EEPROM_ARY_SIZE(p_eep->coring.cor)  * sizeof(uint16_t));
-//    memcpy((void*)p_eep->coring.corb,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_CORB)),
-//    TL_EEPROM_ARY_SIZE(p_eep->coring.corb) * sizeof(uint16_t));
-//    memcpy((void*)p_eep->coring.corf,
-//    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_CORF)),
-//    TL_EEPROM_ARY_SIZE(p_eep->coring.corf) * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->coring.cor);i++){
-		p_eep->coring.cor[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_COR + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->coring.corb);i++){
-		p_eep->coring.corb[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_CORB + i * 2);
-    }
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->coring.corf);i++){
-		p_eep->coring.corf[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_CORF + i * 2);
-    }
+    memcpy((void*)p_eep->coring.cor,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_COR)),
+    TL_EEPROM_ARY_SIZE(p_eep->coring.cor)  * sizeof(uint16_t));
+    memcpy((void*)p_eep->coring.corb,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_CORB)),
+    TL_EEPROM_ARY_SIZE(p_eep->coring.corb) * sizeof(uint16_t));
+    memcpy((void*)p_eep->coring.corf,
+    (void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_CORF)),
+    TL_EEPROM_ARY_SIZE(p_eep->coring.corf) * sizeof(uint16_t));
 
     /* depth control */
     p_eep->depth_ctrl.depth1
@@ -771,15 +650,11 @@ static TL_E_RESULT cam_eeprom_format_calibration_mode_data_read(
 
 	tof_eeprom->control_value = p_eep->pls_mod.control;
 
-   // memcpy((void*)p_eep->pls_mod.val,
-	//		(void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_PLS_MOD_VAL)),
-	//		TL_EEPROM_ARY_SIZE(p_eep->pls_mod.val) * sizeof(uint16_t));
-    for(i=0;i<TL_EEPROM_ARY_SIZE(p_eep->pls_mod.val);i++){
-		p_eep->pls_mod.val[i]
-			= TL_EEPROM_OFST_VAL(p_mode,TL_EEPROM_PLS_MOD_VAL + i * 2);
-    }
+    memcpy((void*)p_eep->pls_mod.val,
+			(void*)(p_mode + TL_EEPROM_OFFSET(TL_EEPROM_PLS_MOD_VAL)),
+			TL_EEPROM_ARY_SIZE(p_eep->pls_mod.val) * sizeof(uint16_t));
 
-    /* calc frame rate */
+	/* calc frame rate */
     p_eep->info.fps = tl_dev_eeprom_calc_fps(&p_eep->exp_prm);
     if(p_eep->info.fps == 0xFFFFU){
         return TL_E_ERR_SYSTEM;
@@ -812,64 +687,6 @@ static TL_E_RESULT tl_dev_eeprom_check_module_type(uint16_t mod_type)
 	  }
     return TL_E_SUCCESS;
 }
-#if 0
-void show(uint16_t *p_cmn,uint32_t pup_size)
-{
-	int i;
-	int size = (912 + 624 + 624 + pup_size)/2;
-	for(i = 0; i< size;i++){
-		CAM_ERR(CAM_EEPROM,
-		"LOEE : reg_addr = %#x,reg_data = %#x",i * 2
-		,TL_EEPROM_OFST_VAL(p_cmn,i * 2));
-	}
-}
-#endif
-
-static int cam_eeprom_tl_atoi(char *buf,int size)
-{
-	int num = 0;
-	int i = 0;
-	for(i = 0;i < size;i++){
-		if(buf[i] >= '0' && buf[i] <= '9'){
-			num = num*10 + (buf[i] - '0');
-		} else {
-			return num;
-		}
-	}
-	return num;
-}
-
-static int cam_eeprom_read_init_data_from_file(tl_dev_eeprom_pup *tof_eeprom,uint32_t pup_size)
-{
-	char *buf = NULL;
-	struct file *fp;
-	uint16_t data;
- 	int i;
-	mm_segment_t fs;
-	loff_t pos;
-
-	fp = filp_open("/usr/bin/eeprommodule002",O_RDWR,0644);
-	if(IS_ERR(fp)){
-		CAM_ERR(CAM_EEPROM,"open file /usr/bin/eeprommodule002 error");
-		return -1;
-	}
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	pos = 0;
-	buf = kzalloc(sizeof(char) * 7,GFP_KERNEL);
-	if(buf == NULL)
-		return -1;
-	for(i = 0;i < pup_size/2;i++){
-		memset(buf,0,sizeof(char)*7);
-		vfs_read(fp,buf,sizeof(char) * 7,&pos);
-		data = cam_eeprom_tl_atoi(buf,7);
-		tof_eeprom->pup_data[i] = data;
-	}
-	filp_close(fp,NULL);
-	set_fs(fs);
-	kfree(buf);
-	return 0;
-}
 
 tl_dev_eeprom_pup* cam_eeprom_module_offload(
 		struct cam_eeprom_ctrl_t *e_ctrl,
@@ -884,6 +701,10 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 
 
 	if(cmd == 0){
+		if(p_cmn == NULL){
+			CAM_ERR(CAM_EEPROM,"error cmn eeprom data");
+			return NULL;
+		}
 		tof_eeprom = kzalloc(sizeof(tl_dev_eeprom_pup),GFP_KERNEL);
 		if(tof_eeprom == NULL)
 			return NULL;
@@ -896,7 +717,6 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 				| ((uint16_t)(*(p_cmn + i) & 0xFF00U) >> 8U);
 			tof_eeprom->p_cmn_mode[i] = *(p_cmn + i);
 		}
-#if 0
 		tof_eeprom->afe_reg.revision_addr = 0xC0FFU;
 		for(j = 0;j < TL_E_MODE_MAX;j++){
 			idle_size = TL_EEPROM_OFST_VAL(p_cmn+TL_EEPROM_MODE_TOP(j),TL_EEPROM_IDLE_PERI_NUM);
@@ -906,11 +726,18 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 			}
 			tof_eeprom->afe_reg.idle_reg[j].size = idle_size;
 		}
-#endif
 		return NULL;
 	}
 
 	if(cmd == 1){
+		if(tof_eeprom == NULL){
+			CAM_ERR(CAM_EEPROM,"error tof_eeprom kzalloc");
+			return NULL;
+		}
+		if(p_init == NULL){
+			CAM_ERR(CAM_EEPROM,"error init eeprom data");
+			return NULL;
+		}
 		p_cmn = &tof_eeprom->p_cmn_mode[0];
 	}
 	if(e_ctrl->cal_data.num_data == 0){
@@ -959,9 +786,6 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 
 	memcpy(tof_eeprom->pup_data,p_init,pup_size);
 
-	// read initial data from rom file if necessary
-	// cam_eeprom_read_init_data_from_file(tof_eeprom,pup_size);
-	// show(p_cmn,pup_size);
  	 /* check CHECK_SUM value */
 	tl_ret = tl_dev_eeprom_calc_chksum(
 			p_cmn, tof_eeprom->pup_data, pup_size);
@@ -987,7 +811,6 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 			= (uint16_t)((uint16_t)(*(p_init + i) & 0x00FFU) << 8U)
 			| ((uint16_t)(*(p_init + i) & 0xFF00U) >> 8U);
 	}
-
 	return tof_eeprom;
 free_kz:
 	kfree(tof_eeprom);

@@ -744,10 +744,6 @@ static int32_t cam_eeprom_pkt_parse(struct cam_eeprom_ctrl_t *e_ctrl, void *arg)
 	uint64_t                        generic_pkt_addr;
 	size_t                          pkt_len;
 	struct cam_packet              *csl_packet = NULL;
-	/*for tof camera Begin*/
-	tl_dev_eeprom_pup			   *tof_eeprom_ctrl = NULL;
-	int                            ret = 0;
-	/*for tof camera End*/
 	struct cam_eeprom_soc_private  *soc_private =
 		(struct cam_eeprom_soc_private *)e_ctrl->soc_info.soc_private;
 	struct cam_sensor_power_ctrl_t *power_info = &soc_private->power_info;
@@ -827,14 +823,8 @@ static int32_t cam_eeprom_pkt_parse(struct cam_eeprom_ctrl_t *e_ctrl, void *arg)
 		}
 		/*for tof camera Begin*/
 		if(if_tof_sensor_check(e_ctrl) && check_kobj() == NULL){
-			tof_eeprom_ctrl
-				= cam_eeprom_module_offload(e_ctrl,e_ctrl->cal_data.mapdata,1);
-			if(tof_eeprom_ctrl != NULL){
-				ret = cam_eeprom_create_list(e_ctrl,tof_eeprom_ctrl);
-				if(ret == 0){
-					tl_eeprom_create_node();
-					}
-			}
+			cam_eeprom_module_offload(e_ctrl,e_ctrl->cal_data.mapdata,1);
+			tl_eeprom_create_node();
 		}
 		/*for tof camera End*/
 		if(!if_tof_sensor_check(e_ctrl)){

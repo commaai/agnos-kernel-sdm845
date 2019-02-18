@@ -1,9 +1,25 @@
+/********************************************************************/
+/**
+ * @file	tl_dev_sensor_map.h
+ * @brief	AFE device address mapping
+ * @copyright	Thundersoft Corporation.
+ */
+/********************************************************************/
+
+#define TL_AFE_OUTPUT_TYPE_ADDR				(0xC3DBU)	 /* output type address */
+#define TL_AFE_OUTPUT_TYPE_DEPTH_IR_VAL		(0x0000U)	 /* output type Depth + IR value */
+#define TL_AFE_OUTPUT_TYPE_DEPTH_IRBG_VAL	(0x0002U)	 /* output type Depth + IR/BG value */
+#define TL_AFE_OUTPUT_TYPE_BG_IR_VAL		(0x0001U)	 /* output type BG + IR value */
+
+
+
 /*-----------------------------------------*/
 /* AFE setting address from EEPROM(mode)   */
 /*-----------------------------------------*/
 #include "tl_dev_eeprom_map.h"
 
-#define EEPROM_INIT_MAP_ADDR                     (0x0870U)
+
+#define TL_AFE_REVISION                          (0xC0FFU)
 
 #define TL_AFE_READ_SIZE2_ADDR                   (0xC3CCU)   /* when to start output */
 #define TL_AFE_LDPOSBLKOUTEN_ADDR                (0xC084U)   /* LD positive edge setting */
@@ -24,7 +40,6 @@
 #define TL_EEPROM_OPT_AXIS_CENTER_H              (0x0090U)    /* optical axis center (horizonal) [pixel] */
 
 /*  to reg common addr*/
-#define EEPROM_CONFIG_DATA_MAX                   (27)
 
 #define TL_AFE_SHD_OFFSET_ADDR                   (0xC600U)   /* depth shading offset */
 #define TL_AFE_SHD_ADDR                          (0xC3C0U)
@@ -59,41 +74,6 @@
 #define	TL_AFE_CHKR_LWRERR_V_ADDR                (0xc314U)
 #define	TL_AFE_CHKR_DET_ENA_ADDR                 (0xc315U)
 
-//data_size
-#define	EEPROM_CONFIG_SHD_OFFSET_SIZE              (192)
-#define	EEPROM_CONFIG_SHD_SIZE                     (1)
-#define	EEPROM_CONFIG_SHD_X0_SIZE                  (1)
-#define	EEPROM_CONFIG_SHD_WPWR_SIZE                (4)
-#define	EEPROM_CONFIG_SHD_Y0_SIZE                  (1)
-#define	EEPROM_CONFIG_SHD_YPWR_SIZE                (3)
-
-#define	EEPROM_CONFIG_DFCT_PIX_TH_TBL_SIZE         (12)
-#define	EEPROM_CONFIG_DFCT_SIZE                    (2)
-
-#define	EEPROM_CONFIG_TIMING_MIPI_SHP_LOC_SIZE     (1)
-#define	EEPROM_CONFIG_TIMING_MIPI_SHD_LOC_SIZE     (1)
-#define	EEPROM_CONFIG_TIMING_MIPI_OUTPUT_SIZE      (1)
-#define	EEPROM_CONFIG_TIMING_MIPI_OUTPUT_SEL_SIZE  (1)
-#define	EEPROM_CONFIG_TIMING_MIPI_VC_SIZE          (1)
-
-#define	EEPROM_CONFIG_GRID3_SIZE_SIZE              (1)
-
-#define	EEPROM_CONFIG_IR_SIZE                      (1)
-#define	EEPROM_CONFIG_IR_GMM_SIZE                  (3)
-#define	EEPROM_CONFIG_IR_GMM_Y_SIZE                (9)
-
-#define	EEPROM_CONFIG_CHKR_UPPRTH_SIZE             (1)
-#define	EEPROM_CONFIG_CHKR_LWRTH_SIZE              (1)
-#define	EEPROM_CONFIG_CHKR_START_V_SIZE            (1)
-#define	EEPROM_CONFIG_CHKR_START_H_SIZE            (1)
-#define	EEPROM_CONFIG_CHKR_SIZE_H_SIZE             (1)
-#define	EEPROM_CONFIG_CHKR_UPRERR_H_SIZE           (1)
-#define	EEPROM_CONFIG_CHKR_UPRERR_V_SIZE           (1)
-#define	EEPROM_CONFIG_CHKR_LWRERR_H_SIZE           (1)
-#define	EEPROM_CONFIG_CHKR_LWRERR_V_SIZE           (1)
-#define	EEPROM_CONFIG_CHKR_DET_ENA_SIZE            (1)
-
-#define EEPROM_CONFIG_DATA_MODE_MAX                     (24)
 /*  to reg mode addr*/
 #define TL_AFE_NLR_OFFSET_ADDR              (0xC382U)   /* nlr data offset address */
 #define TL_AFE_NLR_X0_ADDR                  (0xC3B3U)   /* nlr data x0 address */
@@ -128,40 +108,4 @@
 
 #define TL_AFE_PLS_MOD_CTRL_ADDR            (0x7D11U)   /* contorl of TOF pluse address */
 #define TL_AFE_PLS_MOD_VAL_ADDR             (0xC710U)   /* contorl of TOF pluse address */
-
-
-//data_size
-#define EEPROM_NLR_OFFSET_SIZE                   (49)
-#define EEPROM_NLR_X0_SIZE                       (1)
-#define EEPROM_NLR_XPWR_SIZE                     (12)
-
-#define EEPROM_DEPTH0_SIZE                       (1)
-#define EEPROM_DEPTH2_SIZE                       (1)
-#define EEPROM_DEPTH3_SIZE                       (1)
-
-#define EEPROM_RATE_ADJUST_SIZE                  (3)
-#define EEPROM_ALIGN_SIZE                        (11)
-
-#define EEPROM_READ_SIZE0_SIZE                   (2)
-#define EEPROM_READ_SIZE3_SIZE                   (5)
-
-#define EEPROM_ROI_SIZE                          (8)
-
-#define EEPROM_GRID_SIZE                         (3)
-
-#define EEPROM_RAWNR_XPWR_SIZE                   (3)
-#define EEPROM_RAWNR_BLTBL_SIZE                  (13)
-#define EEPROM_MED_SIZE                          (1)
-#define	EEPROM_SAT_TH_SIZE                       (1)
-#define	EEPROM_RAWNR_BKTNL_SIZE                  (13)
-
-#define	EEPROM_COR_SIZE                          (3)
-#define	EEPROM_CORB_SIZE                         (3)
-#define	EEPROM_CORF_SIZE                         (3)
-
-#define	EEPROM_DEPTH1_SIZE                       (1)
-#define	EEPROM_DEPTH_CTRL_SIZE                   (1)
-
-#define	EEPROM_PLS_MOD_CTRL__SIZE                (1)
-#define	EEPROM_PLS_MOD_VAL_SIZE                  (10)
 
