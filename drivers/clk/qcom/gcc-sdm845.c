@@ -390,6 +390,7 @@ static struct clk_rcg2 gcc_cpuss_rbcpr_clk_src = {
 };
 
 static const struct freq_tbl ftbl_gcc_gp1_clk_src[] = {
+	F(32000, P_BI_TCXO, 12, 1, 50),
 	F(19200000, P_BI_TCXO, 1, 0, 0),
 	F(25000000, P_GPLL0_OUT_EVEN, 12, 0, 0),
 	F(50000000, P_GPLL0_OUT_EVEN, 6, 0, 0),
@@ -411,7 +412,7 @@ static struct clk_rcg2 gcc_gp1_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_ops,
 		VDD_CX_FMAX_MAP4(
-			MIN, 19200000,
+			MIN, 32000,
 			LOWER, 50000000,
 			LOW, 100000000,
 			NOMINAL, 200000000),

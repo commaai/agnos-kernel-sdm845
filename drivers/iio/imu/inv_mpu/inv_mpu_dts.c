@@ -17,6 +17,10 @@
 #include <linux/of_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/export.h>
+#include <linux/clk/msm-clk.h>
+#include <linux/clk.h>
+
+
 
 #include <linux/iio/imu/mpu.h>
 #include "inv_mpu_dts.h"
@@ -334,6 +338,45 @@ int invensense_mpu_parse_dt(struct device *dev, struct mpu_platform_data *pdata)
 	}
 	pdata->power_on = inv_mpu_power_on;
 	pdata->power_off = inv_mpu_power_off;
+
+	pdata->pinctrl = devm_pinctrl_get(dev);
+	pdata->clk_ctrl_active = pinctrl_lookup_state(pdata->pinctrl,"inv_active");
+	if (IS_ERR_OR_NULL(pdata->clk_ctrl_active)) {
+		rc = PTR_ERR(pdata->clk_ctrl_active);
+		dev_err(dev,
+			"Can not lookup inv_active pinstate\n");
+		return rc;
+	}
+
+	rc = pinctrl_select_state(pdata->pinctrl,pdata->clk_ctrl_active);
+
+	if (rc < 0){
+		dev_err(dev,
+		"Active inv clkin Err\n");
+		return rc;
+	}
+
+	pdata->pclk = clk_get(dev, "gpio-inv-clk");
+	if (IS_ERR(pdata->pclk)) {
+		dev_err(dev,"Can't find inv clk");
+		pdata->pclk = NULL;
+		return -1;
+	}
+
+	rc = clk_set_rate(pdata->pclk, 32000);
+	if (rc)
+		dev_err(dev,"inv clk set rate fail, ret = %d\n", rc);
+
+	rc = clk_prepare_enable(pdata->pclk);
+	if (rc)
+		dev_err(dev,"inv clk_prepare error!!!\n");
+	else
+		dev_err(dev,"inv clk_prepare success!\n");
+
+
+	dev_err(dev,
+		"Active inv clkin \n");
+
 	dev_dbg(dev, "parse dt complete\n");
 
 	return 0;
