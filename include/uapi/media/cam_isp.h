@@ -205,6 +205,7 @@ struct cam_isp_in_port_info {
 	uint32_t                        batch_size;
 	uint32_t                        dsp_mode;
 	uint32_t                        hbi_cnt;
+        uint32_t                        custom_csid;
 	uint32_t                        reserved;
 	uint32_t                        num_out_res;
 	struct cam_isp_out_port_info    data[1];
