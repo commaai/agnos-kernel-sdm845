@@ -880,6 +880,7 @@ static int cam_ife_mgr_acquire_cid_res(
 	struct cam_ife_hw_mgr_res           *cid_res;
 	struct cam_hw_intf                  *hw_intf;
 	struct cam_csid_hw_reserve_resource_args  csid_acquire;
+        bool   match = false;
 
 	ife_hw_mgr = ife_ctx->hw_mgr;
 
@@ -894,8 +895,17 @@ static int cam_ife_mgr_acquire_cid_res(
 	csid_acquire.in_port = in_port;
 	csid_acquire.res_id =  csid_path;
 
-	for (i = 0; i < CAM_IFE_CSID_HW_NUM_MAX; i++) {
-		if (!ife_hw_mgr->csid_devices[i])
+        if (ife_hw_mgr->csid_devices[in_port->custom_csid]) {
+            hw_intf = ife_hw_mgr->csid_devices[in_port->custom_csid];
+            rc = hw_intf->hw_ops.reserve(hw_intf->hw_priv, &csid_acquire,
+                sizeof(csid_acquire));
+
+            if (!rc)
+                match = true;
+        }
+
+	for (i = 0; i < CAM_IFE_CSID_HW_NUM_MAX && (!match); i++) {
+		if (!ife_hw_mgr->csid_devices[i] || in_port->custom_csid == i)
 			continue;
 
 		hw_intf = ife_hw_mgr->csid_devices[i];
