@@ -118,6 +118,9 @@ struct mpu_platform_data {
 	int (*power_off)(struct mpu_platform_data *);
 	struct regulator *vdd_ana;
 	struct regulator *vdd_i2c;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *clk_ctrl_active;
+	struct clk		*pclk;
 #endif
 };
 

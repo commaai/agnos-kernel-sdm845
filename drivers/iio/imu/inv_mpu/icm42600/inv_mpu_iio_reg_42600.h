@@ -22,6 +22,13 @@
 /* Comment out not to use lower power mode on accel */
 #define SUPPORT_ACCEL_LPM
 
+/* Uncommnet to enable RTC MODE (Only for ICM42622/42688) */
+#define SUPPORT_RTC_MODE
+
+/* RTC(CLKIN) frequency in Hz (Only for ICM42622/42688) */
+#define RTC_FREQ_HZ                    32768
+
+
 /* Registers and associated bit definitions */
 /* Bank 0 */
 #define REG_CHIP_CONFIG_REG		0x11
@@ -448,6 +455,13 @@
 #define BIT_GYRO_ODR_25			0x0A
 #define BIT_GYRO_ODR_12			0x0B
 
+/* Bank1 REG_INTF_CONFIG5 */
+#define BIT_PIN9_FUNC_INT2             0x00
+#define BIT_PIN9_FUNC_FSYNC            0x02
+#define BIT_PIN9_FUNC_CLKIN            0x04
+#define BIT_PIN9_FUNC_RSV              0x06
+
+
 /* Bank4 REG_DRV_GYR_CFG0_REG */
 #define GYRO_DRV_TEST_FSMFORCE_D2A_LINEAR_START_MODE		0x0D
 #define GYRO_DRV_TEST_FSMFORCE_D2A_STEADY_STATE_AGC_REG_MODE	0x2A
@@ -535,7 +549,12 @@ enum INV_SENSORS {
 	SENSOR_INVALID,
 };
 
+#ifdef SUPPORT_RTC_MODE
+#define BASE_SAMPLE_RATE               (RTC_FREQ_HZ / 32)
+#else
 #define BASE_SAMPLE_RATE		1000
+#endif
+
 #define GESTURE_ACCEL_RATE		50
 #define ESI_GYRO_RATE			1000
 #define MPU_INIT_SENSOR_RATE_LNM	12	/* min Hz in LNM */

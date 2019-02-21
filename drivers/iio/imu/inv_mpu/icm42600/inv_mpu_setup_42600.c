@@ -678,6 +678,9 @@ int set_inv_enable(struct iio_dev *indio_dev)
 		BIT_CLK_SEL_PLL;
 	if (st->chip_config.accel_enable && st->chip_config.gyro_enable)
 		w |= BIT_ACCEL_LP_CLK_SEL;
+#ifdef SUPPORT_RTC_MODE
+	w |= BIT_RTC_MODE;
+#endif
 	result = inv_plat_single_write(st, REG_INTF_CONFIG1, w);
 	if (result)
 		return result;

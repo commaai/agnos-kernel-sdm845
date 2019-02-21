@@ -375,7 +375,19 @@ int inv_mpu_initialize(struct inv_mpu_state *st)
 		return result;
 	msleep(100);
 
+#ifdef SUPPORT_RTC_MODE
+	result |= inv_plat_single_write(st, REG_REG_BANK_SEL, BIT_BANK_SEL_1);
+	result |= inv_plat_single_write(st, REG_INTF_CONFIG5, BIT_PIN9_FUNC_CLKIN);
+	result |= inv_plat_single_write(st, REG_REG_BANK_SEL, BIT_BANK_SEL_0);
+	if (result)
+		return result;
+#endif
+
 	v = BIT_GYRO_AFSR_MODE_HFS | BIT_ACCEL_AFSR_MODE_HFS | BIT_CLK_SEL_PLL;
+#ifdef SUPPORT_RTC_MODE
+	v |= BIT_RTC_MODE;
+#endif
+
 	result = inv_plat_single_write(st, REG_INTF_CONFIG1, v);
 	if (result)
 		return result;

@@ -190,8 +190,8 @@ int inv_get_dmp_ts(struct inv_mpu_state *st, int i)
 	defined(CONFIG_INV_MPU_IIO_IAM20680) || \
 	defined(CONFIG_INV_MPU_IIO_ICM42600)
 	/* for no DMP devices */
-	expected_upper_duration = st->eng_info[st->sensor[i].engine_base].divider * 1020000;
-	expected_lower_duration = st->eng_info[st->sensor[i].engine_base].divider * 980000;
+	expected_upper_duration = st->eng_info[st->sensor[i].engine_base].dur / 1000 * 1020;
+	expected_lower_duration = st->eng_info[st->sensor[i].engine_base].dur / 1000 * 980;
 #else
 	/* for DMP enabled devices */
 	expected_upper_duration = NSEC_PER_SEC /
