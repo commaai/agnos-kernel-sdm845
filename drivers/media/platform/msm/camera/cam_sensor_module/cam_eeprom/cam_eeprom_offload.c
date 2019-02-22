@@ -4,6 +4,84 @@
 struct kobject *eeprom_kobj = NULL;
 tl_dev_eeprom_pup *tof_eeprom = NULL;
 
+int init_temperature_setting(int cmd)
+{
+	int i;
+	uint16_t sensor_slave_addr;
+	struct cam_sensor_i2c_reg_array tl_therm_init_data[3];
+	struct cam_sensor_i2c_reg_setting therm_write;
+
+	if(cmd == 1){
+		/* Therm low Register */
+		tl_therm_init_data[0].reg_addr = 0x02U;
+		tl_therm_init_data[0].reg_data = 0xE480U;
+		tl_therm_init_data[0].delay = 0x00U;
+		tl_therm_init_data[0].data_mask = 0x00U;
+		/* Therm high Register */
+		tl_therm_init_data[1].reg_addr = 0x03U;
+		tl_therm_init_data[1].reg_data = 0x4B00U;
+		tl_therm_init_data[1].delay = 0x00U;
+		tl_therm_init_data[1].data_mask = 0x00U;
+		 /* Configuration Register */
+		tl_therm_init_data[2].reg_addr = 0x01U;
+		tl_therm_init_data[2].reg_data = 0x78B0U;
+		tl_therm_init_data[2].delay = 0x00U;
+		tl_therm_init_data[2].data_mask = 0x00U;
+	} else if (cmd == 0){
+		/* Therm low Register */
+		tl_therm_init_data[0].reg_addr = 0x02U;
+		tl_therm_init_data[0].reg_data = 0x4B00U;
+		tl_therm_init_data[0].delay = 0x00U;
+		tl_therm_init_data[0].data_mask = 0x00U;
+		/* Therm high Register */
+		tl_therm_init_data[1].reg_addr = 0x03U;
+		tl_therm_init_data[1].reg_data = 0x5000U;
+		tl_therm_init_data[1].delay = 0x00U;
+		tl_therm_init_data[1].data_mask = 0x00U;
+		 /* Configuration Register */
+		tl_therm_init_data[2].reg_addr = 0x01U;
+		tl_therm_init_data[2].reg_data = 0x60a0U;
+		tl_therm_init_data[2].delay = 0x00U;
+		tl_therm_init_data[2].data_mask = 0x00U;
+	}
+
+    for(i = 0;i <3;i++) {
+		therm_write.size = 1;
+        therm_write.reg_setting = &tl_therm_init_data[i];
+        therm_write.addr_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+        therm_write.data_type = CAMERA_SENSOR_I2C_TYPE_WORD;
+        therm_write.delay = 0;
+        camera_io_dev_write_continuous(&(tof_eeprom->io_master_info),&therm_write,1);
+	}
+
+	return 0;
+}
+
+static int32_t cam_sensor_therm_convert_temperature(uint32_t value)
+{
+	int32_t   sign, tmp;
+	uint32_t  comp, t;
+
+	//conversionsrt temperature
+	sign = ((value & 0x8000U) == 0U) ? 1 : -1;
+	comp = (sign == 1) ? value : ((uint32_t)~value + 1U);
+	t = (comp & 0x7FE0U) >> 3U;
+	tmp = sign * (((int32_t)t * 625 ) / 100);
+	return tmp;
+}
+
+int read_tof_temperature(void)
+{
+	uint32_t reg_val = 0;
+	uint16_t temperature = 0;
+
+	camera_io_dev_read(&(tof_eeprom->io_master_info)
+			,0x00,&reg_val
+			,CAMERA_SENSOR_I2C_TYPE_WORD,CAMERA_SENSOR_I2C_TYPE_WORD);
+	temperature = cam_sensor_therm_convert_temperature(reg_val);
+	return temperature;
+}
+
 bool tof_sensor_check_sync(void)
 {
 	if(tof_eeprom == NULL)
@@ -103,7 +181,7 @@ ssize_t temperature_show(struct kobject *kobj,
 	uint16_t count;
 
 	temperature = read_tof_temperature();
-	count = 8;
+	count = 5;
 	snprintf(ubuf,count,"%d",temperature);
 	return count;
 }
@@ -811,6 +889,20 @@ tl_dev_eeprom_pup* cam_eeprom_module_offload(
 			= (uint16_t)((uint16_t)(*(p_init + i) & 0x00FFU) << 8U)
 			| ((uint16_t)(*(p_init + i) & 0xFF00U) >> 8U);
 	}
+
+		tof_eeprom->io_master_info.master_type = CCI_MASTER;
+		tof_eeprom->io_master_info.cci_client
+			= kzalloc(sizeof(struct cam_sensor_cci_client),GFP_KERNEL);
+		if(!(tof_eeprom->io_master_info.cci_client)){
+			return NULL;
+		}
+		tof_eeprom->io_master_info.cci_client->cci_i2c_master = MASTER_0;
+		tof_eeprom->io_master_info.cci_client->sid = 0x90 >> 1;
+		tof_eeprom->io_master_info.cci_client->retries = 3;
+		tof_eeprom->io_master_info.cci_client->id_map = 0;
+		tof_eeprom->io_master_info.cci_client->i2c_freq_mode = I2C_FAST_MODE;
+		tof_eeprom->io_master_info.cci_client->cci_subdev = cam_cci_get_subdev();
+
 	return tof_eeprom;
 free_kz:
 	kfree(tof_eeprom);

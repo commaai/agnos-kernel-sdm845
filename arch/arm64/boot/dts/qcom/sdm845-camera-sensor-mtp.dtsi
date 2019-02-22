@@ -146,11 +146,6 @@
 		status = "ok";
 	};
 
-	TOF,temperature {
-		compatible = "tof-tmp";
-		status = "ok";
-	};
-
 /*
 	actuator_rear: qcom,actuator@0 {
 		cell-index = <0>;
@@ -435,12 +430,6 @@
 		clock-cntl-level = "turbo";
 		clock-rates = <24000000>;
     };
-	/*
-	temperature_tof_position1: tof,temperature@1 {
-		cell-index = <1>;
-		compatible = "tof-tmp";
-		status = "ok";
-	}*/
 /*for tof camera End*/
 	qcom,cam-sensor@0 {
 		cell-index = <0>;
@@ -500,7 +489,6 @@
 		sensor-position-pitch = <0>;
 		sensor-position-yaw = <180>;
 		eeprom-src = <&eeprom_tof_position1>;
-//		temperature-src = <&temperature_tof_position1>;
 		cam_vio-supply = <&pm8998_lvs1>;
 		cam_clk-supply = <&titan_top_gdsc>;
 		regulator-names = "cam_vio", "cam_clk";

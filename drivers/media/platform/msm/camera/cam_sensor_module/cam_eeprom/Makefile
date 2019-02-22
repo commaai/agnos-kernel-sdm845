@@ -2,7 +2,6 @@ ccflags-y += -Idrivers/media/platform/msm/camera/cam_utils
 ccflags-y += -Idrivers/media/platform/msm/camera/cam_cpas/include
 #for tof camera Begin#
 ccflags-y += -Idrivers/media/platform/msm/camera/cam_sensor_module/cam_sensor
-ccflags-y += -Idrivers/media/platform/msm/camera/cam_sensor_module/cam_temperature
 #for tof camera End#
 ccflags-y += -Idrivers/media/platform/msm/camera/cam_sensor_module/cam_sensor_io
 ccflags-y += -Idrivers/media/platform/msm/camera/cam_sensor_module/cam_sensor_utils

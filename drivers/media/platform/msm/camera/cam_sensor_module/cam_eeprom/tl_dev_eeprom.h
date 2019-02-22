@@ -16,7 +16,6 @@
 #include "cam_eeprom_dev.h"
 #include "cam_eeprom_core.h"
 #include "cam_sensor_core.h"
-#include "../cam_temperature/cam_temp_dev.h"
 /*--------------------------------------------------------------------
     definitions
 --------------------------------------------------------------------*/
@@ -357,6 +356,7 @@ typedef struct {
     tl_dev_eeprom                   eeprom;
 	tl_dev_afe_reg                  afe_reg;
 	tl_transmit_kernel              *tl_sensor_setting;
+	struct camera_io_master         io_master_info;
 	uint16_t                        p_cmn_mode[TL_EEPROM_CMN_AREA_MAX_SIZE];
 	 /* Power-Up Sequenece data */
     uint16_t                        pup_data[TL_EEPROM_PUP_AREA_MAX_SIZE];
