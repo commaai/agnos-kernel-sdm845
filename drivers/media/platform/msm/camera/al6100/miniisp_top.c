@@ -168,7 +168,7 @@ void mini_isp_e_to_a(void)
 	dev_global_variable = get_mini_isp_global_variable();
 	misp_info("mini_isp_drv_setting(1) mini_isp_e_to_a");
 	mini_isp_register_write(0xffef0240, 0x0);
-	mdelay(100);
+	mdelay(1);
 	dev_global_variable->altek_spi_mode = ALTEK_SPI_MODE_A;
 }
 
