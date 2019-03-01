@@ -34,14 +34,14 @@ static bool tof_sensor_check(struct cam_sensor_ctrl_t *s_ctrl)
 
 static int cam_sensor_rstb_sync(void *data)
 {
-	uint16_t m_delay = 0,fps;
-	struct cam_sensor_ctrl_t *s_ctrl = (struct cam_sensor_ctrl_t *)data;
+	uint16_t fps;
+	uint32_t u_delay = 0;
 	fps = cam_sensor_get_fps();
-	m_delay = 1000/fps;
-	if(1000%fps > 0)
-		m_delay++;
+	u_delay = (1000*1000)/fps;
+	if((1000*1000)%fps > 0)
+		u_delay++;
 
-	if(m_delay == 0){
+	if(u_delay == 0){
 		CAM_ERR(CAM_EEPROM,"mdelsy = 0,error fps");
 		return -1;
 	}
@@ -54,7 +54,7 @@ static int cam_sensor_rstb_sync(void *data)
 		cam_res_mgr_gpio_set_value(8,1);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 
-		mdelay(m_delay - 1);
+		udelay(u_delay - (1*1000));
 	}
 	return 0;
 }
