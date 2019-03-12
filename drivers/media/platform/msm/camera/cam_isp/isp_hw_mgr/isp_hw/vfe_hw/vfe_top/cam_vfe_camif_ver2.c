@@ -24,6 +24,8 @@
 #include "cam_cdm_util.h"
 #include "cam_cpas_api.h"
 
+#define CAM_VFE_CAMIF_IRQ_SOF_DEBUG_CNT_MAX 2
+
 struct cam_vfe_mux_camif_data {
 	void __iomem                                *mem_base;
 	struct cam_hw_intf                          *hw_intf;
@@ -39,6 +41,9 @@ struct cam_vfe_mux_camif_data {
 	uint32_t                           first_line;
 	uint32_t                           last_pixel;
 	uint32_t                           last_line;
+	bool                               enable_sof_irq_debug;
+	uint32_t                           irq_debug_cnt;
+	uint32_t                           camif_debug;
 };
 
 static int cam_vfe_camif_validate_pix_pattern(uint32_t pattern)
@@ -265,6 +270,19 @@ static int cam_vfe_camif_resource_start(
 	CAM_DBG(CAM_ISP, "hw id:%d RUP val:%d", camif_res->hw_intf->hw_idx,
 		rsrc_data->reg_data->reg_update_cmd_data);
 
+	/* disable sof irq debug flag */
+	rsrc_data->enable_sof_irq_debug = false;
+	rsrc_data->irq_debug_cnt = 0;
+
+	if (rsrc_data->camif_debug &
+		CAMIF_DEBUG_ENABLE_SENSOR_DIAG_STATUS) {
+		val = cam_io_r_mb(rsrc_data->mem_base +
+			rsrc_data->camif_reg->vfe_diag_config);
+		val |= rsrc_data->reg_data->enable_diagnostic_hw;
+		cam_io_w_mb(val, rsrc_data->mem_base +
+			rsrc_data->camif_reg->vfe_diag_config);
+	}
+
 	CAM_DBG(CAM_ISP, "Start Camif IFE %d Done", camif_res->hw_intf->hw_idx);
 	return 0;
 }
@@ -356,13 +374,39 @@ static int cam_vfe_camif_resource_stop(
 	if (camif_res->res_state == CAM_ISP_RESOURCE_STATE_STREAMING)
 		camif_res->res_state = CAM_ISP_RESOURCE_STATE_RESERVED;
 
+	val = cam_io_r_mb(camif_priv->mem_base +
+			camif_priv->camif_reg->vfe_diag_config);
+	if (val & camif_priv->reg_data->enable_diagnostic_hw) {
+		val &= ~camif_priv->reg_data->enable_diagnostic_hw;
+		cam_io_w_mb(val, camif_priv->mem_base +
+			camif_priv->camif_reg->vfe_diag_config);
+	}
+
 	return rc;
+}
+
+static int cam_vfe_camif_sof_irq_debug(
+	struct cam_isp_resource_node *rsrc_node, void *cmd_args)
+{
+	struct cam_vfe_mux_camif_data *camif_priv;
+	uint32_t *enable_sof_irq = (uint32_t *)cmd_args;
+
+	camif_priv =
+		(struct cam_vfe_mux_camif_data *)rsrc_node->res_priv;
+
+	if (*enable_sof_irq == 1)
+		camif_priv->enable_sof_irq_debug = true;
+	else
+		camif_priv->enable_sof_irq_debug = false;
+
+	return 0;
 }
 
 static int cam_vfe_camif_process_cmd(struct cam_isp_resource_node *rsrc_node,
 	uint32_t cmd_type, void *cmd_args, uint32_t arg_size)
 {
 	int rc = -EINVAL;
+	struct cam_vfe_mux_camif_data *camif_priv = NULL;
 
 	if (!rsrc_node || !cmd_args) {
 		CAM_ERR(CAM_ISP, "Invalid input arguments");
@@ -376,6 +420,14 @@ static int cam_vfe_camif_process_cmd(struct cam_isp_resource_node *rsrc_node,
 		break;
 	case CAM_ISP_HW_CMD_GET_REG_DUMP:
 		rc = cam_vfe_camif_reg_dump(rsrc_node);
+		break;
+	case CAM_ISP_HW_CMD_SOF_IRQ_DEBUG:
+		rc = cam_vfe_camif_sof_irq_debug(rsrc_node, cmd_args);
+		break;
+	case CAM_ISP_HW_CMD_SET_CAMIF_DEBUG:
+		camif_priv =
+			(struct cam_vfe_mux_camif_data *)rsrc_node->res_priv;
+		camif_priv->camif_debug = *((uint32_t *)cmd_args);
 		break;
 	default:
 		CAM_ERR(CAM_ISP,
@@ -401,6 +453,7 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 	struct cam_vfe_top_irq_evt_payload   *payload;
 	uint32_t                              irq_status0;
 	uint32_t                              irq_status1;
+	uint32_t                              val;
 
 	if (!handler_priv || !evt_payload_priv) {
 		CAM_ERR(CAM_ISP, "Invalid params");
@@ -419,7 +472,21 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 	switch (payload->evt_id) {
 	case CAM_ISP_HW_EVENT_SOF:
 		if (irq_status0 & camif_priv->reg_data->sof_irq_mask) {
-			CAM_DBG(CAM_ISP, "Received SOF");
+			if ((camif_priv->enable_sof_irq_debug) &&
+				(camif_priv->irq_debug_cnt <=
+				CAM_VFE_CAMIF_IRQ_SOF_DEBUG_CNT_MAX)) {
+				CAM_INFO_RATE_LIMIT(CAM_ISP, "Received SOF");
+
+				camif_priv->irq_debug_cnt++;
+				if (camif_priv->irq_debug_cnt ==
+					CAM_VFE_CAMIF_IRQ_SOF_DEBUG_CNT_MAX) {
+					camif_priv->enable_sof_irq_debug =
+						false;
+					camif_priv->irq_debug_cnt = 0;
+				}
+			} else {
+				CAM_DBG(CAM_ISP, "Received SOF");
+			}
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
 		}
 		break;
@@ -448,6 +515,14 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 			cam_vfe_camif_reg_dump(camif_node);
 		} else {
 			ret = CAM_ISP_HW_ERROR_NONE;
+		}
+
+		if (camif_priv->camif_debug &
+			CAMIF_DEBUG_ENABLE_SENSOR_DIAG_STATUS) {
+			val = cam_io_r(camif_priv->mem_base +
+				camif_priv->camif_reg->vfe_diag_sensor_status);
+			CAM_DBG(CAM_ISP, "VFE_DIAG_SENSOR_STATUS: 0x%x",
+				camif_priv->mem_base, val);
 		}
 		break;
 	default:

@@ -97,6 +97,8 @@ struct tof_sensor_rstb_thread {
  * @device_name: Sensor device structure
  * @streamon_count: Count to hold the number of times stream on called
  * @streamoff_count: Count to hold the number of times stream off called
+ * @bob_reg_index: Hold to BoB regulator index
+ * @bob_pwm_switch: Boolean flag to switch into PWM mode for BoB regulator
  */
 struct cam_sensor_ctrl_t {
 	struct platform_device *pdev;
@@ -119,6 +121,8 @@ struct cam_sensor_ctrl_t {
 	uint32_t streamon_count;
 	uint32_t streamoff_count;
 	struct tof_sensor_rstb_thread rstb_sync;
+	int bob_reg_index;
+	bool bob_pwm_switch;
 };
 
 #endif /* _CAM_SENSOR_DEV_H_ */
