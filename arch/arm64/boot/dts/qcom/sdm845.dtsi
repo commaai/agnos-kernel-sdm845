@@ -1208,6 +1208,7 @@
 		qcom,cam_cc_csi0phytimer_clk_src-opp-handle = <&cam_csiphy0>;
 		qcom,cam_cc_csi1phytimer_clk_src-opp-handle = <&cam_csiphy1>;
 		qcom,cam_cc_csi2phytimer_clk_src-opp-handle = <&cam_csiphy2>;
+		qcom,cam_cc_csi3phytimer_clk_src-opp-handle = <&cam_csiphy3>;
 		qcom,cam_cc_cci_clk_src-opp-handle = <&cam_cci>;
 		qcom,cam_cc_ife_0_csid_clk_src-opp-handle = <&cam_csid0>;
 		qcom,cam_cc_ife_0_clk_src-opp-handle = <&cam_vfe0>;
