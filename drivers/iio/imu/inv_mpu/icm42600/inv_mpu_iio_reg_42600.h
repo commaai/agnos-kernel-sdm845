@@ -26,7 +26,7 @@
 #define SUPPORT_RTC_MODE
 
 /* RTC(CLKIN) frequency in Hz (Only for ICM42622/42688) */
-#define RTC_FREQ_HZ                    32768
+#define RTC_FREQ_HZ                    32000
 
 
 /* Registers and associated bit definitions */
