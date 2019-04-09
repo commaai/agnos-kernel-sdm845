@@ -550,7 +550,7 @@ static int lt9611_hdmi_tx_phy(struct lt9611 *pdata)
 {
 	lt9611_write(pdata, 0xff, 0x81);
 	lt9611_write(pdata, 0x30, 0x6a);
-	lt9611_write(pdata, 0x31, 0x73);//DC: 0x44, AC:0x73
+	lt9611_write(pdata, 0x31, 0x44);//DC: 0x44, AC:0x73
 	lt9611_write(pdata, 0x32, 0x4a);
 	lt9611_write(pdata, 0x33, 0x0b);
 	lt9611_write(pdata, 0x34, 0x00);
@@ -558,10 +558,10 @@ static int lt9611_hdmi_tx_phy(struct lt9611 *pdata)
 	lt9611_write(pdata, 0x36, 0x00);
 	lt9611_write(pdata, 0x37, 0x44);
 	lt9611_write(pdata, 0x3f, 0x0f);
-	lt9611_write(pdata, 0x40, 0xa0);
-	lt9611_write(pdata, 0x41, 0xa0);
-	lt9611_write(pdata, 0x42, 0xa0);
-	lt9611_write(pdata, 0x43, 0xa0);
+	lt9611_write(pdata, 0x40, 0x90);
+	lt9611_write(pdata, 0x41, 0x90);
+	lt9611_write(pdata, 0x42, 0x90);
+	lt9611_write(pdata, 0x43, 0x90);
 	lt9611_write(pdata, 0x44, 0x0a);
 
 	return 0;
