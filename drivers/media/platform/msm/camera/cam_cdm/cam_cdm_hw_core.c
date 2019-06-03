@@ -342,7 +342,7 @@ bool cam_hw_cdm_commit_bl_write(struct cam_hw_info *cdm_hw)
 int cam_hw_cdm_submit_gen_irq(struct cam_hw_info *cdm_hw,
 	struct cam_cdm_hw_intf_cmd_submit_bl *req)
 {
-	struct cam_cdm_bl_cb_request_entry *node;
+	struct cam_cdm_bl_cb_request_entry *node = NULL;
 	struct cam_cdm *core = (struct cam_cdm *)cdm_hw->core_info;
 	uint32_t len;
 	int rc;
@@ -354,6 +354,19 @@ int cam_hw_cdm_submit_gen_irq(struct cam_hw_info *cdm_hw,
 	}
 	CAM_DBG(CAM_CDM, "CDM write BL last cmd tag=%x total=%d cookie=%d",
 		core->bl_tag, req->data->cmd_arrary_count, req->data->cookie);
+	// remove the last node which is the same core->bl_tag
+	node = cam_cdm_find_request_by_bl_tag(core->bl_tag,
+			&core->bl_request_list);
+	if (node) {
+		CAM_ERR(CAM_CDM, "cdm test remove bl tag %d old ctx %p"
+			" cookie %d new ctx %p cookie %d",
+			core->bl_tag, node->userdata, node->cookie,
+			req->data->userdata, req->data->cookie);
+		list_del_init(&node->entry);
+		kfree(node);
+		node = NULL;
+	}
+
 	node = kzalloc(sizeof(struct cam_cdm_bl_cb_request_entry),
 			GFP_KERNEL);
 	if (!node) {
