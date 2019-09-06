@@ -11,6 +11,7 @@
  */
 
 
+// comma 2
 /dts-v1/;
 
 #include <dt-bindings/clock/qcom,gcc-sdm845.h>
