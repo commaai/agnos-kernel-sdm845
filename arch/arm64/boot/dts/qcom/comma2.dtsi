@@ -57,5 +57,22 @@
 	status = "disabled";
 };
 
+/* regulators */
+
+&vendor {
+  main3v3: main3v3 {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "main3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&tlmm 27 0>;
+    enable-active-high;
+    regulator-always-on;
+  };
+};
+
 /* IMUs are on SSC i2c, have to interact with that firmware */
 
