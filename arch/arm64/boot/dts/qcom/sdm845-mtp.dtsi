@@ -270,9 +270,9 @@
 };
 
 //&dsi_dual_lt8912_video_display {
-&dsi_lt9611_1080_video_display {
+/*&dsi_lt9611_1080_video_display {
 	qcom,dsi-display-active;
-};
+};*/
 
 &pmi8998_wled {
 	status = "disabled";
@@ -408,7 +408,7 @@
 };
 
 ///ALTEK_TAG_HwMiniISP>>>
-&qupv3_se5_spi {
+/*&qupv3_se5_spi {
 	status = "ok";
 	mini_isp@0 {
 		compatible = "altek_isp";
@@ -416,7 +416,6 @@
 		spi-max-frequency = <50000000>;
 		spi-cpol;
 		spi-cpha;
-		/*spi-cs-high;*/
 		//vcc-supply = <&pm8953_s3>;
 		reset-gpios = <&tlmm 12 0x00>;
 		irq-gpios = <&tlmm 24 0x00>;
@@ -425,11 +424,12 @@
 		//status = "disabled";
 		status = "ok";
 	};
-};
+};*/
 ///ALTEK_TAG_HwMiniISP<<<
 
 &qupv3_se3_i2c {
 	status = "disabled";
+  /* do we have this? */
 	nq@28 {
 		compatible = "qcom,nq-nci";
 		reg = <0x28>;
@@ -462,7 +462,8 @@
 
 &qupv3_se2_spi {
 	status = "ok";
-	invensense_icm@0 {
+  /* why is this not on SSC? */
+	/*invensense_icm@0 {
 		compatible = "invensense,icm42600";
 		reg = <0>;
 		spi-max-frequency = <8000000>;
@@ -484,9 +485,7 @@
 		clocks = <&clock_gcc GCC_GP1_CLK>;
 		clock-names = "gpio-inv-clk";
 		status= "ok";
-	};
-
-
+	};*/
 };
 
 &usb1 {
@@ -715,22 +714,21 @@
 		interrupt-names = "hdmi_hpd_irq1";
 	};
 */
-	lt9611@3b {
+	/*lt9611@3b {
 		compatible = "lontium,lt9611";
 		reg = <0x3b>;
 		lt,irq-gpio = <&tlmm 84 0x00>;
 		lt,reset-gpio = <&tlmm 128 0x00>;
-		/*lt,secondary-hpd-irq-gpio = <&tlmm 52 0x00>;*/
-		/*lt,receiver-enable-gpio = <&tlmm 31 0x00>;*/
-		/*lt,pwr-enable-gpio = <&tlmm 89 0x00>;*/
 		lt,pwr-sys1v8-gpio = <&tlmm 89 0x00>;
-		lt,pwr-sys5v0-gpio = <&tlmm 120 0x00>;/*GPIO120_DSI_SW_SEL*/
-		/*lt,pwr-sys3v3-gpio = <&tlmm 125 0x00>;*/
+		lt,pwr-sys5v0-gpio = <&tlmm 120 0x00>;
 		lt,video-format-id = <4>;
 		lt,mipi-lanes-type = <0>;//4 lane
 		lt,mipi-ports-type = <0>;//single port
-
-	};
+	};*/
+		/*lt,secondary-hpd-irq-gpio = <&tlmm 52 0x00>;*/
+		/*lt,receiver-enable-gpio = <&tlmm 31 0x00>;*/
+		/*lt,pwr-enable-gpio = <&tlmm 89 0x00>;*/
+		/*lt,pwr-sys3v3-gpio = <&tlmm 125 0x00>;*/
 };
 
 &qupv3_se2_i2c {

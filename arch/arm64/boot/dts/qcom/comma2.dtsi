@@ -7,11 +7,14 @@
 	status = "disabled";
 };
 
-/* don't use /dev/i2c-4, it's for DP */
+&qupv3_se2_i2c {
+	status = "disabled";
+};
 
 /* audio and power monitor(ina230) I2C, /dev/i2c-0 */
 &qupv3_se10_i2c {
-	status = "ok";
+  status = "ok";
+  qcom,clk-freq-out = <100000>;
 
   ti_ina320@64 {
     compatible = "ti,ina230";
@@ -29,7 +32,8 @@
 
 /* light(RPR-0521RS) and touch panel I2C, /dev/i2c-2 */
 &qupv3_se5_i2c {
-	status = "ok";
+  status = "ok";
+  qcom,clk-freq-out = <100000>;
 
   rpr0521@38 {
     compatible = "rpr0521";
@@ -37,11 +41,21 @@
   };
 };
 
+/* second home of the sensors besides SSC, BLSP4 on tici */
+&qupv3_se4_i2c {
+  status = "ok";
+  qcom,clk-freq-out = <100000>;
+};
+
 /* panda SPI */
 &qupv3_se0_spi {
 	status = "ok";
 };
 
+/* GPS UART */
+&qupv3_se6_4uart {
+	status = "disabled";
+};
 
 /* IMUs are on SSC i2c, have to interact with that firmware */
 
