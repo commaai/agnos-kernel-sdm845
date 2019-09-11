@@ -16,9 +16,9 @@
   status = "ok";
   qcom,clk-freq-out = <100000>;
 
-  ti_ina320@64 {
-    compatible = "ti,ina230";
-    reg = <0x64>;
+  ti_ina321@40 {
+    compatible = "ti,ina231";
+    reg = <0x40>;
     /* value is 30mOhm, measured in uohms */
     shunt-resistor = <30000>;
   };
