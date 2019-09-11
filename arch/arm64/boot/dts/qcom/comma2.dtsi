@@ -1,0 +1,31 @@
+/* audio and power monitor(ina230) I2C */
+&qupv3_se10_i2c {
+	status = "ok";
+
+  ti_ina320@38 {
+    compatible = "ti,ina230";
+    reg = <0x38>;
+    /* value is 30mOhm, measured in uohms */
+    shunt-resistor = <30000>;
+  };
+};
+
+/* light(RPR-0521RS) and touch panel I2C */
+&qupv3_se5_i2c {
+	status = "ok";
+
+
+  rpr0521@68 {
+    compatible = "rpr0521";
+    reg = <0x68>;
+  };
+};
+
+/* panda SPI */
+&qupv3_se0_spi {
+	status = "ok";
+};
+
+
+/* IMUs are on SSC i2c */
+
