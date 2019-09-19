@@ -1130,7 +1130,7 @@ CONFIG_CAN_CALC_BITTIMING=y
 # CAN SPI interfaces
 #
 # CONFIG_CAN_MCP251X is not set
-CONFIG_CAN_MCP25XXFD=y
+# CONFIG_CAN_MCP25XXFD is not set
 
 #
 # CAN USB interfaces
