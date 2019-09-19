@@ -373,6 +373,9 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 		.arginfo = SCM_ARGS(2),
 	};
 
+	pr_err("Rebooting in 5 seconds.");
+	msleep(5000);
+
 	pr_notice("Going down for restart now\n");
 
 	msm_restart_prepare(cmd);
