@@ -21,8 +21,8 @@
 
 #include "sda845-v2.1.dtsi"
 #include "sdm845-sde-display.dtsi"
-#include "sdm845-mtp.dtsi"
-#include "sdm845-audio-overlay.dtsi"
+/*#include "sdm845-mtp.dtsi"
+#include "sdm845-audio-overlay.dtsi"*/
 #include "comma2.dtsi"
 
 / {
