@@ -78,6 +78,9 @@ static void cam_icp_dev_iommu_fault_handler(
 static int cam_icp_subdev_open(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh)
 {
+	// hacks cause the icp is dumb
+	return -EPERM;
+
 	struct cam_hw_mgr_intf *hw_mgr_intf = NULL;
 	struct cam_node *node = v4l2_get_subdevdata(sd);
 	int rc = 0;
