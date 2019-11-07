@@ -364,7 +364,7 @@
 					"CAM_RESET1",
 					"CAM_VANA1";
 		sensor-mode = <0>;
-		cci-master = <1>;
+		cci-master = <0>;
 		status = "ok";
 		clocks = <&clock_camcc CAM_CC_MCLK2_CLK>;
 		clock-names = "cam_clk";
