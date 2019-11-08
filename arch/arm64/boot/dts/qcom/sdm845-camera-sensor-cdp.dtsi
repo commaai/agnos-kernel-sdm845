@@ -310,9 +310,9 @@
 		/*gpios = <&tlmm 13 0>,
 			<&tlmm 80 0>,
 			<&tlmm 79 0>;*/
-		gpios = <&tlmm 15 0>,
+		gpios = <&tlmm 13 0>,
 			<&tlmm 9 0>,
-			<&tlmm 8 0>;
+			<&tlmm 8 0>; 
 		gpio-reset = <1>;
 		gpio-vana = <2>;
 		gpio-req-tbl-num = <0 1 2>;
