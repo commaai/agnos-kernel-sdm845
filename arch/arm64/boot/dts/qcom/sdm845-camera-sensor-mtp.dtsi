@@ -346,7 +346,8 @@
 		//actuator-src = <&actuator_rear_aux>;
 		//led-flash-src = <&led_flash_rear_aux>;
 		//eeprom-src = <&eeprom_rear_aux>;
-		cam_vdig-supply = <&camera_ldo>;
+		cam_vdig-supply = <&camera_rear_ldo>;
+		//cam_vdig-supply = <&camera_ldo>;
 		cam_vio-supply = <&pm8998_lvs1>;
 		cam_vana-supply = <&pmi8998_bob>;
 		cam_clk-supply = <&titan_top_gdsc>;
@@ -364,7 +365,8 @@
 				&cam_sensor_rear2_suspend>;
 		gpios = <&tlmm 14 0>,
 			<&tlmm 7 0>,
-			<&tlmm 84 0>;
+			<&tlmm 8 0>; // all vana0
+			//<&tlmm 84 0>;
 		gpio-reset = <1>;
 		gpio-vana = <2>;
 		gpio-req-tbl-num = <0 1 2>;
@@ -373,7 +375,7 @@
 					"CAM_RESET1",
 					"CAM_VANA1";
 		sensor-mode = <0>;
-		cci-master = <1>;
+		cci-master = <0>;
 		status = "ok";
 		clocks = <&clock_camcc CAM_CC_MCLK1_CLK>;
 		clock-names = "cam_clk";
