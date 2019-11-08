@@ -1,7 +1,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include "sdm845-pmic-overlay.dtsi"
 #include "sdm845-pinctrl-overlay.dtsi"
-#include "sdm845-camera-sensor-cdp.dtsi"
+#include "sdm845-camera-sensor-mtp.dtsi"
 
 /* disable the SPI */
 &qupv3_se5_spi {
