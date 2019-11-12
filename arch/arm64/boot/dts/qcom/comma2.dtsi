@@ -4,6 +4,7 @@
 #include "sdm845-camera-sensor-mtp.dtsi"
 
 #include "dsi-panel-ss-fhd-ea8074-cmd.dtsi"
+#include <dt-bindings/clock/mdss-10nm-pll-clk.h>
 
 /* disable the SPI */
 &qupv3_se5_spi {
@@ -393,11 +394,12 @@
     qcom,dsi-phy = <&mdss_dsi_phy0>;
     clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
       <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
-    clock-names = "mux_byte_clk", "mux_pixel_clk";
+		clock-names = "src_byte_clk", "src_pixel_clk";
 
     pinctrl-names = "panel_active", "panel_suspend";
     pinctrl-0 = <&sde_dsi_active &sde_te_active>;
     pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
+
     /* gpios are correct and connected */
     qcom,platform-te-gpio = <&tlmm 10 0>;
     qcom,platform-reset-gpio = <&tlmm 6 0>;
@@ -407,30 +409,7 @@
     vddio-supply = <&pm8998_l14>;
 
     /*vci-supply = <&disp_vci_vreg>;*/
-
     qcom,dsi-display-active;
   };
-};
-
-/* broken, remove later */
-
-&dsi_lt9611_1080_video {
-  qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
-  qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
-  qcom,mdss-dsi-bl-min-level = <1>;
-  qcom,mdss-dsi-bl-max-level = <255>;
-  //qcom,mdss-dsi-mode-sel-gpio-state = "single_port";
-  //qcom,panel-mode-gpio = <&tlmm 52 0>;
-  qcom,platform-reset-gpio = <&tlmm 97 0>;
-};
-
-&dsi_lt9611_4k_video {
-  qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
-  qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
-  qcom,mdss-dsi-bl-min-level = <1>;
-  qcom,mdss-dsi-bl-max-level = <255>;
-  //qcom,mdss-dsi-mode-sel-gpio-state = "dual_port";
-  //qcom,panel-mode-gpio = <&tlmm 52 0>;
-  qcom,platform-reset-gpio = <&tlmm 97 0>;
 };
 
