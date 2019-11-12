@@ -50,7 +50,8 @@
 
 /* second home of the sensors besides SSC, BLSP4 on tici */
 &qupv3_se4_i2c {
-  status = "ok";
+  status = "disabled";
+  //status = "ok";
   qcom,clk-freq-out = <100000>;
 };
 

@@ -341,7 +341,7 @@
 				};
 			};
 
-			pcie0_3v3_on: pcie0_3v3_on {
+			/*pcie0_3v3_on: pcie0_3v3_on {
 				mux {
 					pins = "gpio90";
 					function = "gpio";
@@ -365,7 +365,7 @@
 					bias-disable;
 					output-high;
 				};
-			};
+			};*/
 		};
 
 		pcie1 {
