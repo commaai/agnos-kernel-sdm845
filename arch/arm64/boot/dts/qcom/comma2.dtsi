@@ -385,7 +385,22 @@
 };
 
 &soc {
-  dsi_ss_ea8074_fhd_cmd_display: qcom,dsi-display@22 {
+	dsi_panel_pwr_supply: dsi_panel_pwr_supply {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		qcom,panel-supply-entry@0 {
+			reg = <0>;
+			qcom,supply-name = "vddio";
+			qcom,supply-min-voltage = <1800000>;
+			qcom,supply-max-voltage = <1800000>;
+			qcom,supply-enable-load = <62000>;
+			qcom,supply-disable-load = <80>;
+			qcom,supply-post-on-sleep = <20>;
+		};
+	};
+
+  dsi_ss_ea8074_fhd_cmd_display: qcom,dsi-display@0 {
     compatible = "qcom,dsi-display";
     label = "dsi_ss_ea8074_fhd_cmd_display";
     qcom,display-type = "primary";
@@ -393,7 +408,7 @@
     qcom,dsi-ctrl = <&mdss_dsi0>;
     qcom,dsi-phy = <&mdss_dsi_phy0>;
     clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
-      <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+             <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
 		clock-names = "src_byte_clk", "src_pixel_clk";
 
     pinctrl-names = "panel_active", "panel_suspend";
@@ -403,13 +418,69 @@
     /* gpios are correct and connected */
     qcom,platform-te-gpio = <&tlmm 10 0>;
     qcom,platform-reset-gpio = <&tlmm 6 0>;
-    qcom,panel-errfg-gpio = <&tlmm 135 0>;
+    /*qcom,panel-errfg-gpio = <&tlmm 135 0>;*/
 
     qcom,dsi-panel = <&dsi_ss_fhd_ea8074_cmd>;
     vddio-supply = <&pm8998_l14>;
 
     /*vci-supply = <&disp_vci_vreg>;*/
-    qcom,dsi-display-active;
   };
+
+	sde_wb: qcom,wb-display@0 {
+		compatible = "qcom,wb-display";
+		cell-index = <0>;
+		label = "wb_display";
+	};
+
+	ext_disp: qcom,msm-ext-disp {
+		compatible = "qcom,msm-ext-disp";
+
+		ext_disp_audio_codec: qcom,msm-ext-disp-audio-codec-rx {
+			compatible = "qcom,msm-ext-disp-audio-codec-rx";
+		};
+	};
 };
+
+&sde_dp {
+	qcom,dp-usbpd-detection = <&pmi8998_pdphy>;
+	qcom,ext-disp = <&ext_disp>;
+
+	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
+	pinctrl-0 = <&sde_dp_aux_active &sde_dp_usbplug_cc_active>;
+	pinctrl-1 = <&sde_dp_aux_suspend &sde_dp_usbplug_cc_suspend>;
+	qcom,aux-en-gpio = <&tlmm 43 0>;
+	qcom,aux-sel-gpio = <&tlmm 51 0>;
+	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
+};
+
+&mdss_mdp {
+	connectors = <&sde_rscc &sde_wb &sde_dp>;
+};
+
+&dsi_ss_ea8074_fhd_cmd_display {
+  qcom,dsi-display-active;
+};
+
+&dsi_ss_fhd_ea8074_cmd {
+  /* questionable */
+  qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+  qcom,platform-te-gpio = <&tlmm 10 0>;
+  qcom,platform-reset-gpio = <&tlmm 6 0>;
+
+  qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+  qcom,mdss-dsi-bl-min-level = <1>;
+  qcom,mdss-dsi-bl-max-level = <255>;
+
+  qcom,mdss-dsi-t-clk-post = <0x0e>;
+  qcom,mdss-dsi-t-clk-pre = <0x31>;
+  qcom,mdss-dsi-display-timings {
+    timing@0{
+      qcom,mdss-dsi-panel-phy-timings = [00 20 08 08 24 23 08
+        08 05 03 04 00];
+      qcom,display-topology = <1 0 1>;
+      qcom,default-topology-index = <0>;
+    };  
+  };  
+};
+
 
