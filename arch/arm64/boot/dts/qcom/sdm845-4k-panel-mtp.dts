@@ -53,6 +53,6 @@
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
 };
 
-&dsi_sharp_4k_dsc_video_display {
+/*&dsi_sharp_4k_dsc_video_display {
 	qcom,dsi-display-active;
-};
+};*/

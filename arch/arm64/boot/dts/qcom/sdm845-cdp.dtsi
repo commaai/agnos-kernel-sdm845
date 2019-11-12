@@ -290,9 +290,9 @@
 	qcom,platform-te-gpio = <&tlmm 10 0>;
 };
 
-&dsi_nt35597_truly_dsc_cmd_display {
+/*&dsi_nt35597_truly_dsc_cmd_display {
 	qcom,dsi-display-active;
-};
+};*/
 
 &pmi8998_wled {
 	status = "okay";
