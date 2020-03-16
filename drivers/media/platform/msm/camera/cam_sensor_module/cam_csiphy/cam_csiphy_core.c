@@ -502,8 +502,8 @@ static int32_t cam_csiphy_external_cmd(struct csiphy_device *csiphy_dev,
 	} else {
 		csiphy_dev->csiphy_info.lane_cnt =
 			cam_cmd_csiphy_info.lane_cnt;
-		csiphy_dev->csiphy_info.lane_cnt =
-			cam_cmd_csiphy_info.lane_cnt;
+		csiphy_dev->csiphy_info.lane_assign =
+			cam_cmd_csiphy_info.lane_assign;
 		csiphy_dev->csiphy_info.lane_mask =
 			cam_cmd_csiphy_info.lane_mask;
 		csiphy_dev->csiphy_info.csiphy_3phase =
