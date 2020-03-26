@@ -354,9 +354,9 @@
 		regulator-names = "cam_vio", "cam_vana", "cam_vdig",
 			"cam_clk";
 		rgltr-cntrl-support;
-		rgltr-min-voltage = <1050000 0 3312000 0>;
-		rgltr-max-voltage = <1050000 0 3600000 0>;
-		rgltr-load-current = <105000 0 80000 0>;
+		rgltr-min-voltage = <0 3312000 1050000 0>;
+		rgltr-max-voltage = <0 3600000 1050000 0>;
+		rgltr-load-current = <0 80000 105000 0>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam_sensor_mclk1_active
