@@ -281,13 +281,14 @@ static int dsi_panel_gpio_request(struct dsi_panel *panel)
 		}
 	}
 
-	if (gpio_is_valid(r_config->lcd_mode_sel_gpio)) {
-		rc = gpio_request(r_config->lcd_mode_sel_gpio, "mode_gpio");
-		if (rc) {
-			pr_err("request for mode_gpio failed, rc=%d\n", rc);
-			goto error_release_mode_sel;
-		}
-	}
+	// HACK: this does something it's not supposed to
+	// if (gpio_is_valid(r_config->lcd_mode_sel_gpio)) {
+	// 	rc = gpio_request(r_config->lcd_mode_sel_gpio, "mode_gpio");
+	// 	if (rc) {
+	// 		pr_err("request for mode_gpio failed, rc=%d\n", rc);
+	// 		goto error_release_mode_sel;
+	// 	}
+	// }
 
 	goto error;
 error_release_mode_sel:

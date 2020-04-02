@@ -407,18 +407,12 @@
 
     qcom,dsi-ctrl = <&mdss_dsi0>;
     qcom,dsi-phy = <&mdss_dsi_phy0>;
-    clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
-             <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+    clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>, <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
 		clock-names = "src_byte_clk", "src_pixel_clk";
 
     pinctrl-names = "panel_active", "panel_suspend";
     pinctrl-0 = <&sde_dsi_active &sde_te_active>;
     pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
-
-    /* gpios are correct and connected */
-    qcom,platform-te-gpio = <&tlmm 10 0>;
-    qcom,platform-reset-gpio = <&tlmm 6 0>;
-    /*qcom,panel-errfg-gpio = <&tlmm 135 0>;*/
 
     qcom,dsi-panel = <&dsi_ss_fhd_ea8074_cmd>;
     vddio-supply = <&pm8998_l14>;
@@ -441,46 +435,51 @@
 	};
 };
 
-&sde_dp {
-	qcom,dp-usbpd-detection = <&pmi8998_pdphy>;
-	qcom,ext-disp = <&ext_disp>;
+// &sde_dp {
+// 	qcom,dp-usbpd-detection = <&pmi8998_pdphy>;
+// 	qcom,ext-disp = <&ext_disp>;
 
-	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
-	pinctrl-0 = <&sde_dp_aux_active &sde_dp_usbplug_cc_active>;
-	pinctrl-1 = <&sde_dp_aux_suspend &sde_dp_usbplug_cc_suspend>;
-	qcom,aux-en-gpio = <&tlmm 43 0>;
-	qcom,aux-sel-gpio = <&tlmm 51 0>;
-	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
+// 	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
+// 	pinctrl-0 = <&sde_dp_aux_active &sde_dp_usbplug_cc_active>;
+// 	pinctrl-1 = <&sde_dp_aux_suspend &sde_dp_usbplug_cc_suspend>;
+// 	qcom,aux-en-gpio = <&tlmm 43 0>;
+// 	qcom,aux-sel-gpio = <&tlmm 51 0>;
+// 	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
+
+// };
+
+&mdss_dsi0 {
+   qcom,dsi-pref-prim-pan = <&dsi_ss_fhd_ea8074_cmd>;
+   status = "ok";
 };
 
 &mdss_mdp {
 	connectors = <&sde_rscc &sde_wb &sde_dp>;
 };
 
+// Display
 &dsi_ss_ea8074_fhd_cmd_display {
   qcom,dsi-display-active;
 };
 
+// Panel
 &dsi_ss_fhd_ea8074_cmd {
-  /* questionable */
   qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+
+  /* gpios are correct and connected */
   qcom,platform-te-gpio = <&tlmm 10 0>;
   qcom,platform-reset-gpio = <&tlmm 6 0>;
-
-  qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
-  qcom,mdss-dsi-bl-min-level = <1>;
-  qcom,mdss-dsi-bl-max-level = <255>;
+  //qcom,panel-errfg-gpio = <&tlmm 135 0>
 
   qcom,mdss-dsi-t-clk-post = <0x0e>;
-  qcom,mdss-dsi-t-clk-pre = <0x31>;
-  qcom,mdss-dsi-display-timings {
-    timing@0{
-      qcom,mdss-dsi-panel-phy-timings = [00 20 08 08 24 23 08
-        08 05 03 04 00];
-      qcom,display-topology = <1 0 1>;
-      qcom,default-topology-index = <0>;
-    };  
-  };  
+	qcom,mdss-dsi-t-clk-pre = <0x31>;
+	qcom,mdss-dsi-display-timings {
+		timing@0{
+			qcom,mdss-dsi-panel-phy-timings = [00 20 08 08 24 23 08 08 05 03 04 00];
+			qcom,display-topology = <1 0 1>;
+			qcom,default-topology-index = <0>;
+		};
+	};
 };
 
 
