@@ -440,6 +440,24 @@
 		status = "disabled";
 	};
 
+  // GPS UART?
+  qupv3_gps_uart: qcom,qup_uart@0x88c000 {
+		compatible = "qcom,msm-geni-serial-hs";
+		reg = <0x88c000 0x4000>;
+		reg-names = "se_phys";
+		clock-names = "se-clk", "m-ahb", "s-ahb";
+		clocks = <&clock_gcc GCC_QUPV3_WRAP0_S3_CLK>,
+			<&clock_gcc GCC_QUPV3_WRAP_0_M_AHB_CLK>,
+			<&clock_gcc GCC_QUPV3_WRAP_0_S_AHB_CLK>;
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&qupv3_se3_ctsrx>, <&qupv3_se3_rts>, <&qupv3_se3_tx>;
+		pinctrl-1 = <&qupv3_se3_ctsrx>, <&qupv3_se3_rts>, <&qupv3_se3_tx>;
+		interrupts-extended = <GIC_SPI 604 0>, <&tlmm 44 0>; // Not sure. Found online
+		qcom,wrapper-core = <&qupv3_0>;
+		qcom,wakeup-byte = <0xFD>;
+		status = "disabled";
+	};
+
 	/* Debug UART Instance for RUMI platform */
 	qupv3_se10_2uart: qcom,qup_uart@0xa88000 {
 		compatible = "qcom,msm-geni-console";
