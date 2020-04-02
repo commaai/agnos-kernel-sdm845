@@ -2547,12 +2547,22 @@ _sde_kms_get_address_space(struct msm_kms *kms,
 		return NULL;
 	}
 
-	if (domain >= MSM_SMMU_DOMAIN_MAX)
+	if (domain >= MSM_SMMU_DOMAIN_MAX){
+		SDE_ERROR("domain (%d) bigger than MSM_SMMU_DOMAIN_MAX (%d)\n", domain, MSM_SMMU_DOMAIN_MAX);
 		return NULL;
+	}
 
-	return (sde_kms->aspace[domain] &&
-			sde_kms->aspace[domain]->domain_attached) ?
-		sde_kms->aspace[domain] : NULL;
+	if (!sde_kms->aspace[domain]){
+		SDE_ERROR("no sde_kms->aspace[domain] for domain (%d)\n", domain);
+		return NULL;
+	}
+
+	if (!sde_kms->aspace[domain]->domain_attached){
+		SDE_ERROR("sde_kms->aspace[domain]->domain_attached == false for domain (%d)\n", domain);
+		return NULL;
+	}
+
+	return sde_kms->aspace[domain];
 }
 
 static void _sde_kms_post_open(struct msm_kms *kms, struct drm_file *file)
