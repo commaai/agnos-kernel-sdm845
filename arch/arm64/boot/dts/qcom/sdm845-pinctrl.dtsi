@@ -2535,6 +2535,48 @@
 			};
 		};
 
+    // GPS UART
+    qupv3_se3_4uart_pins: qupv3_se3_4uart_pins {
+			qupv3_se3_ctsrx: qupv3_se3_ctsrx {
+				mux {
+					pins = "gpio41", "gpio44";
+					function = "qup03";
+				};
+
+				config {
+					pins = "gpio41", "gpio44";
+					drive-strength = <2>;
+					bias-no-pull;
+				};
+			};
+
+			qupv3_se3_rts: qupv3_se3_rts {
+				mux {
+					pins = "gpio42";
+					function = "qup03";
+				};
+
+				config {
+					pins = "gpio42";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+
+			qupv3_se3_tx: qupv3_se3_tx {
+				mux {
+					pins = "gpio43";
+					function = "qup03";
+				};
+
+				config {
+					pins = "gpio43";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+		};
+
 		qupv3_se9_2uart_pins: qupv3_se9_2uart_pins {
 			qupv3_se9_2uart_active: qupv3_se9_2uart_active {
 				mux {
