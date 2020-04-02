@@ -2540,7 +2540,7 @@
 			qupv3_se3_ctsrx: qupv3_se3_ctsrx {
 				mux {
 					pins = "gpio41", "gpio44";
-					function = "qup03";
+					function = "qup3";
 				};
 
 				config {
@@ -2553,7 +2553,7 @@
 			qupv3_se3_rts: qupv3_se3_rts {
 				mux {
 					pins = "gpio42";
-					function = "qup03";
+					function = "qup3";
 				};
 
 				config {
@@ -2566,7 +2566,7 @@
 			qupv3_se3_tx: qupv3_se3_tx {
 				mux {
 					pins = "gpio43";
-					function = "qup03";
+					function = "qup3";
 				};
 
 				config {
