@@ -1856,18 +1856,34 @@ msm_gem_smmu_address_space_get(struct drm_device *dev,
 	struct msm_kms *kms;
 	const struct msm_kms_funcs *funcs;
 
-	if ((!dev) || (!dev->dev_private))
+	if (!dev) {
+		dev_err(dev, "msm_gem_smmu_address_space_get: no dev\n");
 		return NULL;
+	}
+
+	if (!dev->dev_private) {
+		dev_err(dev, "msm_gem_smmu_address_space_get: no dev->dev_private\n");
+		return NULL;
+	}
 
 	priv = dev->dev_private;
 	kms = priv->kms;
-	if (!kms)
+	if (!kms) {
+		dev_err(dev, "msm_gem_smmu_address_space_get: no kms\n");
 		return NULL;
+	}
 
 	funcs = kms->funcs;
 
-	if ((!funcs) || (!funcs->get_address_space))
+	if (!funcs) {
+		dev_err(dev, "msm_gem_smmu_address_space_get: no funcs\n");
 		return NULL;
+	}
+
+	if (!funcs->get_address_space) {
+		dev_err(dev, "msm_gem_smmu_address_space_get: no funcs->get_address_space\n");
+		return NULL;
+	}
 
 	return funcs->get_address_space(priv->kms, domain);
 }
