@@ -880,12 +880,12 @@ static void msm_geni_serial_start_tx(struct uart_port *uport)
 	unsigned int geni_status;
 	unsigned int geni_ios;
 
-	if (!uart_console(uport) && !pm_runtime_active(uport->dev)) {
+	/*if (!uart_console(uport) && !pm_runtime_active(uport->dev)) {
 		IPC_LOG_MSG(msm_port->ipc_log_misc,
 				"%s.Putting in async RPM vote\n", __func__);
 		pm_runtime_get(uport->dev);
 		goto exit_start_tx;
-	}
+	}*/
 
 	if (!uart_console(uport)) {
 		IPC_LOG_MSG(msm_port->ipc_log_misc,
