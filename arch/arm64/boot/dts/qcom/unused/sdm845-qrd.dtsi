@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,10 +10,14 @@
  * GNU General Public License for more details.
  */
 
-#include <dt-bindings/gpio/gpio.h>
 #include "sdm845-pmic-overlay.dtsi"
 #include "sdm845-pinctrl-overlay.dtsi"
-#include "sdm845-camera-sensor-cdp.dtsi"
+#include "sdm845-camera-sensor-qrd.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+
+&qupv3_se10_i2c {
+#include "smb1355.dtsi"
+};
 
 &vendor {
 	bluetooth: bt_wcn3990 {
@@ -36,6 +40,19 @@
 		qca,bt-vdd-pa-current-level = <1>; /* LPM/PFM */
 		qca,bt-vdd-ldo-current-level = <1>; /* LPM/PFM */
 	};
+
+	qrd_batterydata: qcom,battery-data {
+		qcom,batt-id-range-pct = <15>;
+		//#include "fg-gen3-batterydata-gt3746a6-2900mah.dtsi"
+	};
+};
+
+&qupv3_se9_2uart {
+	status = "ok";
+};
+
+&qupv3_se8_spi {
+	status = "ok";
 };
 
 &soc {
@@ -44,20 +61,7 @@
 		label = "gpio-keys";
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&key_home_default
-			     &key_vol_up_default
-			     &key_cam_snapshot_default
-			     &key_cam_focus_default>;
-
-		home {
-			label = "home";
-			gpios = <&pm8998_gpios 5 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
-			linux,code = <102>;
-			gpio-key,wakeup;
-			debounce-interval = <15>;
-			linux,can-disable;
-		};
+		pinctrl-0 = <&key_vol_up_default>;
 
 		vol_up {
 			label = "volume_up";
@@ -68,27 +72,49 @@
 			debounce-interval = <15>;
 			linux,can-disable;
 		};
-
-		cam_snapshot {
-			label = "cam_snapshot";
-			gpios = <&pm8998_gpios 7 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
-			linux,code = <766>;
-			gpio-key,wakeup;
-			debounce-interval = <15>;
-			linux,can-disable;
-		};
-
-		cam_focus {
-			label = "cam_focus";
-			gpios = <&pm8998_gpios 8 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
-			linux,code = <528>;
-			gpio-key,wakeup;
-			debounce-interval = <15>;
-			linux,can-disable;
-		};
 	};
+};
+
+&qupv3_se3_i2c {
+	status = "ok";
+	nq@28 {
+		compatible = "qcom,nq-nci";
+		reg = <0x28>;
+		qcom,nq-irq = <&tlmm 63 0x00>;
+		qcom,nq-ven = <&tlmm 12 0x00>;
+		qcom,nq-firm = <&tlmm 62 0x00>;
+		qcom,nq-clkreq = <&pm8998_gpios 21 0x00>;
+		qcom,nq-esepwr = <&tlmm 116 0x00>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <63 0>;
+		interrupt-names = "nfc_irq";
+		pinctrl-names = "nfc_active", "nfc_suspend";
+		pinctrl-0 = <&nfc_int_active
+			     &nfc_enable_active
+			     &nfc_clk_default>;
+		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend>;
+	};
+};
+
+&qupv3_se10_i2c {
+	status = "ok";
+};
+
+&qupv3_se6_4uart {
+	status = "ok";
+};
+
+&pmi8998_fg {
+	qcom,battery-data = <&qrd_batterydata>;
+	qcom,fg-bmd-en-delay-ms = <300>;
+};
+
+&smb1355_charger_0 {
+	status = "ok";
+};
+
+&smb1355_charger_1 {
+	status = "ok";
 };
 
 &mdss_mdp {
@@ -139,160 +165,10 @@
 	status = "ok";
 };
 
-&pmi8998_switch1 {
-	pinctrl-names = "led_enable", "led_disable";
-	pinctrl-0 = <&flash_led3_front_en>;
-	pinctrl-1 = <&flash_led3_front_dis>;
-};
-
-&pmi8998_charger {
-	qcom,batteryless-platform;
-};
-
-&vendor {
-	extcon_usb1: extcon_usb1 {
-		compatible = "linux,extcon-usb-gpio";
-		id-gpio = <&pmi8998_gpios 9 GPIO_ACTIVE_HIGH>;
-		vbus-gpio = <&pmi8998_gpios 8 GPIO_ACTIVE_HIGH>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&usb2_vbus_det_default
-			     &usb2_id_det_default>;
-	};
-
-	usb1_vbus_vreg: usb1_vbus_vreg {
-		compatible = "regulator-fixed";
-		regulator-name = "usb_vbus_vreg";
-		gpio = <&pmi8998_gpios 2 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-
-		/* Typical EN-to-VBUS turn on time for NX5P1100 */
-		regulator-enable-ramp-delay = <630>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&usb2_vbus_boost_default>;
-	};
-};
-
-&qupv3_se9_2uart {
-	status = "ok";
-};
-
 &labibb {
 	status = "ok";
 	qcom,qpnp-labibb-mode = "lcd";
 };
-
-&dsi_dual_nt35597_truly_video {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,mdss-dsi-mode-sel-gpio-state = "dual_port";
-	qcom,panel-mode-gpio = <&tlmm 52 0>;
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_dual_nt35597_truly_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,mdss-dsi-mode-sel-gpio-state = "dual_port";
-	qcom,panel-mode-gpio = <&tlmm 52 0>;
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-	qcom,platform-te-gpio = <&tlmm 10 0>;
-};
-
-&dsi_nt35597_truly_dsc_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,mdss-dsi-mode-sel-gpio-state = "single_port";
-	qcom,panel-mode-gpio = <&tlmm 52 0>;
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-	qcom,platform-te-gpio = <&tlmm 10 0>;
-};
-
-&dsi_nt35597_truly_dsc_video {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,mdss-dsi-mode-sel-gpio-state = "single_port";
-	qcom,panel-mode-gpio = <&tlmm 52 0>;
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_sharp_1080_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_sim_vid {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_dual_sim_vid {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_sim_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_dual_sim_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_sim_dsc_375_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_dual_sim_dsc_375_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_dual_nt35597_video {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,mdss-dsi-mode-sel-gpio-state = "dual_port";
-	qcom,panel-mode-gpio = <&tlmm 52 0>;
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_dual_nt35597_cmd {
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,mdss-dsi-mode-sel-gpio-state = "dual_port";
-	qcom,panel-mode-gpio = <&tlmm 52 0>;
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-	qcom,platform-te-gpio = <&tlmm 10 0>;
-};
-
-/*&dsi_nt35597_truly_dsc_cmd_display {
-	qcom,dsi-display-active;
-};*/
 
 &pmi8998_wled {
 	status = "okay";
@@ -300,56 +176,50 @@
 };
 
 &pmi8998_haptics {
-	qcom,vmax-mv = <2400>;
+	qcom,vmax-mv = <1800>;
+	qcom,wave-play-rate-us = <4347>;
 	qcom,lra-auto-mode;
 	status = "okay";
 };
 
-&qupv3_se8_spi {
+&mdss_mdp {
+	connectors = <&sde_rscc &sde_wb &sde_dp>;
+};
+
+// &dsi_nt35597_truly_dsc_cmd {
+// 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+// 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+// 	qcom,mdss-dsi-bl-min-level = <1>;
+// 	qcom,mdss-dsi-bl-max-level = <4095>;
+// 	qcom,mdss-dsi-mode-sel-gpio-state = "single_port";
+// 	qcom,panel-mode-gpio = <&tlmm 52 0>;
+// 	qcom,platform-te-gpio = <&tlmm 10 0>;
+// 	qcom,platform-reset-gpio = <&tlmm 6 0>;
+// 	qcom,mdss-dsi-panel-orientation = "180";
+// };
+
+// &dsi_nt35597_truly_dsc_video {
+// 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+// 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+// 	qcom,mdss-dsi-bl-min-level = <1>;
+// 	qcom,mdss-dsi-bl-max-level = <4095>;
+// 	qcom,mdss-dsi-mode-sel-gpio-state = "single_port";
+// 	qcom,panel-mode-gpio = <&tlmm 52 0>;
+// 	qcom,platform-te-gpio = <&tlmm 10 0>;
+// 	qcom,platform-reset-gpio = <&tlmm 6 0>;
+// 	qcom,mdss-dsi-panel-orientation = "180";
+// };
+
+// &dsi_nt35597_truly_dsc_cmd_display {
+// 	qcom,dsi-display-active;
+// };
+
+&wil6210 {
 	status = "ok";
 };
 
-&qupv3_se3_i2c {
+&ext_5v_boost {
 	status = "ok";
-	nq@28 {
-		compatible = "qcom,nq-nci";
-		reg = <0x28>;
-		qcom,nq-irq = <&tlmm 63 0x00>;
-		qcom,nq-ven = <&tlmm 12 0x00>;
-		qcom,nq-firm = <&tlmm 62 0x00>;
-		qcom,nq-clkreq = <&pm8998_gpios 21 0x00>;
-		qcom,nq-esepwr = <&tlmm 116 0x00>;
-		interrupt-parent = <&tlmm>;
-		interrupts = <63 0>;
-		interrupt-names = "nfc_irq";
-		pinctrl-names = "nfc_active", "nfc_suspend";
-		pinctrl-0 = <&nfc_int_active
-			     &nfc_enable_active
-			     &nfc_clk_default>;
-		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend>;
-	};
-};
-
-&qupv3_se10_i2c {
-	status = "ok";
-};
-
-&qupv3_se6_4uart {
-	status = "ok";
-};
-
-&usb1 {
-	status = "okay";
-	extcon = <&extcon_usb1>;
-	vbus_dwc3-supply = <&usb1_vbus_vreg>;
-};
-
-&qusb_phy1 {
-	status = "okay";
-};
-
-&usb_qmp_phy {
-	status = "okay";
 };
 
 &pm8998_vadc {
@@ -485,8 +355,8 @@
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
-				hysteresis = <10000>;
+				temperature = <65000>;
+				hysteresis = <1000>;
 				type = "passive";
 			};
 		};
@@ -500,8 +370,8 @@
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
-				hysteresis = <10000>;
+				temperature = <65000>;
+				hysteresis = <1000>;
 				type = "passive";
 			};
 		};
@@ -515,8 +385,8 @@
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
-				hysteresis = <10000>;
+				temperature = <65000>;
+				hysteresis = <1000>;
 				type = "passive";
 			};
 		};
@@ -530,18 +400,10 @@
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
-				hysteresis = <10000>;
+				temperature = <65000>;
+				hysteresis = <1000>;
 				type = "passive";
 			};
 		};
 	};
-};
-
-&wil6210 {
-	status = "ok";
-};
-
-&ext_5v_boost {
-	status = "ok";
 };
