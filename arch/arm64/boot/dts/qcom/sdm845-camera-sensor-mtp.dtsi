@@ -116,6 +116,10 @@
 	qcom,cam-res-mgr {
 		compatible = "qcom,cam-res-mgr";
 		status = "ok";
+		// shared-gpios = <8>;
+		// pinctrl-names = "cam_res_mgr_default", "cam_res_mgr_suspend";
+		// pinctrl-0 = <&cam_res_mgr_active>;
+		// pinctrl-1 = <&cam_res_mgr_suspend>;
 	};
 
 	actuator_rear: qcom,actuator@0 {
@@ -353,7 +357,7 @@
 		cam_clk-supply = <&titan_top_gdsc>;
 		regulator-names = "cam_vio", "cam_vana", "cam_vdig",
 			"cam_clk";
-		//rgltr-cntrl-support;
+		rgltr-cntrl-support;
 		rgltr-min-voltage = <0 3312000 1050000 0>;
 		rgltr-max-voltage = <0 3600000 1050000 0>;
 		rgltr-load-current = <0 80000 105000 0>;
@@ -400,7 +404,7 @@
 		cam_clk-supply = <&titan_top_gdsc>;
 		regulator-names = "cam_vio", "cam_vana", "cam_vdig",
 			"cam_clk";
-		//rgltr-cntrl-support;
+		rgltr-cntrl-support;
 		rgltr-min-voltage = <0 3312000 1050000 0>;
 		rgltr-max-voltage = <0 3600000 1050000 0>;
 		rgltr-load-current = <0 80000 105000 0>;
