@@ -89,6 +89,19 @@
     enable-active-high;
     regulator-always-on;
   };
+
+  main5v: main5v {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "main5v";
+    regulator-min-microvolt = <5000000>;
+    regulator-max-microvolt = <5000000>;
+
+    gpio = <&tlmm 25 0>;
+    enable-active-high;
+    regulator-always-on;
+  };
 };
 
 /* IMUs are on SSC i2c, have to interact with that firmware */
@@ -166,10 +179,6 @@
 
 &pmi8998_pdphy {
   vbus-supply = <&smb2_vbus>;
-};
-
-&ext_5v_boost {
-  status = "disabled";
 };
 
 &usb_qmp_phy {
@@ -404,6 +413,7 @@
     compatible = "qcom,dsi-display";
     label = "dsi_ss_ea8074_fhd_cmd_display";
     qcom,display-type = "primary";
+    qcom,dsi-display-active;
 
     qcom,dsi-ctrl = <&mdss_dsi0>;
     qcom,dsi-phy = <&mdss_dsi_phy0>;
@@ -426,13 +436,13 @@
 		label = "wb_display";
 	};
 
-	ext_disp: qcom,msm-ext-disp {
-		compatible = "qcom,msm-ext-disp";
+	// ext_disp: qcom,msm-ext-disp {
+	// 	compatible = "qcom,msm-ext-disp";
 
-		ext_disp_audio_codec: qcom,msm-ext-disp-audio-codec-rx {
-			compatible = "qcom,msm-ext-disp-audio-codec-rx";
-		};
-	};
+	// 	ext_disp_audio_codec: qcom,msm-ext-disp-audio-codec-rx {
+	// 		compatible = "qcom,msm-ext-disp-audio-codec-rx";
+	// 	};
+	// };
 };
 
 // &sde_dp {
@@ -455,11 +465,6 @@
 
 &mdss_mdp {
 	connectors = <&sde_rscc &sde_wb &sde_dp>;
-};
-
-// Display
-&dsi_ss_ea8074_fhd_cmd_display {
-  qcom,dsi-display-active;
 };
 
 // Panel

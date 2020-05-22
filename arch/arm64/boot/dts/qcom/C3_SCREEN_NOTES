@@ -1,0 +1,7 @@
+Panel name: SS EA8074
+
+DTS components:
+    - dsi_panel_pwr_supply: dsi_panel_pwr_supply
+    - dsi_ss_ea8074_fhd_cmd_display: qcom,dsi-display
+    - sde_wb: qcom,wb-display
+    - dsi_ss_fhd_ea8074_cmd: qcom,mdss_dsi_ss_fhd_ea8074_cmd
