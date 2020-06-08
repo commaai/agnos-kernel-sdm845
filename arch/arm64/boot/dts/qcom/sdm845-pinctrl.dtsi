@@ -3694,13 +3694,13 @@
 					mux {
 						pins = "gpio78";
 						function = "gpio";
-					};   
+					};
 
 					config {
 						pins = "gpio78";
-						drive-strength = <8>; 
+						drive-strength = <8>;
 						bias-disable;
-					}; 
+					};
 	   		};
 		};
 	};
@@ -3783,21 +3783,33 @@
 		};
 	};
 
-	camera_rear_avdd_en {
-		camera_rear_avdd_en_default: camera_rear_avdd_en_default {
+	tp_3v3_en_n {
+		tp_3v3_en_n_active: tp_3v3_en_n_active {
 			pins = "gpio10";
 			function = "normal";
 			power-source = <0>;
 			output-low;
 		};
+
+		tp_3v3_en_n_suspend: tp_3v3_en_n_suspend {
+			pins = "gpio10";
+			function = "normal";
+			power-source = <0>;
+		};
 	};
 
-	led_user4 {
-		led_user4_default: led_user4_default {
+	lcd_3v3_en_n {
+		lcd_3v3_en_n_active: lcd_3v3_en_n_active {
 			pins = "gpio13";
 			function = "normal";
 			power-source = <0>;
 			output-low;
+		};
+
+		lcd_3v3_en_n_suspend: lcd_3v3_en_n_suspend {
+			pins = "gpio13";
+			function = "normal";
+			power-source = <0>;
 		};
 	};
 
