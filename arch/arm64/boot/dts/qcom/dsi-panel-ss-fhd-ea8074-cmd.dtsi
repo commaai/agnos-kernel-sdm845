@@ -16,7 +16,7 @@
  * Update input XML file to add a new entry or update variable in this file
  * VERSION = "1.0"
  *---------------------------------------------------------------------------*/
-&soc {
+&mdss_mdp {
 	dsi_ss_fhd_ea8074_cmd: qcom,mdss_dsi_ss_fhd_ea8074_cmd {
 		qcom,mdss-dsi-panel-name = "ss fhd cmd dsi panel";
 		qcom,mdss-dsi-panel-id = <0>;
@@ -38,7 +38,7 @@
 		qcom,mdss-dsi-lane-3-state;
 		qcom,mdss-dsi-t-clk-post = <0x0e>;
 		qcom,mdss-dsi-t-clk-pre = <0x31>;
-                qcom,mdss-dsi-bl-min-level = <1>;
+        qcom,mdss-dsi-bl-min-level = <1>;
 		qcom,mdss-dsi-bl-max-level = <1023>;
 		qcom,mdss-brightness-max-level = <1023>;
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";

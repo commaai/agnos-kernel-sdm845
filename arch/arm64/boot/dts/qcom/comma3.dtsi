@@ -102,6 +102,30 @@
     enable-active-high;
     regulator-always-on;
   };
+
+  // lcd3v3: lcd3v3 {
+  //   status = "ok";
+
+  //   compatible = "regulator-fixed";
+  //   regulator-name = "lcd3v3";
+  //   regulator-min-microvolt = <3300000>;
+  //   regulator-max-microvolt = <3300000>;
+
+  //   gpio = <&pm8998_gpios 13 0>;
+  //   regulator-boot-on;
+  // };
+
+  // tp3v3: tp3v3 {
+  //   status = "ok";
+
+  //   compatible = "regulator-fixed";
+  //   regulator-name = "tp3v3";
+  //   regulator-min-microvolt = <3300000>;
+  //   regulator-max-microvolt = <3300000>;
+
+  //   gpio = <&pm8998_gpios 10 0>;
+  //   regulator-boot-on;
+  // };
 };
 
 /* IMUs are on SSC i2c, have to interact with that firmware */
@@ -421,6 +445,8 @@
 		clock-names = "src_byte_clk", "src_pixel_clk";
 
     pinctrl-names = "panel_active", "panel_suspend";
+    //pinctrl-0 = <&sde_dsi_active &sde_te_active &lcd_3v3_en_n_active &tp_3v3_en_n_active>;
+    //pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend &lcd_3v3_en_n_suspend &tp_3v3_en_n_suspend>;
     pinctrl-0 = <&sde_dsi_active &sde_te_active>;
     pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 
@@ -436,27 +462,27 @@
 		label = "wb_display";
 	};
 
-	// ext_disp: qcom,msm-ext-disp {
-	// 	compatible = "qcom,msm-ext-disp";
+	ext_disp: qcom,msm-ext-disp {
+		compatible = "qcom,msm-ext-disp";
 
-	// 	ext_disp_audio_codec: qcom,msm-ext-disp-audio-codec-rx {
-	// 		compatible = "qcom,msm-ext-disp-audio-codec-rx";
-	// 	};
-	// };
+		ext_disp_audio_codec: qcom,msm-ext-disp-audio-codec-rx {
+			compatible = "qcom,msm-ext-disp-audio-codec-rx";
+		};
+	};
 };
 
-// &sde_dp {
-// 	qcom,dp-usbpd-detection = <&pmi8998_pdphy>;
-// 	qcom,ext-disp = <&ext_disp>;
+&sde_dp {
+  status = "disabled";
+	qcom,dp-usbpd-detection = <&pmi8998_pdphy>;
+	qcom,ext-disp = <&ext_disp>;
 
-// 	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
-// 	pinctrl-0 = <&sde_dp_aux_active &sde_dp_usbplug_cc_active>;
-// 	pinctrl-1 = <&sde_dp_aux_suspend &sde_dp_usbplug_cc_suspend>;
-// 	qcom,aux-en-gpio = <&tlmm 43 0>;
-// 	qcom,aux-sel-gpio = <&tlmm 51 0>;
-// 	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
-
-// };
+	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
+	pinctrl-0 = <&sde_dp_aux_active &sde_dp_usbplug_cc_active>;
+	pinctrl-1 = <&sde_dp_aux_suspend &sde_dp_usbplug_cc_suspend>;
+	qcom,aux-en-gpio = <&tlmm 43 0>;
+	qcom,aux-sel-gpio = <&tlmm 51 0>;
+	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
+};
 
 &mdss_dsi0 {
    qcom,dsi-pref-prim-pan = <&dsi_ss_fhd_ea8074_cmd>;
@@ -464,7 +490,8 @@
 };
 
 &mdss_mdp {
-	connectors = <&sde_rscc &sde_wb &sde_dp>;
+	//connectors = <&sde_rscc &sde_wb &sde_dp>;
+  connectors = <&sde_rscc &sde_wb>;
 };
 
 // Panel
