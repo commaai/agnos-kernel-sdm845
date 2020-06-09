@@ -547,6 +547,7 @@ config SND_SOC_LM49453
 
 config SND_SOC_MAX98088
        tristate
+       default y
 
 config SND_SOC_MAX98090
        tristate
