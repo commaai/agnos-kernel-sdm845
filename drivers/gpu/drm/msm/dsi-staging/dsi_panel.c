@@ -640,13 +640,14 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 
 	dsi = &panel->mipi_device;
 
-	mutex_lock(&panel->panel_lock);
+  // commented out to remove double lock
+	//mutex_lock(&panel->panel_lock);
 
 	rc = mipi_dsi_dcs_set_display_brightness(dsi, bl_lvl);
 	if (rc < 0)
 		pr_err("failed to update dcs backlight:%d\n", bl_lvl);
 
-	mutex_unlock(&panel->panel_lock);
+	//mutex_unlock(&panel->panel_lock);
 	return rc;
 }
 
@@ -664,8 +665,8 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		dsi_panel_update_backlight(panel, bl_lvl);
 		break;
 	default:
-		//pr_err("Backlight type(%d) not supported\n", bl->type);
-		//rc = -ENOTSUPP;
+		pr_err("Backlight type(%d) not supported\n", bl->type);
+		rc = -ENOTSUPP;
 		break;
 	}
 

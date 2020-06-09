@@ -11,7 +11,14 @@ Init panel?
 - build
 - cd ~/libdrm/tests/modetest
 - sudo ./modetest -M msm_drm -s 26:1080x2160
+- sudo ./modetest -M msm_drm -s 26:1080x2160-60
+- sudo ./modetest -M msm_drm -s 26@111:1080x2160-60
 
 File of the month
 -- /sys/kernel/debug# cat pinctrl/3400000.pinctrl/pinmux-pins
 
+sudo su -c 'echo 1 > /sys/kernel/debug/regulator/lcd3v3/enable'
+sudo su -c 'echo 1 > /sys/kernel/debug/regulator/tp3v3/enable'
+
+
+/sys/devices/platform/soc/ae00000.qcom,mdss_mdp/backlight/panel0-backlight/brightness

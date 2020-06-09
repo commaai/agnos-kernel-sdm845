@@ -103,29 +103,29 @@
     regulator-always-on;
   };
 
-  // lcd3v3: lcd3v3 {
-  //   status = "ok";
+  lcd3v3: lcd3v3 {
+    status = "ok";
 
-  //   compatible = "regulator-fixed";
-  //   regulator-name = "lcd3v3";
-  //   regulator-min-microvolt = <3300000>;
-  //   regulator-max-microvolt = <3300000>;
+    compatible = "regulator-fixed";
+    regulator-name = "lcd3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
 
-  //   gpio = <&pm8998_gpios 13 0>;
-  //   regulator-boot-on;
-  // };
+    gpio = <&pm8998_gpios 13 0>;
+    regulator-boot-on;
+  };
 
-  // tp3v3: tp3v3 {
-  //   status = "ok";
+  tp3v3: tp3v3 {
+   status = "ok";
 
-  //   compatible = "regulator-fixed";
-  //   regulator-name = "tp3v3";
-  //   regulator-min-microvolt = <3300000>;
-  //   regulator-max-microvolt = <3300000>;
+   compatible = "regulator-fixed";
+   regulator-name = "tp3v3";
+   regulator-min-microvolt = <3300000>;
+   regulator-max-microvolt = <3300000>;
 
-  //   gpio = <&pm8998_gpios 10 0>;
-  //   regulator-boot-on;
-  // };
+   gpio = <&pm8998_gpios 10 0>;
+   regulator-boot-on;
+  };
 };
 
 /* IMUs are on SSC i2c, have to interact with that firmware */
@@ -492,6 +492,8 @@
 &mdss_mdp {
 	//connectors = <&sde_rscc &sde_wb &sde_dp>;
   connectors = <&sde_rscc &sde_wb>;
+  // crashes without sde_wb
+  //connectors = <&sde_rscc>;
 };
 
 // Panel
