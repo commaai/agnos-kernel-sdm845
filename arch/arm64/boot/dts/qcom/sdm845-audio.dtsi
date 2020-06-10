@@ -29,8 +29,9 @@
 	};
 
 	snd_934x: sound-tavil {
-		compatible = "qcom,sdm845-asoc-snd-tavil";
-		qcom,model = "sdm845-tavil-snd-card";
+		//compatible = "qcom,sdm845-asoc-snd-tavil";
+		compatible = "qcom,sdm845-asoc-snd-stub";
+		qcom,model = "sdm845-stub-snd-card";
 		qcom,ext-disp-audio-rx;
 		qcom,wcn-btfm;
 		qcom,mi2s-audio-intf;
