@@ -2581,6 +2581,8 @@ static int msm_aux_pcm_tx_format_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+// we don't support this
+#if 0
 static int msm_hifi_ctrl(struct snd_soc_codec *codec)
 {
 	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
@@ -2630,6 +2632,7 @@ static int msm_hifi_put(struct snd_kcontrol *kcontrol,
 
 	return 0;
 }
+#endif
 
 static int msm_qos_ctl_get(struct snd_kcontrol *kcontrol,
 			   struct snd_ctl_elem_value *ucontrol)
@@ -2909,8 +2912,8 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			msm_aux_pcm_rx_format_get, msm_aux_pcm_rx_format_put),
 	SOC_ENUM_EXT("QUAT_AUX_PCM_TX Format", aux_pcm_tx_format,
 			msm_aux_pcm_tx_format_get, msm_aux_pcm_tx_format_put),
-	SOC_ENUM_EXT("HiFi Function", hifi_function, msm_hifi_get,
-			msm_hifi_put),
+	/*SOC_ENUM_EXT("HiFi Function", hifi_function, msm_hifi_get,
+			msm_hifi_put),*/
 	SOC_ENUM_EXT("MultiMedia5_RX QOS Vote", qos_vote, msm_qos_ctl_get,
 			msm_qos_ctl_put),
 };
@@ -2920,13 +2923,13 @@ static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec,
 {
 	int ret = 0;
 
-	if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
+	/*if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
 		ret = tavil_cdc_mclk_enable(codec, enable);
-	} else {
+	} else {*/
 		dev_err(codec->dev, "%s: unknown codec to enable ext clk\n",
 			__func__);
 		ret = -EINVAL;
-	}
+	//}
 	return ret;
 }
 
@@ -2935,13 +2938,13 @@ static int msm_snd_enable_codec_ext_tx_clk(struct snd_soc_codec *codec,
 {
 	int ret = 0;
 
-	if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
+	/*if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
 		ret = tavil_cdc_mclk_tx_enable(codec, enable);
-	} else {
+	} else {*/
 		dev_err(codec->dev, "%s: unknown codec to enable TX ext clk\n",
 			__func__);
 		ret = -EINVAL;
-	}
+	//}
 
 	return ret;
 }
@@ -2978,6 +2981,8 @@ static int msm_mclk_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+// we don't have one of these
+#if 0
 static int msm_hifi_ctrl_event(struct snd_soc_dapm_widget *w,
 			       struct snd_kcontrol *k, int event)
 {
@@ -3010,6 +3015,7 @@ static int msm_hifi_ctrl_event(struct snd_soc_dapm_widget *w,
 
 	return 0;
 }
+#endif
 
 static const struct snd_soc_dapm_widget msm_dapm_widgets[] = {
 
@@ -3022,7 +3028,7 @@ static const struct snd_soc_dapm_widget msm_dapm_widgets[] = {
 
 	SND_SOC_DAPM_SPK("Lineout_1 amp", NULL),
 	SND_SOC_DAPM_SPK("Lineout_2 amp", NULL),
-	SND_SOC_DAPM_SPK("hifi amp", msm_hifi_ctrl_event),
+	//SND_SOC_DAPM_SPK("hifi amp", msm_hifi_ctrl_event),
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
@@ -3541,6 +3547,8 @@ err_lookup_state:
 	return ret;
 }
 
+// we don't support this
+#if 0
 static bool msm_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 {
 	int value = 0;
@@ -3577,6 +3585,7 @@ static bool msm_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 	}
 	return ret;
 }
+#endif
 
 static int msm_afe_set_config(struct snd_soc_codec *codec)
 {
@@ -6478,6 +6487,8 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 	return card;
 }
 
+// no support for wsa881x
+#if 0
 static int msm_wsa881x_init(struct snd_soc_component *component)
 {
 	u8 spkleft_ports[WSA881X_MAX_SWR_PORTS] = {100, 101, 102, 106};
@@ -6717,6 +6728,7 @@ err_free_dev_info:
 err:
 	return ret;
 }
+#endif
 
 static void msm_i2s_auxpcm_init(struct platform_device *pdev)
 {
@@ -6839,9 +6851,9 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	}
 
   // we don't have a wsa dev
-	ret = msm_init_wsa_dev(pdev, card);
+	/*ret = msm_init_wsa_dev(pdev, card);
 	if (ret)
-		goto err;
+		goto err;*/
 
   printk("REAL here4 in msm_asoc_machine_probe\n");
 
@@ -6910,6 +6922,8 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	 * entry is not found in DT file as some targets do not support
 	 * US-Euro detection
 	 */
+
+  #if 0
 	pdata->us_euro_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"qcom,us-euro-gpios", 0);
 	if (!gpio_is_valid(pdata->us_euro_gpio))
@@ -6926,6 +6940,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
 	if (of_find_property(pdev->dev.of_node, usb_c_dt, NULL))
 		wcd_mbhc_cfg.swap_gnd_mic = msm_swap_gnd_mic;
+  #endif
 
 	ret = msm_prepare_us_euro(card);
 	if (ret)
