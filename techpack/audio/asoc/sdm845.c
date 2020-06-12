@@ -178,8 +178,7 @@ struct msm_asoc_wcd93xx_codec {
 	void (*mbhc_hs_detect_exit)(struct snd_soc_codec *codec);
 };
 
-static const char *const pin_states[] = {"sleep", "i2s-active",
-					 "tdm-active"};
+static const char *const pin_states[] = {"sleep", "i2s-active", "tdm-active"};
 
 enum {
 	TDM_0 = 0,
@@ -4631,7 +4630,7 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 				__func__, index, ret);
 			goto clk_off;
 		}
-		if (index == QUAT_MI2S) {
+		if (index == QUAT_MI2S || true) {
 			ret_pinctrl = msm_set_pinctrl(pinctrl_info,
 						      STATE_MI2S_ACTIVE);
 			if (ret_pinctrl)
