@@ -3457,6 +3457,8 @@ done:
 	return rc;
 }
 
+// we don't support this
+#if 0
 static bool msm_usbc_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 {
 	int value = 0;
@@ -3542,8 +3544,6 @@ err_lookup_state:
 	return ret;
 }
 
-// we don't support this
-#if 0
 static bool msm_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 {
 	int value = 0;
