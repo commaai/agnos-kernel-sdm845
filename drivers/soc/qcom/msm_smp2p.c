@@ -372,13 +372,7 @@ static void *smp2p_get_local_smem_item(int remote_pid)
 
 			if (!item_ptr) {
 				size = sizeof(struct smp2p_smem_item);
-        item_ptr = kzalloc(
-            sizeof(struct smp2p_smem_item),
-            GFP_ATOMIC);
-        printk("smp2p_get_local_smem_item: HACKED MISSING %d %d %d\n", smem_id, size, remote_pid);
-
-				/*item_ptr = smem_alloc(smem_id, size,
-								remote_pid, 0);*/
+				item_ptr = smem_alloc(smem_id, size, remote_pid, 0);
 			}
 		}
 	} else if (remote_pid == SMP2P_REMOTE_MOCK_PROC) {
