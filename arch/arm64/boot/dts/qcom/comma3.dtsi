@@ -5,6 +5,7 @@
 
 #include "dsi-panel-ss-fhd-ea8074-cmd.dtsi"
 #include <dt-bindings/clock/mdss-10nm-pll-clk.h>
+#include <dt-bindings/clock/qcom,audio-ext-clk.h>
 
 /* disable the SPI */
 &qupv3_se5_spi {
@@ -17,6 +18,17 @@
 
 &qupv3_se2_i2c {
   status = "disabled";
+};
+
+&soc {
+	clock_audio_lnbb: audio_ext_clk_lnbb {
+		status = "ok";
+		compatible = "qcom,audio-ref-clk";
+		clock-names = "osr_clk";
+		clocks = <&clock_rpmh RPMH_LN_BB_CLK2>;
+		qcom,node_has_rpm_clock;
+		#clock-cells = <1>;
+	};
 };
 
 /* audio and power monitor(ina230) I2C, /dev/i2c-0 */
@@ -38,8 +50,8 @@
     reg = <0x10>;  /* slave address 0x20 for write, 0x21 for read */
     mic-left-digital;
     mic-right-digital;
-		/*clocks = <&clks IMX6UL_CLK_SAI2>;
-		clock-names = "mclk";*/
+		clock-names = "mclk";
+		clocks = <&clock_audio_lnbb AUDIO_PMIC_LNBB_CLK>;
   };
 };
 

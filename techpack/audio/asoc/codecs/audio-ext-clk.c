@@ -242,6 +242,8 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 	int ret;
 	struct clk *audio_clk;
 
+  printk("HACKED: audio_ref_clk_probe\n");
+
 	clk_gpio = of_get_named_gpio(pdev->dev.of_node,
 				     "qcom,audio-ref-clk-gpio", 0);
 	if (clk_gpio > 0) {
@@ -276,6 +278,8 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 			}
 			audio_pmi_lnbb_clk.c.parent = audio_clk;
 			audio_pmi_lnbb_clk.gpio = -EINVAL;
+      printk("HACKED: enabling clock\n");
+      clk_prepare_enable(audio_clk);
 		}
 	}
 

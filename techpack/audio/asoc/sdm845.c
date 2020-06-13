@@ -3812,6 +3812,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_info_entry *entry;
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(rtd->card);
+	struct clk *mclk;
 
 	/* Codec SLIMBUS configuration
 	 * RX1, RX2, RX3, RX4, RX5, RX6, RX7, RX8
@@ -3919,6 +3920,19 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	}
 	pdata->codec_root = entry;
 	//tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
+
+  // enable mclk
+	mclk = clk_get(codec->dev, "mclk");
+	if (IS_ERR(mclk)) {
+    printk("HACKED: find mclk failed %p %d\n", codec, mclk);
+    return -1;
+  }
+    
+  ret = clk_prepare_enable(mclk);
+  if (ret) {
+    printk("HACKED: mclk enable fail\n");
+    return -1;
+  }
 
 done:
 	codec_reg_done = true;
@@ -5911,7 +5925,6 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
-		.init = &msm_audrx_init,
 	},
 	{
 		.name = LPASS_BE_PRI_MI2S_TX,
@@ -5936,13 +5949,14 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.codec_dai_name = "msm-stub-rx",*/
     .codec_name = "max98088.0-0010",
     .codec_dai_name = "HiFi",
-		//.no_pcm = 1,
+		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_SECONDARY_MI2S_RX,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
+		.init = &msm_audrx_init,
 	},
 	{
 		.name = LPASS_BE_SEC_MI2S_TX,
@@ -5953,7 +5967,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.codec_dai_name = "msm-stub-tx",*/
     .codec_name = "max98088.0-0010",
     .codec_dai_name = "HiFi",
-		//.no_pcm = 1,
+		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_SECONDARY_MI2S_TX,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
@@ -5970,7 +5984,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.codec_dai_name = "msm-stub-rx",*/
     .codec_name = "max98088.0-0010",
     .codec_dai_name = "HiFi",
-		//.no_pcm = 1,
+		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_TERTIARY_MI2S_RX,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
@@ -5987,7 +6001,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.codec_dai_name = "msm-stub-tx",*/
     .codec_name = "max98088.0-0010",
     .codec_dai_name = "HiFi",
-		//.no_pcm = 1,
+		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_TERTIARY_MI2S_TX,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
