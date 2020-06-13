@@ -38,8 +38,8 @@
     reg = <0x10>;  /* slave address 0x20 for write, 0x21 for read */
     mic-left-digital;
     mic-right-digital;
-    mclk-pin = <2>;
-    status = "okay";
+		/*clocks = <&clks IMX6UL_CLK_SAI2>;
+		clock-names = "mclk";*/
   };
 };
 
@@ -563,7 +563,8 @@
 	/*qcom,usbc-analog-en1-gpio = <&wcd_usbc_analog_en1_gpio>;
 	qcom,usbc-analog-en2-gpio = <&tlmm 51 0>;*/
 
-	// secondary i2s 81,79,80,83,82
+	// mclk 79
+	// secondary i2s 81,80,83,82
 	// tert i2s 76,75,77,78
 
 	pinctrl-names = "aud_active", "aud_sleep",
@@ -573,8 +574,8 @@
 	pinctrl-1 = <&wcd_usbc_analog_en2_idle>;
 	//pinctrl-2 = <&quat_mi2s_sleep &quat_mi2s_sd0_sleep &quat_mi2s_sd1_sleep &quat_mi2s_sd2_sleep &quat_mi2s_sd3_sleep>;
 	//pinctrl-3 = <&quat_mi2s_active &quat_mi2s_sd0_active &quat_mi2s_sd1_active &quat_mi2s_sd2_active &quat_mi2s_sd3_active>;
-	pinctrl-2 = <&sec_mi2s_sleep &sec_mi2s_sd0_sleep &sec_mi2s_sd1_sleep &tert_mi2s_sleep &tert_mi2s_sd0_sleep &tert_mi2s_sd1_sleep>;
-	pinctrl-3 = <&sec_mi2s_active &sec_mi2s_sd0_active &sec_mi2s_sd1_active &tert_mi2s_active &tert_mi2s_sd0_active &tert_mi2s_sd1_active>;
+	pinctrl-2 = <&sec_mi2s_sleep &sec_mi2s_mclk_sleep &sec_mi2s_sd0_sleep &sec_mi2s_sd1_sleep &tert_mi2s_sleep &tert_mi2s_sd0_sleep &tert_mi2s_sd1_sleep>;
+	pinctrl-3 = <&sec_mi2s_active &sec_mi2s_mclk_active &sec_mi2s_sd0_active &sec_mi2s_sd1_active &tert_mi2s_active &tert_mi2s_sd0_active &tert_mi2s_sd1_active>;
 	pinctrl-4 = <&quat_tdm_sleep &quat_tdm_din_sleep &quat_tdm_dout_sleep>;
 	pinctrl-5 = <&quat_tdm_active &quat_tdm_din_active &quat_tdm_din_active>;
 

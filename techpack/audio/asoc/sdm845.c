@@ -3752,6 +3752,53 @@ static struct notifier_block service_nb = {
 	.priority = -INT_MAX,
 };
 
+static struct afe_param_cdc_reg_cfg audio_reg_cfg[] = {};
+
+static struct afe_param_cdc_reg_cfg_data tavil_audio_reg_cfg = {
+	.num_registers = ARRAY_SIZE(audio_reg_cfg),
+	.reg_data = audio_reg_cfg,
+};
+
+static struct afe_param_id_cdc_aanc_version tavil_cdc_aanc_version = {
+	.cdc_aanc_minor_version = AFE_API_VERSION_CDC_AANC_VERSION,
+	.aanc_hw_version        = AANC_HW_BLOCK_VERSION_2,
+};
+
+static struct afe_param_cdc_reg_page_cfg tavil_cdc_reg_page_cfg = {
+	.minor_version = AFE_API_VERSION_CDC_REG_PAGE_CFG,
+	.enable = 1,
+	.proc_id = AFE_CDC_REG_PAGE_ASSIGN_PROC_ID_1,
+};
+
+/**
+ * tavil_get_afe_config - returns specific codec configuration to afe to write
+ *
+ * @codec: codec instance
+ * @config_type: Indicates type of configuration to write.
+ */
+void *tavil_get_afe_config(struct snd_soc_codec *codec,
+			   enum afe_config_type config_type)
+{
+	//struct tavil_priv *priv = snd_soc_codec_get_drvdata(codec);
+
+	switch (config_type) {
+	//case AFE_SLIMBUS_SLAVE_CONFIG:
+	//	return &priv->slimbus_slave_cfg;
+	case AFE_CDC_REGISTERS_CONFIG:
+		return &tavil_audio_reg_cfg;
+	//case AFE_SLIMBUS_SLAVE_PORT_CONFIG:
+	//	return &tavil_slimbus_slave_port_cfg;
+	case AFE_AANC_VERSION:
+		return &tavil_cdc_aanc_version;
+	case AFE_CDC_REGISTER_PAGE_CONFIG:
+		return &tavil_cdc_reg_page_cfg;
+	default:
+		dev_info(codec->dev, "%s: Unknown config_type 0x%x\n",
+			__func__, config_type);
+		return NULL;
+	}
+}
+
 static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int ret = 0;
@@ -3850,7 +3897,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	 */
 	pr_debug("%s: Number of aux devices: %d\n",
 		__func__, rtd->card->num_aux_devs);
-	if (rtd->card->num_aux_devs &&
+	/*if (rtd->card->num_aux_devs &&
 	    !list_empty(&rtd->card->aux_comp_list)) {
 		aux_comp = list_first_entry(&rtd->card->aux_comp_list,
 				struct snd_soc_component, list_aux);
@@ -3860,7 +3907,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 			tavil_set_spkr_gain_offset(rtd->codec,
 					WCD934X_RX_GAIN_OFFSET_M1P5_DB);
 		}
-	}
+	}*/
 	card = rtd->card->snd_card;
 	entry = snd_info_create_subdir(card->module, "codecs",
 				       card->proc_root);
@@ -3871,7 +3918,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		goto done;
 	}
 	pdata->codec_root = entry;
-	tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
+	//tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
 
 done:
 	codec_reg_done = true;
@@ -5864,6 +5911,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
+		.init = &msm_audrx_init,
 	},
 	{
 		.name = LPASS_BE_PRI_MI2S_TX,

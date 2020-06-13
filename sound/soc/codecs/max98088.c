@@ -1099,6 +1099,8 @@ static int max98088_dai_set_sysclk(struct snd_soc_dai *dai,
        struct snd_soc_codec *codec = dai->codec;
        struct max98088_priv *max98088 = snd_soc_codec_get_drvdata(codec);
 
+       printk("HACKED max98088_dai_set_sysclk clk_id: %d freq: %d dir: %d\n", clk_id, freq, dir);
+
        /* Requested clock frequency is already setup */
        if (freq == max98088->sysclk)
                return 0;
