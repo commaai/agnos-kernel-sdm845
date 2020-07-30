@@ -68,9 +68,11 @@
   samsung-ts@17 {
     compatible = "samsung_i2c_touchpanel";
     reg = <0x17>;
-    interrupt-gpio = <&tlmm 122 0>;
-    reset-gpio = <&tlmm 99 0>;
-    ta-gpio = <&tlmm 128 0>;
+    interrupt-parent = <&tlmm>;
+		interrupts = <125 0x2002>;
+    interrupt-gpios = <&tlmm 125 0x2002>;
+    reset-gpios = <&tlmm 104 0>;
+    ta-gpios = <&tlmm 128 0>;
   };
 };
 
