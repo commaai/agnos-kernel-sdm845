@@ -18,9 +18,9 @@
 static int __init wcd9xxx_soc_init(void)
 {
 	int ret = 0;
-  printk("wcd9xxx_soc_init\n");
 
-  ret = audio_ref_clk_platform_init();
+	// Commma hack: alternative init
+  	ret = audio_ref_clk_platform_init();
 	/*ret = wcd_dsp_mgr_init();
 	if (!ret) {
 		if (ret) {

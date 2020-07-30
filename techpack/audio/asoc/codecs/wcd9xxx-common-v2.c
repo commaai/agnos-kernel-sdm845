@@ -552,7 +552,8 @@ static void wcd_clsh_flyback_ctrl(struct snd_soc_codec *codec,
 			bulk_reg[1].bytes = 1;
 			/* 500usec delay is needed as per HW requirement */
 			usleep_range(500, 510);
-      printk("HACKED BROKEN\n");
+
+			// Comma hack: breaks stuff, not needed
 			/*wcd9xxx_slim_bulk_write(wcd9xxx, bulk_reg, 2,
 						false);*/
 			snd_soc_update_bits(codec, WCD9XXX_FLYBACK_EN,

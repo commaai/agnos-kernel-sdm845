@@ -3924,13 +3924,11 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
   // enable mclk
 	mclk = clk_get(codec->dev, "mclk");
 	if (IS_ERR(mclk)) {
-    printk("HACKED: find mclk failed %p %d\n", codec, mclk);
     return -1;
   }
     
   ret = clk_prepare_enable(mclk);
   if (ret) {
-    printk("HACKED: mclk enable fail\n");
     return -1;
   }
 
@@ -6834,8 +6832,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	int ret;
 	const char *usb_c_dt = "qcom,msm-mbhc-usbc-audio-supported";
 
-  printk("msm_asoc_machine_probe\n");
-
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "No platform supplied from device tree\n");
 		return -EINVAL;
@@ -6855,8 +6851,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	card->dev = &pdev->dev;
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, pdata);
-
-  printk("REAL here in msm_asoc_machine_probe\n");
 
 	ret = snd_soc_of_parse_card_name(card, "qcom,model");
 	if (ret) {
@@ -6880,8 +6874,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-  printk("REAL here2 in msm_asoc_machine_probe\n");
-
 	mclk_freq_prop_name = "qcom,tavil-mclk-clk-freq";
 
 	ret = of_property_read_u32(pdev->dev.of_node,
@@ -6900,7 +6892,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err;
 	}
-  printk("REAL here3 in msm_asoc_machine_probe\n");
 
 	ret = msm_populate_dai_link_component_of_node(card);
 	if (ret) {
@@ -6908,18 +6899,16 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-  // we don't have a wsa dev
+  	// we don't have a wsa dev
 	/*ret = msm_init_wsa_dev(pdev, card);
 	if (ret)
 		goto err;*/
-
-  printk("REAL here4 in msm_asoc_machine_probe\n");
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
 		if (codec_reg_done)
 			ret = -EINVAL;
-    printk("msm_asoc_machine_probe -EPROBE_DEFER\n");
+
 		goto err;
 	} else if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
@@ -6927,7 +6916,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-  printk("REAL printing registered\n");
 	dev_info(&pdev->dev, "Sound card %s registered\n", card->name);
 	spdev = pdev;
 

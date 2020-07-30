@@ -472,8 +472,6 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 	int i;
 	struct clk_onecell_data *clk_data;
 
-  printk("HACKED: audio_ref_clk_probe\n");
-
 	ret = of_property_read_u32(pdev->dev.of_node,
 			"qcom,codec-mclk-clk-freq",
 			&mclk_freq);
@@ -616,7 +614,6 @@ static struct platform_driver audio_ref_clk_driver = {
 
 int audio_ref_clk_platform_init(void)
 {
-  printk("audio_ref_clk_platform_init\n");
 	return platform_driver_register(&audio_ref_clk_driver);
 }
 

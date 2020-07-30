@@ -4425,13 +4425,10 @@ CONFIG_TRACER_PKT=y
 CONFIG_QTI_RPMH_API=y
 CONFIG_QTI_SYSTEM_PM=y
 
-
-# alt implementation?
 #CONFIG_QCOM_SMEM=y
 #CONFIG_QCOM_SMP2P=y
 #CONFIG_QCOM_SMSM=y
 
-# this was panicing, it is okay now?
 CONFIG_MSM_SMEM=y
 CONFIG_MSM_SMP2P=y
 
