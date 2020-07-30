@@ -31,10 +31,10 @@
 	snd_934x: sound-tavil {
 		compatible = "qcom,sdm845-asoc-snd-tavil";
 		qcom,model = "sdm845-tavil-snd-card";
-		qcom,ext-disp-audio-rx;
-		qcom,wcn-btfm;
+		//qcom,ext-disp-audio-rx;
+		//qcom,wcn-btfm;
 		qcom,mi2s-audio-intf;
-		qcom,auxpcm-audio-intf;
+		//qcom,auxpcm-audio-intf;
 		qcom,msm-mi2s-master = <1>, <1>, <1>, <1>;
 
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,

@@ -178,8 +178,7 @@ struct msm_asoc_wcd93xx_codec {
 	void (*mbhc_hs_detect_exit)(struct snd_soc_codec *codec);
 };
 
-static const char *const pin_states[] = {"sleep", "i2s-active",
-					 "tdm-active"};
+static const char *const pin_states[] = {"sleep", "i2s-active", "tdm-active"};
 
 enum {
 	TDM_0 = 0,
@@ -2581,6 +2580,8 @@ static int msm_aux_pcm_tx_format_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+// we don't support this
+#if 0
 static int msm_hifi_ctrl(struct snd_soc_codec *codec)
 {
 	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
@@ -2630,6 +2631,7 @@ static int msm_hifi_put(struct snd_kcontrol *kcontrol,
 
 	return 0;
 }
+#endif
 
 static int msm_qos_ctl_get(struct snd_kcontrol *kcontrol,
 			   struct snd_ctl_elem_value *ucontrol)
@@ -2909,8 +2911,8 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			msm_aux_pcm_rx_format_get, msm_aux_pcm_rx_format_put),
 	SOC_ENUM_EXT("QUAT_AUX_PCM_TX Format", aux_pcm_tx_format,
 			msm_aux_pcm_tx_format_get, msm_aux_pcm_tx_format_put),
-	SOC_ENUM_EXT("HiFi Function", hifi_function, msm_hifi_get,
-			msm_hifi_put),
+	/*SOC_ENUM_EXT("HiFi Function", hifi_function, msm_hifi_get,
+			msm_hifi_put),*/
 	SOC_ENUM_EXT("MultiMedia5_RX QOS Vote", qos_vote, msm_qos_ctl_get,
 			msm_qos_ctl_put),
 };
@@ -2920,13 +2922,13 @@ static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec,
 {
 	int ret = 0;
 
-	if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
+	/*if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
 		ret = tavil_cdc_mclk_enable(codec, enable);
-	} else {
+	} else {*/
 		dev_err(codec->dev, "%s: unknown codec to enable ext clk\n",
 			__func__);
 		ret = -EINVAL;
-	}
+	//}
 	return ret;
 }
 
@@ -2935,13 +2937,13 @@ static int msm_snd_enable_codec_ext_tx_clk(struct snd_soc_codec *codec,
 {
 	int ret = 0;
 
-	if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
+	/*if (!strcmp(dev_name(codec->dev), "tavil_codec")) {
 		ret = tavil_cdc_mclk_tx_enable(codec, enable);
-	} else {
+	} else {*/
 		dev_err(codec->dev, "%s: unknown codec to enable TX ext clk\n",
 			__func__);
 		ret = -EINVAL;
-	}
+	//}
 
 	return ret;
 }
@@ -2978,6 +2980,8 @@ static int msm_mclk_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+// we don't have one of these
+#if 0
 static int msm_hifi_ctrl_event(struct snd_soc_dapm_widget *w,
 			       struct snd_kcontrol *k, int event)
 {
@@ -3010,19 +3014,16 @@ static int msm_hifi_ctrl_event(struct snd_soc_dapm_widget *w,
 
 	return 0;
 }
+#endif
 
 static const struct snd_soc_dapm_widget msm_dapm_widgets[] = {
 
-	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0,
-			    msm_mclk_event,
-			    SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-
-	SND_SOC_DAPM_SUPPLY("MCLK TX",  SND_SOC_NOPM, 0, 0,
-	msm_mclk_tx_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0, msm_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_SUPPLY("MCLK TX",  SND_SOC_NOPM, 0, 0, msm_mclk_tx_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_SPK("Lineout_1 amp", NULL),
 	SND_SOC_DAPM_SPK("Lineout_2 amp", NULL),
-	SND_SOC_DAPM_SPK("hifi amp", msm_hifi_ctrl_event),
+	//SND_SOC_DAPM_SPK("hifi amp", msm_hifi_ctrl_event),
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
@@ -3456,6 +3457,8 @@ done:
 	return rc;
 }
 
+// we don't support this
+#if 0
 static bool msm_usbc_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 {
 	int value = 0;
@@ -3577,6 +3580,7 @@ static bool msm_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 	}
 	return ret;
 }
+#endif
 
 static int msm_afe_set_config(struct snd_soc_codec *codec)
 {
@@ -3748,6 +3752,53 @@ static struct notifier_block service_nb = {
 	.priority = -INT_MAX,
 };
 
+static struct afe_param_cdc_reg_cfg audio_reg_cfg[] = {};
+
+static struct afe_param_cdc_reg_cfg_data tavil_audio_reg_cfg = {
+	.num_registers = ARRAY_SIZE(audio_reg_cfg),
+	.reg_data = audio_reg_cfg,
+};
+
+static struct afe_param_id_cdc_aanc_version tavil_cdc_aanc_version = {
+	.cdc_aanc_minor_version = AFE_API_VERSION_CDC_AANC_VERSION,
+	.aanc_hw_version        = AANC_HW_BLOCK_VERSION_2,
+};
+
+static struct afe_param_cdc_reg_page_cfg tavil_cdc_reg_page_cfg = {
+	.minor_version = AFE_API_VERSION_CDC_REG_PAGE_CFG,
+	.enable = 1,
+	.proc_id = AFE_CDC_REG_PAGE_ASSIGN_PROC_ID_1,
+};
+
+/**
+ * tavil_get_afe_config - returns specific codec configuration to afe to write
+ *
+ * @codec: codec instance
+ * @config_type: Indicates type of configuration to write.
+ */
+void *tavil_get_afe_config(struct snd_soc_codec *codec,
+			   enum afe_config_type config_type)
+{
+	//struct tavil_priv *priv = snd_soc_codec_get_drvdata(codec);
+
+	switch (config_type) {
+	//case AFE_SLIMBUS_SLAVE_CONFIG:
+	//	return &priv->slimbus_slave_cfg;
+	case AFE_CDC_REGISTERS_CONFIG:
+		return &tavil_audio_reg_cfg;
+	//case AFE_SLIMBUS_SLAVE_PORT_CONFIG:
+	//	return &tavil_slimbus_slave_port_cfg;
+	case AFE_AANC_VERSION:
+		return &tavil_cdc_aanc_version;
+	case AFE_CDC_REGISTER_PAGE_CONFIG:
+		return &tavil_cdc_reg_page_cfg;
+	default:
+		dev_info(codec->dev, "%s: Unknown config_type 0x%x\n",
+			__func__, config_type);
+		return NULL;
+	}
+}
+
 static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int ret = 0;
@@ -3761,6 +3812,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_info_entry *entry;
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(rtd->card);
+	struct clk *mclk;
 
 	/* Codec SLIMBUS configuration
 	 * RX1, RX2, RX3, RX4, RX5, RX6, RX7, RX8
@@ -3785,11 +3837,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 	}
 
-	snd_soc_dapm_new_controls(dapm, msm_dapm_widgets,
-				ARRAY_SIZE(msm_dapm_widgets));
-
-	snd_soc_dapm_add_routes(dapm, wcd_audio_paths,
-				ARRAY_SIZE(wcd_audio_paths));
+	snd_soc_dapm_new_controls(dapm, msm_dapm_widgets, ARRAY_SIZE(msm_dapm_widgets));
+	snd_soc_dapm_add_routes(dapm, wcd_audio_paths, ARRAY_SIZE(wcd_audio_paths));
 
 	snd_soc_dapm_ignore_suspend(dapm, "Handset Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
@@ -3849,7 +3898,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	 */
 	pr_debug("%s: Number of aux devices: %d\n",
 		__func__, rtd->card->num_aux_devs);
-	if (rtd->card->num_aux_devs &&
+	/*if (rtd->card->num_aux_devs &&
 	    !list_empty(&rtd->card->aux_comp_list)) {
 		aux_comp = list_first_entry(&rtd->card->aux_comp_list,
 				struct snd_soc_component, list_aux);
@@ -3859,7 +3908,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 			tavil_set_spkr_gain_offset(rtd->codec,
 					WCD934X_RX_GAIN_OFFSET_M1P5_DB);
 		}
-	}
+	}*/
 	card = rtd->card->snd_card;
 	entry = snd_info_create_subdir(card->module, "codecs",
 				       card->proc_root);
@@ -3870,7 +3919,18 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		goto done;
 	}
 	pdata->codec_root = entry;
-	tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
+	//tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
+
+	// enable mclk
+		mclk = clk_get(codec->dev, "mclk");
+		if (IS_ERR(mclk)) {
+		return -1;
+	}
+		
+	ret = clk_prepare_enable(mclk);
+	if (ret) {
+		return -1;
+	}
 
 done:
 	codec_reg_done = true;
@@ -3880,6 +3940,7 @@ err:
 	return ret;
 }
 
+#if 0
 static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 {
 	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
@@ -3923,6 +3984,7 @@ static void *def_tavil_mbhc_cal(void)
 
 	return tavil_wcd_cal;
 }
+#endif
 
 static int msm_snd_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *params)
@@ -4627,7 +4689,7 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 				__func__, index, ret);
 			goto clk_off;
 		}
-		if (index == QUAT_MI2S) {
+		if (index == QUAT_MI2S || true) {
 			ret_pinctrl = msm_set_pinctrl(pinctrl_info,
 						      STATE_MI2S_ACTIVE);
 			if (ret_pinctrl)
@@ -5279,6 +5341,7 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 };
 
 static struct snd_soc_dai_link msm_tavil_fe_dai_links[] = {
+#if 0
 	{
 		.name = LPASS_BE_SLIMBUS_4_TX,
 		.stream_name = "Slimbus4 Capture",
@@ -5317,6 +5380,7 @@ static struct snd_soc_dai_link msm_tavil_fe_dai_links[] = {
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 		.ops = &msm_slimbus_2_be_ops,
 	},
+#endif
 };
 
 static struct snd_soc_dai_link msm_common_misc_fe_dai_links[] = {
@@ -5583,6 +5647,7 @@ static struct snd_soc_dai_link msm_common_be_dai_links[] = {
 };
 
 static struct snd_soc_dai_link msm_tavil_be_dai_links[] = {
+#if 0
 	{
 		.name = LPASS_BE_SLIMBUS_0_RX,
 		.stream_name = "Slimbus Playback",
@@ -5768,9 +5833,11 @@ static struct snd_soc_dai_link msm_tavil_be_dai_links[] = {
 		.dpcm_capture = 1,
 		.ignore_pmdown_time = 1,
 	},
+#endif
 };
 
 static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
+#if 0
 	{
 		.name = LPASS_BE_SLIMBUS_7_RX,
 		.stream_name = "Slimbus7 Playback",
@@ -5820,6 +5887,7 @@ static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 		.ops = &msm_wcn_ops,
 		.ignore_suspend = 1,
 	},
+#endif
 };
 
 static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
@@ -5875,8 +5943,10 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Secondary MI2S Playback",
 		.cpu_dai_name = "msm-dai-q6-mi2s.1",
 		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-rx",
+		/*.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-rx",*/
+    .codec_name = "max98088.0-0010",
+    .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_SECONDARY_MI2S_RX,
@@ -5884,14 +5954,17 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
+		.init = &msm_audrx_init,
 	},
 	{
 		.name = LPASS_BE_SEC_MI2S_TX,
 		.stream_name = "Secondary MI2S Capture",
 		.cpu_dai_name = "msm-dai-q6-mi2s.1",
 		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-tx",
+		/*.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-tx",*/
+    .codec_name = "max98088.0-0010",
+    .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_SECONDARY_MI2S_TX,
@@ -5899,13 +5972,16 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 	},
+  	// max98088 is connected here!
 	{
 		.name = LPASS_BE_TERT_MI2S_RX,
 		.stream_name = "Tertiary MI2S Playback",
 		.cpu_dai_name = "msm-dai-q6-mi2s.2",
 		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-rx",
+		/*.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-rx",*/
+    .codec_name = "max98088.0-0010",
+    .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_TERTIARY_MI2S_RX,
@@ -5919,8 +5995,10 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Tertiary MI2S Capture",
 		.cpu_dai_name = "msm-dai-q6-mi2s.2",
 		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-tx",
+		/*.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-tx",*/
+    .codec_name = "max98088.0-0010",
+    .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_TERTIARY_MI2S_TX,
@@ -6080,15 +6158,16 @@ static struct snd_soc_dai_link msm_auxpcm_be_dai_links[] = {
 
 static struct snd_soc_dai_link msm_tavil_snd_card_dai_links[
 			 ARRAY_SIZE(msm_common_dai_links) +
-			 ARRAY_SIZE(msm_tavil_fe_dai_links) +
+			 ARRAY_SIZE(msm_tavil_fe_dai_links) + // disabled, no tavil
 			 ARRAY_SIZE(msm_common_misc_fe_dai_links) +
 			 ARRAY_SIZE(msm_common_be_dai_links) +
-			 ARRAY_SIZE(msm_tavil_be_dai_links) +
-			 ARRAY_SIZE(msm_wcn_be_dai_links) +
+			 ARRAY_SIZE(msm_tavil_be_dai_links) + // disabled, no tavil
+			 ARRAY_SIZE(msm_wcn_be_dai_links) + // disabled, no wcn
 			 ARRAY_SIZE(ext_disp_be_dai_link) +
 			 ARRAY_SIZE(msm_mi2s_be_dai_links) +
 			 ARRAY_SIZE(msm_auxpcm_be_dai_links)];
 
+#if 0
 static int msm_snd_card_tavil_late_probe(struct snd_soc_card *card)
 {
 	const char *be_dl_name = LPASS_BE_SLIMBUS_0_RX;
@@ -6124,10 +6203,12 @@ err_free_mbhc_cal:
 err:
 	return ret;
 }
+#endif
 
 struct snd_soc_card snd_soc_card_tavil_msm = {
 	.name		= "sdm845-tavil-snd-card",
-	.late_probe	= msm_snd_card_tavil_late_probe,
+  // LPASS_BE_SLIMBUS_0_RX is disabled
+	//.late_probe	= msm_snd_card_tavil_late_probe,
 };
 
 static int msm_populate_dai_link_component_of_node(
@@ -6462,6 +6543,8 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 	return card;
 }
 
+// no support for wsa881x
+#if 0
 static int msm_wsa881x_init(struct snd_soc_component *component)
 {
 	u8 spkleft_ports[WSA881X_MAX_SWR_PORTS] = {100, 101, 102, 106};
@@ -6701,6 +6784,7 @@ err_free_dev_info:
 err:
 	return ret;
 }
+#endif
 
 static void msm_i2s_auxpcm_init(struct platform_device *pdev)
 {
@@ -6814,20 +6898,24 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		ret = -EPROBE_DEFER;
 		goto err;
 	}
-	ret = msm_init_wsa_dev(pdev, card);
+
+  	// we don't have a wsa dev
+	/*ret = msm_init_wsa_dev(pdev, card);
 	if (ret)
-		goto err;
+		goto err;*/
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
 		if (codec_reg_done)
 			ret = -EINVAL;
+
 		goto err;
 	} else if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
 			ret);
 		goto err;
 	}
+
 	dev_info(&pdev->dev, "Sound card %s registered\n", card->name);
 	spdev = pdev;
 
@@ -6880,6 +6968,8 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	 * entry is not found in DT file as some targets do not support
 	 * US-Euro detection
 	 */
+
+  #if 0
 	pdata->us_euro_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"qcom,us-euro-gpios", 0);
 	if (!gpio_is_valid(pdata->us_euro_gpio))
@@ -6896,6 +6986,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
 	if (of_find_property(pdev->dev.of_node, usb_c_dt, NULL))
 		wcd_mbhc_cfg.swap_gnd_mic = msm_swap_gnd_mic;
+  #endif
 
 	ret = msm_prepare_us_euro(card);
 	if (ret)

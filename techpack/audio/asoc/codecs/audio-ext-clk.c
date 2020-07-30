@@ -276,6 +276,9 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 			}
 			audio_pmi_lnbb_clk.c.parent = audio_clk;
 			audio_pmi_lnbb_clk.gpio = -EINVAL;
+
+			// Comma hack to enable MCLK
+      		clk_prepare_enable(audio_clk);
 		}
 	}
 
