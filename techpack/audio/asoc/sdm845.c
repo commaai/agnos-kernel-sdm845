@@ -3921,16 +3921,16 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	pdata->codec_root = entry;
 	//tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
 
-  // enable mclk
-	mclk = clk_get(codec->dev, "mclk");
-	if (IS_ERR(mclk)) {
-    return -1;
-  }
-    
-  ret = clk_prepare_enable(mclk);
-  if (ret) {
-    return -1;
-  }
+	// enable mclk
+		mclk = clk_get(codec->dev, "mclk");
+		if (IS_ERR(mclk)) {
+		return -1;
+	}
+		
+	ret = clk_prepare_enable(mclk);
+	if (ret) {
+		return -1;
+	}
 
 done:
 	codec_reg_done = true;
@@ -5972,7 +5972,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 	},
-  // max98088 is connected here!
+  	// max98088 is connected here!
 	{
 		.name = LPASS_BE_TERT_MI2S_RX,
 		.stream_name = "Tertiary MI2S Playback",
