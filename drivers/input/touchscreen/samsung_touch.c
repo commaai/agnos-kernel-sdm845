@@ -29,23 +29,33 @@
 #define SS_I2C_NAME "samsung_i2c_touchpanel"
 
 /* Touchscreen parameters */
-#define SS_MAX_FINGERS			    10
-#define SS_MAX_HOVER			    1
+#define SS_MAX_FINGERS			            10
+#define SS_MAX_HOVER			            1
+#define SS_MAX_X    			            1080
+#define SS_MAX_Y	    		            2160
+#define SS_MAX_PRESSURE   		            255
+#define SS_AREA_LENGTH_LONGER               100
+#define SS_AREA_LENGTH_SHORTER	            100
 
 /* Touchscreen registers */
-#define SS_ONE_EVENT_CMD            0x60
-#define SS_ONE_EVENT_SIZE           15
+#define SS_ONE_EVENT_CMD                    0x60
+#define SS_ONE_EVENT_SIZE                   15
 
 /* Touchscreen events */
-#define SS_EVENT_COORDINATE		    0
-#define SS_EVENT_STATUS		        1
-#define SS_EVENT_GESTURE		    2
-#define SS_EVENT_EMPTY		        3
-#define SS_EVENT_COORDINATE_WET		6
+#define SS_EVENT_COORDINATE		            0
+#define SS_EVENT_STATUS		                1
+#define SS_EVENT_GESTURE		            2
+#define SS_EVENT_EMPTY		                3
+#define SS_EVENT_COORDINATE_WET		        6
+
+/* Touchscreen event constants */
+#define SS_EVENT_COORDINATE_ACTION_DOWN     1
+#define SS_EVENT_COORDINATE_ACTION_MOVE     2
+#define SS_EVENT_COORDINATE_ACTION_UP       3
 
 /* Constants */
-#define SS_STOP                     0
-#define SS_CONTINUE                 1
+#define SS_STOP                             0
+#define SS_CONTINUE                         1
 
 
 struct ss_ts_data {
@@ -57,7 +67,7 @@ struct ss_ts_data {
     struct gpio_desc *ta_gpio;
 };
 
-/* 13 byte */
+/* Event structures */
 struct sec_ts_event_coordinate {
 	uint8_t eid:2;
 	uint8_t tid:4;
@@ -92,16 +102,39 @@ static int ss_read(struct ss_ts_data *ts, uint8_t command, uint8_t *data, uint8_
     return 0;
 }
 
+static int ss_report_touch(struct ss_ts_data *ts, int touch_id, int action, int x, int y, int z, int type, int major, int minor, int ewx, int ewy)
+{
+    input_mt_slot(ts->input, touch_id);
+    switch(action){
+        case SS_EVENT_COORDINATE_ACTION_DOWN:
+        case SS_EVENT_COORDINATE_ACTION_MOVE:
+            input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, true);
+            input_report_abs(ts->input, ABS_MT_POSITION_X, x);
+            input_report_abs(ts->input, ABS_MT_POSITION_Y, y);
+            input_report_abs(ts->input, ABS_MT_PRESSURE, z);
+            input_report_abs(ts->input, ABS_MT_TOUCH_MAJOR, major);
+            input_report_abs(ts->input, ABS_MT_TOUCH_MAJOR, minor);
+            break;
+        case SS_EVENT_COORDINATE_ACTION_UP:
+            input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, false);
+            break;        
+    }
+    input_mt_report_pointer_emulation(ts->input, true);
+	input_sync(ts->input);
+    return 0;
+}
+
 static int ss_handle_coordinate_event(struct ss_ts_data *ts, uint8_t *event)
 {
-    int touch_id;
+    int touch_id, ret;
     struct sec_ts_event_coordinate *event_coord;
 
     event_coord = (struct sec_ts_event_coordinate *) event;
     touch_id = (event_coord->tid - 1);
 
     if(touch_id < SS_MAX_FINGERS + SS_MAX_HOVER && touch_id >= 0){
-        printk("ID: %d ACT: %d X: %d, Y: %d Z: %d Type: %d Major: %d Minor: %d WX: %d WY: %d EWX: %d EWY: %d XER: %d YER: %d", 
+        dev_dbg(&ts->client->dev, "%s: coordinate event: ID: %d ACT: %d X: %d, Y: %d Z: %d Type: %d Major: %d Minor: %d WX: %d WY: %d EWX: %d EWY: %d", 
+            __func__,
             touch_id,
             event_coord->tchsta,
             (event_coord->x_11_4 << 4) | (event_coord->x_3_0),
@@ -111,11 +144,30 @@ static int ss_handle_coordinate_event(struct ss_ts_data *ts, uint8_t *event)
             event_coord->major,
             event_coord->minor,
             event_coord->ewx,
-            event_coord->ewy,
-            event_coord->sgx,
-            event_coord->sgy
+            event_coord->ewy
         );
+
+        ret = ss_report_touch(
+            ts,
+            touch_id, 
+            event_coord->tchsta,
+            (event_coord->x_11_4 << 4) | (event_coord->x_3_0),
+            (event_coord->y_11_4 << 4) | (event_coord->y_3_0),
+            (event_coord->z & 0x3F),
+            (event_coord->ttype_3_2 << 2 | event_coord->ttype_1_0),
+            event_coord->major,
+            event_coord->minor,
+            event_coord->ewx,
+            event_coord->ewy
+        );
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: report touch failed: %d", __func__, ret);
+        }
+
+        // Maybe there's more???
+        return SS_CONTINUE;
     }
+    return SS_STOP;
 }
 
 static int ss_handle_one_event(struct ss_ts_data *ts, uint8_t *event)
@@ -132,7 +184,7 @@ static int ss_handle_one_event(struct ss_ts_data *ts, uint8_t *event)
                 dev_err(&ts->client->dev, "%s: coordinate event handler error: %d\n", __func__, ret);
                 return SS_STOP;
             }
-            return SS_CONTINUE;
+            return ret;
         case SS_EVENT_STATUS:
             dev_warn(&ts->client->dev, "%s: status event handler not implemented!\n", __func__);
             return SS_STOP;
@@ -255,12 +307,12 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 	ts->input->name = "Samsung Touchscreen";
 	ts->input->id.bustype = BUS_I2C;
 
-    // TODO: Read params from IC
-	// input_set_abs_params(input, ABS_MT_POSITION_X, 0, SIS_MAX_X, 0, 0);
-	// input_set_abs_params(input, ABS_MT_POSITION_Y, 0, SIS_MAX_Y, 0, 0);
-	// input_set_abs_params(input, ABS_MT_PRESSURE, 0, SIS_MAX_PRESSURE, 0, 0);
-	// input_set_abs_params(input, ABS_MT_TOUCH_MAJOR, 0, SIS_AREA_LENGTH_LONGER, 0, 0);
-	// input_set_abs_params(input, ABS_MT_TOUCH_MINOR, 0, SIS_AREA_LENGTH_SHORT, 0, 0);
+    input_set_abs_params(ts->input, ABS_MT_TRACKING_ID, 0, SS_MAX_FINGERS + SS_MAX_HOVER, 0, 0);
+	input_set_abs_params(ts->input, ABS_MT_POSITION_X, 0, SS_MAX_X, 0, 0);
+	input_set_abs_params(ts->input, ABS_MT_POSITION_Y, 0, SS_MAX_Y, 0, 0);
+	input_set_abs_params(ts->input, ABS_MT_PRESSURE, 0, SS_MAX_PRESSURE, 0, 0);
+	input_set_abs_params(ts->input, ABS_MT_TOUCH_MAJOR, 0, SS_AREA_LENGTH_LONGER, 0, 0);
+	input_set_abs_params(ts->input, ABS_MT_TOUCH_MINOR, 0, SS_AREA_LENGTH_SHORTER, 0, 0);
 
 	error = input_mt_init_slots(ts->input, SS_MAX_FINGERS, INPUT_MT_DIRECT);
 	if (error) {
