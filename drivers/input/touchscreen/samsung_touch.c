@@ -222,25 +222,6 @@ static irqreturn_t ss_ts_irq_handler(int irq, void *dev_id)
             return IRQ_HANDLED;
         }
 
-        // Print
-        // printk("Event: %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", 
-        //     event[0],
-        //     event[1],
-        //     event[2],
-        //     event[3],
-        //     event[4],
-        //     event[5],
-        //     event[6],
-        //     event[7],
-        //     event[8],
-        //     event[9],
-        //     event[10],
-        //     event[11],
-        //     event[12],
-        //     event[13],
-        //     event[14],
-        //     event[15]
-        // );
 	} while ((ts->interrupt_gpio && !gpiod_get_value_cansleep(ts->interrupt_gpio)) || (ret == SS_CONTINUE));
 
 	return IRQ_HANDLED;
@@ -263,7 +244,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
     struct ss_ts_data *ts;
 	int error;
 
-    printk("SAMSUNG PANEL probe\n");
+    dev_info(&client->dev, "SAMSUNG PANEL probe");
 
     ts = devm_kzalloc(&client->dev, sizeof(*ts), GFP_KERNEL);
 	if (!ts)
@@ -340,7 +321,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
 static int ss_ts_remove(struct i2c_client *client)
 {
-    printk("SAMSUNG PANEL remove\n");
+    dev_info(&client->dev, "SAMSUNG PANEL remove");
 	return 0;
 }
 
