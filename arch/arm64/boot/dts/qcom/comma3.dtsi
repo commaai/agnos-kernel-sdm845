@@ -56,7 +56,6 @@
 };
 
 /* light(RPR-0521RS) and touch panel I2C, /dev/i2c-2 */
-/* throwing invalid proto 1(aka SPI) errors */
 &qupv3_se5_i2c {
   status = "ok";
   qcom,clk-freq-out = <100000>;
@@ -64,6 +63,16 @@
   rpr0521@38 {
     compatible = "rpr0521";
     reg = <0x38>;
+  };
+
+  samsung-ts@17 {
+    compatible = "samsung_i2c_touchpanel";
+    reg = <0x17>;
+    interrupt-parent = <&tlmm>;
+		interrupts = <125 0x2002>;
+    interrupt-gpios = <&tlmm 125 0x2002>;
+    reset-gpios = <&tlmm 104 0>;
+    ta-gpios = <&tlmm 128 0>;
   };
 };
 

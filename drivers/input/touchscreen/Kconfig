@@ -1289,6 +1289,16 @@ config TOUCHSCREEN_HIMAX_CHIPSET
 
 	  If unsure, say N.
 
+config TOUCHSCREEN_SAMSUNG
+	tristate "Samsung touchpanel CHIPSET"
+	depends on I2C
+	help
+	  Say Y here if you have a Samsung touchpanel,
+	  like the one on the Huawei Mate 10 Pro replacement screens.
+	  Written/hacked by comma, so no guarantees!
+
+	  If unsure, say N. Unless on Tici, then say Y!
+
 source "drivers/input/touchscreen/hxchipset/Kconfig"
 
 endif
