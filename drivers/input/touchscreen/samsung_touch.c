@@ -13,6 +13,8 @@
  * GNU General Public License for more details.
  */
 
+// Loosely based on the Huawei Mate 10 Pro kernel driver!
+
 #include <linux/crc-itu-t.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
@@ -27,11 +29,23 @@
 #define SS_I2C_NAME "samsung_i2c_touchpanel"
 
 /* Touchscreen parameters */
-#define SS_MAX_FINGERS			10
+#define SS_MAX_FINGERS			    10
+#define SS_MAX_HOVER			    1
 
 /* Touchscreen registers */
-#define SS_ONE_EVENT_CMD        0x60
-#define SS_ONE_EVENT_SIZE       15
+#define SS_ONE_EVENT_CMD            0x60
+#define SS_ONE_EVENT_SIZE           15
+
+/* Touchscreen events */
+#define SS_EVENT_COORDINATE		    0
+#define SS_EVENT_STATUS		        1
+#define SS_EVENT_GESTURE		    2
+#define SS_EVENT_EMPTY		        3
+#define SS_EVENT_COORDINATE_WET		6
+
+/* Constants */
+#define SS_STOP                     0
+#define SS_CONTINUE                 1
 
 
 struct ss_ts_data {
@@ -43,40 +57,139 @@ struct ss_ts_data {
     struct gpio_desc *ta_gpio;
 };
 
+/* 13 byte */
+struct sec_ts_event_coordinate {
+	uint8_t eid:2;
+	uint8_t tid:4;
+	uint8_t tchsta:2;
+	uint8_t x_11_4;
+	uint8_t y_11_4;
+	uint8_t y_3_0:4;
+	uint8_t x_3_0:4;
+	uint8_t major;
+	uint8_t minor;
+	uint8_t z:6;
+	uint8_t ttype_3_2:2;
+	uint8_t left_event:6;
+	uint8_t ttype_1_0:2;
+	uint8_t wx;
+	uint8_t wy;
+	uint8_t ewx;
+	uint8_t ewy;
+	uint8_t orient;
+	uint8_t sgx;
+	uint8_t sgy;
+} __attribute__ ((packed));
+
 static int ss_read(struct ss_ts_data *ts, uint8_t command, uint8_t *data, uint8_t len)
 {
-    int err;
-    err = i2c_smbus_read_i2c_block_data(ts->client, command, len, data);
-    if(err){
-        dev_err(&ts->client->dev, "%s: i2c_smbus_read_i2c_block_data err: %d\n", __func__, err);
-        return err;
+    int ret;
+    ret = i2c_smbus_read_i2c_block_data(ts->client, command, len, data);
+    if(ret != len){
+        dev_err(&ts->client->dev, "%s: i2c_smbus_read_i2c_block_data. returned bytes: %d expected: %d\n", __func__, ret, len);
+        return -1;
+    }
+    return 0;
+}
+
+static int ss_handle_coordinate_event(struct ss_ts_data *ts, uint8_t *event)
+{
+    int touch_id;
+    struct sec_ts_event_coordinate *event_coord;
+
+    event_coord = (struct sec_ts_event_coordinate *) event;
+    touch_id = (event_coord->tid - 1);
+
+    if(touch_id < SS_MAX_FINGERS + SS_MAX_HOVER && touch_id >= 0){
+        printk("ID: %d ACT: %d X: %d, Y: %d Z: %d Type: %d Major: %d Minor: %d WX: %d WY: %d EWX: %d EWY: %d XER: %d YER: %d", 
+            touch_id,
+            event_coord->tchsta,
+            (event_coord->x_11_4 << 4) | (event_coord->x_3_0),
+            (event_coord->y_11_4 << 4) | (event_coord->y_3_0),
+            (event_coord->z & 0x3F),
+            (event_coord->ttype_3_2 << 2 | event_coord->ttype_1_0),
+            event_coord->major,
+            event_coord->minor,
+            event_coord->ewx,
+            event_coord->ewy,
+            event_coord->sgx,
+            event_coord->sgy
+        );
+    }
+}
+
+static int ss_handle_one_event(struct ss_ts_data *ts, uint8_t *event)
+{
+    uint8_t event_id;
+    int ret;
+
+    event_id = event[0] & 0x3;
+    switch(event_id){
+        case SS_EVENT_COORDINATE:
+            dev_dbg(&ts->client->dev, "%s: coordinate event\n", __func__);
+            ret = ss_handle_coordinate_event(ts, event);
+            if(ret < 0){
+                dev_err(&ts->client->dev, "%s: coordinate event handler error: %d\n", __func__, ret);
+                return SS_STOP;
+            }
+            return SS_CONTINUE;
+        case SS_EVENT_STATUS:
+            dev_warn(&ts->client->dev, "%s: status event handler not implemented!\n", __func__);
+            return SS_STOP;
+        case SS_EVENT_GESTURE:
+            dev_warn(&ts->client->dev, "%s: gesture event handler not implemented!\n", __func__);
+            return SS_STOP;
+        case SS_EVENT_EMPTY:
+            dev_dbg(&ts->client->dev, "%s: empty event\n", __func__);
+            return SS_STOP;
+        case SS_EVENT_COORDINATE_WET:
+            dev_warn(&ts->client->dev, "%s: wet coordinate event handler not implemented!\n", __func__);
+            return SS_STOP;
     }
 }
 
 static irqreturn_t ss_ts_irq_handler(int irq, void *dev_id)
 {
     struct ss_ts_data *ts = dev_id;
-    int err, i;
+    int ret;
 
     // Keep handling packets until the IRQ pin has gone high again
     uint8_t event[SS_ONE_EVENT_SIZE];
     do {
         // Read event
-        err = ss_read(ts, SS_ONE_EVENT_CMD, event, SS_ONE_EVENT_SIZE);
-        if(err){
-            dev_err(&ts->client->dev, "%s: Reading event failed: %d\n", __func__, err);
+        ret = ss_read(ts, SS_ONE_EVENT_CMD, event, SS_ONE_EVENT_SIZE);
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: reading event failed: %d\n", __func__, ret);
+            return IRQ_HANDLED;
+        }
+
+        // Handle
+        ret = ss_handle_one_event(ts, event);
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: handling event failed: %d\n", __func__, ret);
             return IRQ_HANDLED;
         }
 
         // Print
-        printk("Event: ");
-        for(i=0; i<SS_ONE_EVENT_SIZE; i++){
-            printk("%d ", event[i]);
-        }
-        printk("\n");
-
-		//ss_ts_handle_packet(ts);
-	} while (ts->interrupt_gpio && !gpiod_get_value_cansleep(ts->interrupt_gpio));
+        // printk("Event: %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", 
+        //     event[0],
+        //     event[1],
+        //     event[2],
+        //     event[3],
+        //     event[4],
+        //     event[5],
+        //     event[6],
+        //     event[7],
+        //     event[8],
+        //     event[9],
+        //     event[10],
+        //     event[11],
+        //     event[12],
+        //     event[13],
+        //     event[14],
+        //     event[15]
+        // );
+	} while ((ts->interrupt_gpio && !gpiod_get_value_cansleep(ts->interrupt_gpio)) || (ret == SS_CONTINUE));
 
 	return IRQ_HANDLED;
 }
@@ -111,7 +224,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 	if (IS_ERR(ts->interrupt_gpio)) {
 		error = PTR_ERR(ts->interrupt_gpio);
 		if (error != -EPROBE_DEFER)
-			dev_err(&client->dev, "Failed to get interrupt GPIO: %d\n", error);
+			dev_err(&client->dev, "failed to get interrupt GPIO: %d\n", error);
 		return error;
 	}
 
@@ -119,7 +232,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 	if (IS_ERR(ts->reset_gpio)) {
 		error = PTR_ERR(ts->reset_gpio);
 		if (error != -EPROBE_DEFER)
-			dev_err(&client->dev, "Failed to get reset GPIO: %d\n", error);
+			dev_err(&client->dev, "failed to get reset GPIO: %d\n", error);
 		return error;
 	}
 
@@ -127,7 +240,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 	if (IS_ERR(ts->ta_gpio)) {
 		error = PTR_ERR(ts->ta_gpio);
 		if (error != -EPROBE_DEFER)
-			dev_err(&client->dev, "Failed to get TA GPIO: %d\n", error);
+			dev_err(&client->dev, "failed to get TA GPIO: %d\n", error);
 		return error;
 	}
 
@@ -135,7 +248,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
 	ts->input = devm_input_allocate_device(&client->dev);
 	if (!ts->input) {
-		dev_err(&client->dev, "Failed to allocate input device\n");
+		dev_err(&client->dev, "failed to allocate input device\n");
 		return -ENOMEM;
 	}
 
@@ -151,7 +264,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
 	error = input_mt_init_slots(ts->input, SS_MAX_FINGERS, INPUT_MT_DIRECT);
 	if (error) {
-		dev_err(&client->dev, "Failed to initialize MT slots: %d\n", error);
+		dev_err(&client->dev, "failed to initialize MT slots: %d\n", error);
 		return error;
 	}
 
@@ -160,14 +273,13 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 					  IRQF_ONESHOT,
 					  client->name, ts);
 	if (error) {
-		dev_err(&client->dev, "Failed to request IRQ: %d\n", error);
+		dev_err(&client->dev, "failed to request IRQ: %d\n", error);
 		return error;
 	}
 
 	error = input_register_device(ts->input);
 	if (error) {
-		dev_err(&client->dev,
-			"Failed to register input device: %d\n", error);
+		dev_err(&client->dev, "failed to register input device: %d\n", error);
 		return error;
 	}
 
