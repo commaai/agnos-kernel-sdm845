@@ -2799,12 +2799,15 @@ int drm_atomic_helper_page_flip(struct drm_crtc *crtc,
 	struct drm_crtc_state *crtc_state;
 	int ret = 0;
 
+	printk("COMMA: drm_atomic_helper_page_flip. flags: %d");
 	if (flags & DRM_MODE_PAGE_FLIP_ASYNC)
 		return -EINVAL;
 
 	state = drm_atomic_state_alloc(plane->dev);
-	if (!state)
+	if (!state) {
+		printk("COMMA: drm_atomic_helper_page_flip. drm_atomic_state_alloc failed");
 		return -ENOMEM;
+	}
 
 	state->acquire_ctx = drm_modeset_legacy_acquire_ctx(crtc);
 retry:
@@ -2842,6 +2845,7 @@ retry:
 	/* Driver takes ownership of state on successful commit. */
 	return 0;
 fail:
+	printk("COMMA: drm_atomic_helper_page_flip failed");
 	if (ret == -EDEADLK)
 		goto backoff;
 

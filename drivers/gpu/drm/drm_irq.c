@@ -64,7 +64,8 @@ static unsigned int drm_timestamp_precision = 20;  /* Default to 20 usecs. */
  */
 unsigned int drm_timestamp_monotonic = 1;
 
-static int drm_vblank_offdelay = 5000;    /* Default to 5000 msecs. */
+//static int drm_vblank_offdelay = 5000;    /* Default to 5000 msecs. */
+static int drm_vblank_offdelay = 0;    /* COMMA: Always on! */
 
 module_param_named(vblankoffdelay, drm_vblank_offdelay, int, 0600);
 module_param_named(timestamp_precision_usec, drm_timestamp_precision, int, 0600);
@@ -1422,6 +1423,7 @@ void drm_vblank_on(struct drm_device *dev, unsigned int pipe)
 	 * re-enable interrupts if there are users left, or the
 	 * user wishes vblank interrupts to be enabled all the time.
 	 */
+	printk("COMMA: drm_vblank_on: refcount %d, vblank_offdelay %d", atomic_read(&vblank->refcount), drm_vblank_offdelay);
 	if (atomic_read(&vblank->refcount) != 0 || drm_vblank_offdelay == 0)
 		WARN_ON(drm_vblank_enable(dev, pipe));
 	spin_unlock_irqrestore(&dev->vbl_lock, irqflags);
