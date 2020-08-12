@@ -2300,15 +2300,15 @@ static void _sde_crtc_complete_flip(struct drm_crtc *crtc,
 
 	spin_lock_irqsave(&dev->event_lock, flags);
 	event = sde_crtc->event;
-	printk("COMMA: completed flip");
+	SDE_DEBUG("COMMA: completed flip");
 	if (event) {
-		printk("COMMA: completed flip: found event");
+		SDE_DEBUG("COMMA: completed flip: found event");
 		/* if regular vblank case (!file) or if cancel-flip from
 		 * preclose on file that requested flip, then send the
 		 * event:
 		 */
 		if (!file || (event->base.file_priv == file)) {
-			printk("COMMA: completed flip: sent event");
+			SDE_DEBUG("COMMA: completed flip: sent event");
 			sde_crtc->event = NULL;
 			DRM_DEBUG_VBL("%s: send event: %pK\n",
 						sde_crtc->name, event);
@@ -2347,7 +2347,7 @@ static void sde_crtc_vblank_cb(void *data)
 	struct drm_crtc *crtc = (struct drm_crtc *)data;
 	struct sde_crtc *sde_crtc = to_sde_crtc(crtc);
 
-	printk("COMMA: vblank callback");
+	SDE_DEBUG("COMMA: vblank callback");
 
 	/* keep statistics on vblank callback - with auto reset via debugfs */
 	if (ktime_equal(sde_crtc->vblank_cb_time, ktime_set(0, 0)))
@@ -3822,7 +3822,7 @@ static int _sde_crtc_vblank_enable_no_lock(
 
 	if (enable) {
 		int ret;
-		printk("COMMA: Enabling vblanks");
+		SDE_DEBUG("COMMA: Enabling vblanks");
 
 		/* drop lock since power crtc cb may try to re-acquire lock */
 		mutex_unlock(&sde_crtc->crtc_lock);
@@ -3844,7 +3844,7 @@ static int _sde_crtc_vblank_enable_no_lock(
 					sde_crtc_vblank_cb, (void *)crtc);
 		}
 	} else {
-		printk("COMMA: Disabling vblanks");
+		SDE_DEBUG("COMMA: Disabling vblanks");
 		list_for_each_entry(enc, &dev->mode_config.encoder_list, head) {
 			if (enc->crtc != crtc)
 				continue;
@@ -3902,7 +3902,7 @@ static void _sde_crtc_set_suspend(struct drm_crtc *crtc, bool enable)
 	 */
 	SDE_EVT32(DRMID(&sde_crtc->base), enable, sde_crtc->enabled,
 			sde_crtc->suspend, sde_crtc->vblank_requested);
-	printk("COMMA: _sde_crtc_set_suspend: suspend %d, enabled: %d, vblank_requested: %d", sde_crtc->suspend, sde_crtc->enabled, sde_crtc->vblank_requested);
+	SDE_DEBUG("COMMA: _sde_crtc_set_suspend: suspend %d, enabled: %d, vblank_requested: %d", sde_crtc->suspend, sde_crtc->enabled, sde_crtc->vblank_requested);
 
 	if (sde_crtc->suspend == enable)
 		SDE_DEBUG("crtc%d suspend already set to %d, ignoring update\n",
@@ -4326,7 +4326,7 @@ static void sde_crtc_enable(struct drm_crtc *crtc)
 	// Comma hacks: enable vblanks
 	drm_crtc_vblank_on(crtc);
 
-	printk("COMMA: crtc enable. enabled: %d, suspend: %d, vblank_req: %d", sde_crtc->enabled, sde_crtc->suspend, sde_crtc->vblank_requested);
+	SDE_DEBUG("COMMA: crtc enable. enabled: %d, suspend: %d, vblank_req: %d", sde_crtc->enabled, sde_crtc->suspend, sde_crtc->vblank_requested);
 	if (!sde_crtc->enabled && !sde_crtc->suspend &&
 			sde_crtc->vblank_requested) {
 		ret = _sde_crtc_vblank_enable_no_lock(sde_crtc, true);
@@ -4895,7 +4895,7 @@ int sde_crtc_vblank(struct drm_crtc *crtc, bool en)
 	mutex_lock(&sde_crtc->crtc_lock);
 	SDE_EVT32(DRMID(&sde_crtc->base), en, sde_crtc->enabled,
 			sde_crtc->suspend, sde_crtc->vblank_requested);
-	printk("COMMA: sde_crtc_vblank: en %d, enabled: %d, suspend %d", en, sde_crtc->enabled, !sde_crtc->suspend);
+	SDE_DEBUG("COMMA: sde_crtc_vblank: en %d, enabled: %d, suspend %d", en, sde_crtc->enabled, !sde_crtc->suspend);
 	if (sde_crtc->enabled && !sde_crtc->suspend) {
 		ret = _sde_crtc_vblank_enable_no_lock(sde_crtc, en);
 		if (ret)
