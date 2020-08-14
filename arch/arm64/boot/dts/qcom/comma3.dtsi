@@ -145,6 +145,7 @@
 
     gpio = <&pm8998_gpios 13 0>;
     regulator-boot-on;
+    regulator-always-on;
   };
 
   tp3v3: tp3v3 {
@@ -157,6 +158,7 @@
 
    gpio = <&pm8998_gpios 10 0>;
    regulator-boot-on;
+   regulator-always-on;
   };
 };
 

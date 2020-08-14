@@ -48,10 +48,7 @@
  */
 #define SDE_DEBUG(fmt, ...)                                                \
 	do {                                                               \
-		if (unlikely(drm_debug & DRM_UT_KMS))                      \
-			DRM_DEBUG(fmt, ##__VA_ARGS__); \
-		else                                                       \
-			pr_debug(fmt, ##__VA_ARGS__);                      \
+		no_printk(fmt, ##__VA_ARGS__);                             \
 	} while (0)
 
 /**
@@ -60,10 +57,7 @@
  */
 #define SDE_DEBUG_DRIVER(fmt, ...)                                         \
 	do {                                                               \
-		if (unlikely(drm_debug & DRM_UT_DRIVER))                   \
-			DRM_ERROR(fmt, ##__VA_ARGS__); \
-		else                                                       \
-			pr_debug(fmt, ##__VA_ARGS__);                      \
+		no_printk(fmt, ##__VA_ARGS__);                             \
 	} while (0)
 
 #define SDE_ERROR(fmt, ...) pr_err("[sde error]" fmt, ##__VA_ARGS__)
@@ -288,6 +282,9 @@ struct sde_kms {
 	atomic_t detach_sec_cb;
 	atomic_t detach_all_cb;
 	struct mutex secure_transition_lock;
+	struct mutex vblank_ctl_global_lock;
+
+	bool first_kickoff;
 };
 
 struct vsync_info {
@@ -374,7 +371,8 @@ static inline bool sde_kms_is_secure_session_inprogress(struct sde_kms *sde_kms)
 		return false;
 
 	mutex_lock(&sde_kms->secure_transition_lock);
-	if (sde_kms->smmu_state.state == DETACHED)
+	if ((sde_kms->smmu_state.state == DETACHED)
+		|| (sde_kms->smmu_state.state == DETACH_ALL_REQ))
 		ret = true;
 	mutex_unlock(&sde_kms->secure_transition_lock);
 

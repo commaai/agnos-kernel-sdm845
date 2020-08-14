@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2018 XiaoMi, Inc.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -56,6 +57,9 @@
 #define MSM_VERSION_MAJOR	1
 #define MSM_VERSION_MINOR	2
 #define MSM_VERSION_PATCHLEVEL	0
+
+atomic_t resume_pending;
+wait_queue_head_t resume_wait_q;
 
 static void msm_fb_output_poll_changed(struct drm_device *dev)
 {
@@ -201,62 +205,46 @@ u32 msm_readl(const void __iomem *addr)
 	return val;
 }
 
-struct vblank_event {
-	struct list_head node;
+struct vblank_work {
+	struct kthread_work work;
 	int crtc_id;
 	bool enable;
+	struct msm_drm_private *priv;
 };
 
 static void vblank_ctrl_worker(struct kthread_work *work)
 {
-	struct msm_vblank_ctrl *vbl_ctrl = container_of(work,
-						struct msm_vblank_ctrl, work);
-	struct msm_drm_private *priv = container_of(vbl_ctrl,
-					struct msm_drm_private, vblank_ctrl);
+	struct vblank_work *cur_work = container_of(work,
+					struct vblank_work, work);
+	struct msm_drm_private *priv = cur_work->priv;
 	struct msm_kms *kms = priv->kms;
-	struct vblank_event *vbl_ev, *tmp;
-	unsigned long flags;
-	LIST_HEAD(tmp_head);
 
-	spin_lock_irqsave(&vbl_ctrl->lock, flags);
-	list_for_each_entry_safe(vbl_ev, tmp, &vbl_ctrl->event_list, node) {
-		list_del(&vbl_ev->node);
-		list_add_tail(&vbl_ev->node, &tmp_head);
-	}
-	spin_unlock_irqrestore(&vbl_ctrl->lock, flags);
+	if (cur_work->enable)
+		kms->funcs->enable_vblank(kms, priv->crtcs[cur_work->crtc_id]);
+	else
+		kms->funcs->disable_vblank(kms, priv->crtcs[cur_work->crtc_id]);
 
-	list_for_each_entry_safe(vbl_ev, tmp, &tmp_head, node) {
-		if (vbl_ev->enable)
-			kms->funcs->enable_vblank(kms,
-						priv->crtcs[vbl_ev->crtc_id]);
-		else
-			kms->funcs->disable_vblank(kms,
-						priv->crtcs[vbl_ev->crtc_id]);
-
-		kfree(vbl_ev);
-	}
+	kfree(cur_work);
 }
 
 static int vblank_ctrl_queue_work(struct msm_drm_private *priv,
 					int crtc_id, bool enable)
 {
-	struct msm_vblank_ctrl *vbl_ctrl = &priv->vblank_ctrl;
-	struct vblank_event *vbl_ev;
-	unsigned long flags;
+	struct vblank_work *cur_work;
 
-	vbl_ev = kzalloc(sizeof(*vbl_ev), GFP_ATOMIC);
-	if (!vbl_ev)
+	if (!priv || crtc_id >= priv->num_crtcs)
+		return -EINVAL;
+
+	cur_work = kzalloc(sizeof(*cur_work), GFP_ATOMIC);
+	if (!cur_work)
 		return -ENOMEM;
 
-	vbl_ev->crtc_id = crtc_id;
-	vbl_ev->enable = enable;
+	kthread_init_work(&cur_work->work, vblank_ctrl_worker);
+	cur_work->crtc_id = crtc_id;
+	cur_work->enable = enable;
+	cur_work->priv = priv;
 
-	spin_lock_irqsave(&vbl_ctrl->lock, flags);
-	list_add_tail(&vbl_ev->node, &vbl_ctrl->event_list);
-	spin_unlock_irqrestore(&vbl_ctrl->lock, flags);
-
-	kthread_queue_work(&priv->disp_thread[crtc_id].worker,
-			&vbl_ctrl->work);
+	kthread_queue_work(&priv->disp_thread[crtc_id].worker, &cur_work->work);
 
 	return 0;
 }
@@ -268,19 +256,7 @@ static int msm_drm_uninit(struct device *dev)
 	struct msm_drm_private *priv = ddev->dev_private;
 	struct msm_kms *kms = priv->kms;
 	struct msm_gpu *gpu = priv->gpu;
-	struct msm_vblank_ctrl *vbl_ctrl = &priv->vblank_ctrl;
-	struct vblank_event *vbl_ev, *tmp;
 	int i;
-
-	/* We must cancel and cleanup any pending vblank enable/disable
-	 * work before drm_irq_uninstall() to avoid work re-enabling an
-	 * irq after uninstall has disabled it.
-	 */
-	kthread_flush_work(&vbl_ctrl->work);
-	list_for_each_entry_safe(vbl_ev, tmp, &vbl_ctrl->event_list, node) {
-		list_del(&vbl_ev->node);
-		kfree(vbl_ev);
-	}
 
 	/* clean up display commit/event worker threads */
 	for (i = 0; i < priv->num_crtcs; i++) {
@@ -522,9 +498,6 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 
 	INIT_LIST_HEAD(&priv->client_event_list);
 	INIT_LIST_HEAD(&priv->inactive_list);
-	INIT_LIST_HEAD(&priv->vblank_ctrl.event_list);
-	kthread_init_work(&priv->vblank_ctrl.work, vblank_ctrl_worker);
-	spin_lock_init(&priv->vblank_ctrl.lock);
 
 	ret = sde_power_resource_init(pdev, &priv->phandle);
 	if (ret) {
@@ -1615,6 +1588,19 @@ static struct drm_driver msm_driver = {
 };
 
 #ifdef CONFIG_PM_SLEEP
+static int msm_pm_prepare(struct device *dev)
+{
+	atomic_inc(&resume_pending);
+	return 0;
+}
+
+static void msm_pm_complete(struct device *dev)
+{
+	atomic_set(&resume_pending, 0);
+	wake_up_all(&resume_wait_q);
+	return;
+}
+
 static int msm_pm_suspend(struct device *dev)
 {
 	struct drm_device *ddev;
@@ -1667,6 +1653,8 @@ static int msm_pm_resume(struct device *dev)
 #endif
 
 static const struct dev_pm_ops msm_pm_ops = {
+	.prepare = msm_pm_prepare,
+	.complete = msm_pm_complete,
 	SET_SYSTEM_SLEEP_PM_OPS(msm_pm_suspend, msm_pm_resume)
 };
 
@@ -1856,34 +1844,18 @@ msm_gem_smmu_address_space_get(struct drm_device *dev,
 	struct msm_kms *kms;
 	const struct msm_kms_funcs *funcs;
 
-	if (!dev) {
-		dev_err(dev, "msm_gem_smmu_address_space_get: no dev\n");
+	if ((!dev) || (!dev->dev_private))
 		return NULL;
-	}
-
-	if (!dev->dev_private) {
-		dev_err(dev, "msm_gem_smmu_address_space_get: no dev->dev_private\n");
-		return NULL;
-	}
 
 	priv = dev->dev_private;
 	kms = priv->kms;
-	if (!kms) {
-		dev_err(dev, "msm_gem_smmu_address_space_get: no kms\n");
+	if (!kms)
 		return NULL;
-	}
 
 	funcs = kms->funcs;
 
-	if (!funcs) {
-		dev_err(dev, "msm_gem_smmu_address_space_get: no funcs\n");
+	if ((!funcs) || (!funcs->get_address_space))
 		return NULL;
-	}
-
-	if (!funcs->get_address_space) {
-		dev_err(dev, "msm_gem_smmu_address_space_get: no funcs->get_address_space\n");
-		return NULL;
-	}
 
 	return funcs->get_address_space(priv->kms, domain);
 }
@@ -2010,6 +1982,7 @@ static struct platform_driver msm_platform_driver = {
 		.name   = "msm_drm",
 		.of_match_table = dt_match,
 		.pm     = &msm_pm_ops,
+		.suppress_bind_attrs = true,
 	},
 };
 
