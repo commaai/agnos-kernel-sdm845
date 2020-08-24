@@ -85,6 +85,13 @@
 /* panda SPI */
 &qupv3_se0_spi {
   status = "ok";
+
+  panda_spi: spidev@0 {
+    status = "ok";
+    compatible = "commaai,panda";
+    spi-max-frequency = <50000000>;
+    reg = <0>;
+  };
 };
 
 /* GPS UART */
