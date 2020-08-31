@@ -1354,7 +1354,7 @@ int symbol__disassemble(struct symbol *sym, struct map *map, size_t privsize)
 		strcpy(symfs_filename, tmp);
 	}
 
-	snprintf(command, sizeof(command),
+	assert(snprintf(command, sizeof(command),
 		 "%s %s%s --start-address=0x%016" PRIx64
 		 " --stop-address=0x%016" PRIx64
 		 " -l -d %s %s -C %s 2>/dev/null|grep -v %s|expand",
@@ -1365,7 +1365,7 @@ int symbol__disassemble(struct symbol *sym, struct map *map, size_t privsize)
 		 map__rip_2objdump(map, sym->end),
 		 symbol_conf.annotate_asm_raw ? "" : "--no-show-raw",
 		 symbol_conf.annotate_src ? "-S" : "",
-		 symfs_filename, symfs_filename);
+		 symfs_filename, symfs_filename));
 
 	pr_debug("Executing: %s\n", command);
 
