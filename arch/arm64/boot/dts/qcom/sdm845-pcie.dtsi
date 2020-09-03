@@ -209,7 +209,7 @@
 
 		qcom,phy-status-offset = <0x974>;
 
-		//qcom,boot-option = <0x0>;
+		qcom,boot-option = <0x1>;
 
 		linux,pci-domain = <0>;
 
@@ -467,7 +467,7 @@
 			&pcie1_wake_default>;
 
 		perst-gpio = <&tlmm 102 0>;
-		wake-gpio = <&tlmm 104 0>;
+		/*wake-gpio = <&tlmm 104 0>;*/
 
 		gdsc-vdd-supply = <&pcie_1_gdsc>;
 		vreg-1.8-supply = <&pm8998_l26>;
@@ -489,7 +489,7 @@
 
 		qcom,phy-status-offset = <0x1aac>;
 
-		//qcom,boot-option = <0x0>;
+		qcom,boot-option = <0x1>;
 
 		linux,pci-domain = <1>;
 

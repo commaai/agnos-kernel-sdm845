@@ -7,15 +7,6 @@
 #include <dt-bindings/clock/mdss-10nm-pll-clk.h>
 #include <dt-bindings/clock/qcom,audio-ext-clk.h>
 
-/* enable PCIe */
-&pcie0 {
-  status = "ok";
-};
-
-&pcie1 {
-  status = "ok";
-};
-
 /* disable the SPI */
 &qupv3_se5_spi {
   status = "disabled";
