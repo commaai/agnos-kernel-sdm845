@@ -130,10 +130,12 @@ int usb_choose_configuration(struct usb_device *udev)
 		 */
 
 		/* Rule out configs that draw too much bus current */
+#if 0
 		if (usb_get_max_power(udev, c) > udev->bus_mA) {
 			insufficient_power++;
 			continue;
 		}
+#endif
 
 		/* When the first config's first interface is one of Microsoft's
 		 * pet nonstandard Ethernet-over-USB protocols, ignore it unless
