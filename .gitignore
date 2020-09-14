@@ -120,3 +120,5 @@ all.config
 kernel/configs/android-*.cfg
 out
 .*.swp
+*.deb
+*.changes

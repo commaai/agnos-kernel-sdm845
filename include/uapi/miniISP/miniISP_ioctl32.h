@@ -1,6 +1,10 @@
 #include <linux/types.h>
 #include <asm-generic/ioctl.h>         //_IOW(), _IOR()
+#ifdef __KERNEL__
+#ifdef CONFIG_COMPAT
 #include <linux/compat.h> // compat_uptr_t
+#endif
+#endif
 #include <uapi/miniISP/miniISP_ioctl.h>
 
 

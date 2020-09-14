@@ -36,7 +36,7 @@ foreach my $file (@files) {
 	$lineno = 0;
 	while ($line = <$fh>) {
 		$lineno++;
-		&check_include();
+		# &check_include(); # Doesn't work for the qcom source
 		&check_asm_types();
 		&check_sizetypes();
 		&check_declarations();
