@@ -511,14 +511,14 @@
 };
 
 &sde_dp {
-  status = "disabled";
+  status = "ok";
 	qcom,dp-usbpd-detection = <&pmi8998_pdphy>;
 	qcom,ext-disp = <&ext_disp>;
 
 	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
 	pinctrl-0 = <&sde_dp_aux_active &sde_dp_usbplug_cc_active>;
 	pinctrl-1 = <&sde_dp_aux_suspend &sde_dp_usbplug_cc_suspend>;
-	qcom,aux-en-gpio = <&tlmm 43 0>;
+	qcom,aux-en-gpio = <&tlmm 27 0>;
 	qcom,aux-sel-gpio = <&tlmm 51 0>;
 	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
 };
@@ -529,8 +529,8 @@
 };
 
 &mdss_mdp {
-	//connectors = <&sde_rscc &sde_wb &sde_dp>;
-  connectors = <&sde_rscc &sde_wb>;
+	connectors = <&sde_rscc &sde_wb &sde_dp>;
+  //connectors = <&sde_rscc &sde_wb>;
   // crashes without sde_wb
   //connectors = <&sde_rscc>;
 };

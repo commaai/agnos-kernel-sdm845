@@ -725,12 +725,12 @@
 
 		sde_dp_aux_active: sde_dp_aux_active {
 			mux {
-				pins = "gpio43", "gpio51";
+				pins = "gpio27", "gpio51";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio43", "gpio51";
+				pins = "gpio27", "gpio51";
 				bias-disable = <0>; /* no pull */
 				drive-strength = <8>;
 			};
@@ -738,12 +738,12 @@
 
 		sde_dp_aux_suspend: sde_dp_aux_suspend {
 			mux {
-				pins = "gpio43", "gpio51";
+				pins = "gpio27", "gpio51";
 				function = "gpio";
 			};
 
 			config {
-				pins = "gpio43", "gpio51";
+				pins = "gpio27", "gpio51";
 				bias-pull-down;
 				drive-strength = <2>;
 			};
