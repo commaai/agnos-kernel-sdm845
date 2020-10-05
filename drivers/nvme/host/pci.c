@@ -45,12 +45,13 @@
 #include <asm/unaligned.h>
 
 #include "nvme.h"
+#include "../../block/blk-mq.h"
 
 #define NVME_Q_DEPTH		1024
 #define NVME_AQ_DEPTH		256
 #define SQ_SIZE(depth)		(depth * sizeof(struct nvme_command))
 #define CQ_SIZE(depth)		(depth * sizeof(struct nvme_completion))
-		
+
 /*
  * We handle AEN commands ourselves and don't even let the
  * block layer know about them.
@@ -295,6 +296,9 @@ static void __nvme_submit_cmd(struct nvme_queue *nvmeq,
 
 	if (++tail == nvmeq->q_depth)
 		tail = 0;
+
+	printk("NVME: writel 1: 0x%x\n", nvmeq->q_db);
+	// THE NVME DRIVE CRASHES ON THIS WRITE! IT'S AT the IOMAPPED (DEV->BAR + 0x100)
 	writel(tail, nvmeq->q_db);
 	nvmeq->sq_tail = tail;
 }
@@ -583,6 +587,9 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	unsigned map_len;
 	int ret = BLK_MQ_RQ_QUEUE_OK;
 
+	if (WARN_ON_ONCE(hctx != blk_mq_map_queue(req->q, req->mq_ctx->cpu)))
+		blk_dump_rq_flags(req, "nvme hctx mismatch");
+
 	/*
 	 * If formated with metadata, require the block layer provide a buffer
 	 * unless this namespace is formated such that the metadata can be
@@ -601,6 +608,11 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (ret)
 		return ret;
 
+	if(blk_mq_tag_to_rq(*nvmeq->tags, req->tag) != req) {
+		ret = BLK_MQ_RQ_QUEUE_ERROR;
+		goto out;
+	}
+
 	ret = nvme_setup_cmd(ns, req, &cmnd);
 	if (ret)
 		goto out;
@@ -614,6 +626,7 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	cmnd.common.command_id = req->tag;
 	blk_mq_start_request(req);
 
+	printk("NVME: nvme_queue_rq: 1\n");
 	spin_lock_irq(&nvmeq->q_lock);
 	if (unlikely(nvmeq->cq_vector < 0)) {
 		if (ns && !test_bit(NVME_NS_DEAD, &ns->flags))
@@ -623,9 +636,13 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		spin_unlock_irq(&nvmeq->q_lock);
 		goto out;
 	}
+	printk("NVME: nvme_queue_rq: 2\n");
 	__nvme_submit_cmd(nvmeq, &cmnd);
+	printk("NVME: nvme_queue_rq: 3\n");
 	nvme_process_cq(nvmeq);
+	printk("NVME: nvme_queue_rq: 4\n");
 	spin_unlock_irq(&nvmeq->q_lock);
+	printk("NVME: nvme_queue_rq: 5\n");
 	return BLK_MQ_RQ_QUEUE_OK;
 out:
 	nvme_free_iod(dev, req);
@@ -638,7 +655,13 @@ static void nvme_complete_rq(struct request *req)
 	struct nvme_dev *dev = iod->nvmeq->dev;
 	int error = 0;
 
+	printk("NVME: nvme_complete_rq: 1\n");
+	msleep(10);
+
 	nvme_unmap_data(dev, req);
+
+	printk("NVME: nvme_complete_rq: 2\n");
+	msleep(10);
 
 	if (unlikely(req->errors)) {
 		if (nvme_req_needs_retry(req, req->errors)) {
@@ -659,7 +682,13 @@ static void nvme_complete_rq(struct request *req)
 			req->errors);
 	}
 
+	printk("NVME: nvme_complete_rq: 3\n");
+	msleep(10);
+
 	blk_mq_end_request(req, error);
+
+	printk("NVME: nvme_complete_rq: 4\n");
+	msleep(10);
 }
 
 /* We read the CQE phase first to check if the rest of the entry is valid */
@@ -723,8 +752,11 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 	if (head == nvmeq->cq_head && phase == nvmeq->cq_phase)
 		return;
 
-	if (likely(nvmeq->cq_vector >= 0))
+	if (likely(nvmeq->cq_vector >= 0)) {
+		printk("NVME: writel 2: 0x%x + 0x%x = 0x%x\n", nvmeq->q_db, nvmeq->dev->db_stride, nvmeq->q_db + nvmeq->dev->db_stride);
+		msleep(10);
 		writel(head, nvmeq->q_db + nvmeq->dev->db_stride);
+	}
 	nvmeq->cq_head = head;
 	nvmeq->cq_phase = phase;
 
@@ -782,9 +814,13 @@ static void nvme_pci_submit_async_event(struct nvme_ctrl *ctrl, int aer_idx)
 	c.common.opcode = nvme_admin_async_event;
 	c.common.command_id = NVME_AQ_BLKMQ_DEPTH + aer_idx;
 
+	printk("NVME: nvme_pci_submit_async_event: 1\n");
+	msleep(10);
 	spin_lock_irq(&nvmeq->q_lock);
 	__nvme_submit_cmd(nvmeq, &c);
 	spin_unlock_irq(&nvmeq->q_lock);
+	printk("NVME: nvme_pci_submit_async_event: 2\n");
+	msleep(10);
 }
 
 static int adapter_delete_queue(struct nvme_dev *dev, u8 opcode, u16 id)
@@ -1071,6 +1107,7 @@ static struct nvme_queue *nvme_alloc_queue(struct nvme_dev *dev, int qid,
 	spin_lock_init(&nvmeq->q_lock);
 	nvmeq->cq_head = 0;
 	nvmeq->cq_phase = 1;
+	printk("NVME: nvme_alloc_queue: set nvmeq->q_db to 0x%x: dbs: 0x%x stride: 0x%x\n", &dev->dbs[qid * 2 * dev->db_stride], dev->dbs, dev->db_stride);
 	nvmeq->q_db = &dev->dbs[qid * 2 * dev->db_stride];
 	nvmeq->q_depth = depth;
 	nvmeq->qid = qid;
@@ -1106,6 +1143,7 @@ static void nvme_init_queue(struct nvme_queue *nvmeq, u16 qid)
 	nvmeq->sq_tail = 0;
 	nvmeq->cq_head = 0;
 	nvmeq->cq_phase = 1;
+	printk("NVME: nvme_init_queue: set nvmeq->q_db to 0x%x: dbs: 0x%x stride: 0x%x\n", &dev->dbs[qid * 2 * dev->db_stride], dev->dbs, dev->db_stride);
 	nvmeq->q_db = &dev->dbs[qid * 2 * dev->db_stride];
 	memset((void *)nvmeq->cqes, 0, CQ_SIZE(nvmeq->q_depth));
 	dev->online_queues++;
@@ -1215,42 +1253,84 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 	u64 cap = lo_hi_readq(dev->bar + NVME_REG_CAP);
 	struct nvme_queue *nvmeq;
 
+	printk("COMMA: nvme_configure_admin_queue: 1\n");
+	msleep(10);
 	dev->subsystem = readl(dev->bar + NVME_REG_VS) >= NVME_VS(1, 1, 0) ?
 						NVME_CAP_NSSRC(cap) : 0;
 
+	printk("COMMA: nvme_configure_admin_queue: 2\n");
+	msleep(10);
 	if (dev->subsystem &&
-	    (readl(dev->bar + NVME_REG_CSTS) & NVME_CSTS_NSSRO))
+	    (readl(dev->bar + NVME_REG_CSTS) & NVME_CSTS_NSSRO)) {
+		printk("COMMA: nvme_configure_admin_queue: 3\n");
 		writel(NVME_CSTS_NSSRO, dev->bar + NVME_REG_CSTS);
+	}
+	printk("COMMA: nvme_configure_admin_queue: 4\n");
+	msleep(10);
 
 	result = nvme_disable_ctrl(&dev->ctrl, cap);
+	printk("COMMA: nvme_configure_admin_queue: 5: %d\n", result);
+	msleep(10);
 	if (result < 0)
 		return result;
 
 	nvmeq = dev->queues[0];
+	printk("COMMA: nvme_configure_admin_queue: 6\n");
+	msleep(10);
 	if (!nvmeq) {
+		printk("COMMA: nvme_configure_admin_queue: 7\n");
+		msleep(10);
 		nvmeq = nvme_alloc_queue(dev, 0, NVME_AQ_DEPTH);
-		if (!nvmeq)
+		printk("COMMA: nvme_configure_admin_queue: 8\n");
+		msleep(10);
+		if (!nvmeq) {
+			printk("COMMA: nvme_configure_admin_queue: 9\n");
+			msleep(10);
 			return -ENOMEM;
+		}
 	}
+	printk("COMMA: nvme_configure_admin_queue: 10\n");
+	msleep(10);
 
 	aqa = nvmeq->q_depth - 1;
 	aqa |= aqa << 16;
 
+	printk("COMMA: nvme_configure_admin_queue: 11\n");
+	msleep(10);
 	writel(aqa, dev->bar + NVME_REG_AQA);
+	printk("COMMA: nvme_configure_admin_queue: 12\n");
+	msleep(10);
 	lo_hi_writeq(nvmeq->sq_dma_addr, dev->bar + NVME_REG_ASQ);
+	printk("COMMA: nvme_configure_admin_queue: 13\n");
+	msleep(10);
 	lo_hi_writeq(nvmeq->cq_dma_addr, dev->bar + NVME_REG_ACQ);
+	printk("COMMA: nvme_configure_admin_queue: 14\n");
+	msleep(10);
 
 	result = nvme_enable_ctrl(&dev->ctrl, cap);
-	if (result)
+	printk("COMMA: nvme_configure_admin_queue: 15\n");
+	msleep(10);
+	if (result){
+		printk("COMMA: nvme_configure_admin_queue: 16\n");
+		msleep(10);
 		return result;
+	}
 
+	printk("COMMA: nvme_configure_admin_queue: 17\n");
+	msleep(10);
 	nvmeq->cq_vector = 0;
 	result = queue_request_irq(nvmeq);
+	printk("COMMA: nvme_configure_admin_queue: 18\n");
+	msleep(10);
 	if (result) {
+		printk("COMMA: nvme_configure_admin_queue: 19\n");
+		msleep(10);
 		nvmeq->cq_vector = -1;
 		return result;
 	}
 
+	printk("COMMA: nvme_configure_admin_queue: 20\n");
+	msleep(10);
 	return result;
 }
 
@@ -1284,6 +1364,7 @@ static bool nvme_should_reset(struct nvme_dev *dev, u32 csts)
 static void nvme_watchdog_timer(unsigned long data)
 {
 	struct nvme_dev *dev = (struct nvme_dev *)data;
+	printk("NVME: readl 1: 0x%x + 0x%x = 0x%x\n", dev->bar, NVME_REG_CSTS, dev->bar + NVME_REG_CSTS);
 	u32 csts = readl(dev->bar + NVME_REG_CSTS);
 
 	/* Skip controllers under certain specific conditions. */
@@ -1345,9 +1426,14 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
 	void __iomem *cmb;
 	int bar;
 
+	printk("NVME: readl 2: 0x%x + 0x%x = 0x%x\n", dev->bar, NVME_REG_CMBSZ, dev->bar + NVME_REG_CMBSZ);
+	msleep(10);
 	dev->cmbsz = readl(dev->bar + NVME_REG_CMBSZ);
 	if (!(NVME_CMB_SZ(dev->cmbsz)))
 		return NULL;
+
+	printk("NVME: readl 3: 0x%x + 0x%x = 0x%x\n", dev->bar, NVME_REG_CMBLOC, dev->bar + NVME_REG_CMBLOC);
+	msleep(10);
 	dev->cmbloc = readl(dev->bar + NVME_REG_CMBLOC);
 
 	if (!use_cmb_sqes)
@@ -1425,12 +1511,14 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 		iounmap(dev->bar);
 		do {
 			dev->bar = ioremap(pci_resource_start(pdev, 0), size);
+			printk("NVME: nvme_setup_io_queues remapping 0x%x to 0x%x\n", pci_resource_start(pdev, 0), dev->bar);
 			if (dev->bar)
 				break;
 			if (!--nr_io_queues)
 				return -ENOMEM;
 			size = db_bar_size(dev, nr_io_queues);
 		} while (1);
+		printk("NVME: nvme_setup_io_queues: setting dev->dbs to 0x%x\n", dev->bar + 4096);
 		dev->dbs = dev->bar + 4096;
 		adminq->q_db = dev->dbs;
 	}
@@ -1590,6 +1678,8 @@ static int nvme_pci_enable(struct nvme_dev *dev)
 	    dma_set_mask_and_coherent(dev->dev, DMA_BIT_MASK(32)))
 		goto disable;
 
+	printk("NVME: readl 4: 0x%x + 0x%x = 0x%x\n", dev->bar, NVME_REG_CSTS, dev->bar + NVME_REG_CSTS);
+	msleep(10);
 	if (readl(dev->bar + NVME_REG_CSTS) == -1) {
 		result = -ENODEV;
 		goto disable;
@@ -1608,6 +1698,7 @@ static int nvme_pci_enable(struct nvme_dev *dev)
 
 	dev->q_depth = min_t(int, NVME_CAP_MQES(cap) + 1, NVME_Q_DEPTH);
 	dev->db_stride = 1 << NVME_CAP_STRIDE(cap);
+	printk("NVME: nvme_pci_enable: setting dev->dbs to 0x%x\n", dev->bar + 4096);
 	dev->dbs = dev->bar + 4096;
 
 	/*
@@ -1629,6 +1720,8 @@ static int nvme_pci_enable(struct nvme_dev *dev)
 	 * NULL as final argument to sysfs_add_file_to_group.
 	 */
 
+	printk("NVME: readl 5: 0x%x + 0x%x = 0x%x\n", dev->bar, NVME_REG_VS, dev->bar + NVME_REG_VS);
+	msleep(10);
 	if (readl(dev->bar + NVME_REG_VS) >= NVME_VS(1, 2, 0)) {
 		dev->cmb = nvme_map_cmb(dev);
 
@@ -1679,6 +1772,9 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown)
 	mutex_lock(&dev->shutdown_lock);
 	if (pci_is_enabled(to_pci_dev(dev->dev))) {
 		nvme_stop_queues(&dev->ctrl);
+
+		printk("NVME: readl 6: 0x%x + 0x%x = 0x%x\n", dev->bar, NVME_REG_CSTS, dev->bar + NVME_REG_CSTS);
+		msleep(10);
 		csts = readl(dev->bar + NVME_REG_CSTS);
 	}
 
@@ -1755,6 +1851,9 @@ static void nvme_reset_work(struct work_struct *work)
 	struct nvme_dev *dev = container_of(work, struct nvme_dev, reset_work);
 	int result = -ENODEV;
 
+	printk("COMMA: nvme_reset_work\n");
+	msleep(10);
+
 	if (WARN_ON(dev->ctrl.state != NVME_CTRL_RESETTING))
 		goto out;
 
@@ -1762,27 +1861,44 @@ static void nvme_reset_work(struct work_struct *work)
 	 * If we're called to reset a live controller first shut it down before
 	 * moving on.
 	 */
-	if (dev->ctrl.ctrl_config & NVME_CC_ENABLE)
+	if (dev->ctrl.ctrl_config & NVME_CC_ENABLE) {
+		printk("COMMA: nvme_reset_work: nvme_dev_disable: start\n");
+		msleep(10);
 		nvme_dev_disable(dev, false);
+		printk("COMMA: nvme_reset_work: nvme_dev_disable\n");
+		msleep(10);
+	}
 
 	result = nvme_pci_enable(dev);
+	printk("COMMA: nvme_reset_work: nvme_pci_enable\n");
+	msleep(10);
 	if (result)
 		goto out;
 
 	result = nvme_configure_admin_queue(dev);
+	printk("COMMA: nvme_reset_work: nvme_configure_admin_queue\n");
+	msleep(10);
 	if (result)
 		goto out;
 
 	nvme_init_queue(dev->queues[0], 0);
+	printk("COMMA: nvme_reset_work: nvme_init_queue\n");
+	msleep(10);
 	result = nvme_alloc_admin_tags(dev);
+	printk("COMMA: nvme_reset_work: nvme_alloc_admin_tags\n");
+	msleep(10);
 	if (result)
 		goto out;
 
 	result = nvme_init_identify(&dev->ctrl);
+	printk("COMMA: nvme_reset_work: nvme_init_identify\n");
+	msleep(10);
 	if (result)
 		goto out;
 
 	result = nvme_setup_io_queues(dev);
+	printk("COMMA: nvme_reset_work: nvme_setup_io_queues\n");
+	msleep(10);
 	if (result)
 		goto out;
 
@@ -1792,10 +1908,17 @@ static void nvme_reset_work(struct work_struct *work)
 	 * should not submit commands the user did not request, so skip
 	 * registering for asynchronous event notification on this condition.
 	 */
-	if (dev->online_queues > 1)
+	if (dev->online_queues > 1) {
+		printk("COMMA: nvme_reset_work: nvme_queue_async_events: start\n");
+		msleep(10);
 		nvme_queue_async_events(&dev->ctrl);
+		printk("COMMA: nvme_reset_work: nvme_queue_async_events\n");
+		msleep(10);
+	}
 
 	mod_timer(&dev->watchdog_timer, round_jiffies(jiffies + HZ));
+	printk("COMMA: nvme_reset_work: mod_timer\n");
+	msleep(10);
 
 	/*
 	 * Keep the controller around but remove all namespaces if we don't have
@@ -1803,11 +1926,21 @@ static void nvme_reset_work(struct work_struct *work)
 	 */
 	if (dev->online_queues < 2) {
 		dev_warn(dev->ctrl.device, "IO queues not created\n");
+		printk("COMMA: nvme_reset_work: nvme_kill_queues: start\n");
+		msleep(10);
 		nvme_kill_queues(&dev->ctrl);
+		printk("COMMA: nvme_reset_work: nvme_kill_queues\n");
+		msleep(10);
 		nvme_remove_namespaces(&dev->ctrl);
+		printk("COMMA: nvme_reset_work: nvme_remove_namespaces\n");
+		msleep(10);
 	} else {
 		nvme_start_queues(&dev->ctrl);
+		printk("COMMA: nvme_reset_work: nvme_start_queues\n");
+		msleep(10);
 		nvme_dev_add(dev);
+		printk("COMMA: nvme_reset_work: nvme_dev_add\n");
+		msleep(10);
 	}
 
 	if (!nvme_change_ctrl_state(&dev->ctrl, NVME_CTRL_LIVE)) {
@@ -1815,8 +1948,13 @@ static void nvme_reset_work(struct work_struct *work)
 		goto out;
 	}
 
-	if (dev->online_queues > 1)
+	if (dev->online_queues > 1) {
+		printk("COMMA: nvme_reset_work: nvme_queue_scan: start\n");
+		msleep(10);
 		nvme_queue_scan(&dev->ctrl);
+		printk("COMMA: nvme_reset_work: nvme_queue_scan\n");
+		msleep(10);
+	}
 	return;
 
  out:
@@ -1847,18 +1985,21 @@ static int nvme_reset(struct nvme_dev *dev)
 
 static int nvme_pci_reg_read32(struct nvme_ctrl *ctrl, u32 off, u32 *val)
 {
+	printk("NVME: readl 7: 0x%x + 0x%x = 0x%x\n", to_nvme_dev(ctrl)->bar, off, to_nvme_dev(ctrl)->bar + off);
 	*val = readl(to_nvme_dev(ctrl)->bar + off);
 	return 0;
 }
 
 static int nvme_pci_reg_write32(struct nvme_ctrl *ctrl, u32 off, u32 val)
 {
+	printk("NVME: writel 3: 0x%x + 0x%x = 0x%x\n", to_nvme_dev(ctrl)->bar, off, to_nvme_dev(ctrl)->bar + off);
 	writel(val, to_nvme_dev(ctrl)->bar + off);
 	return 0;
 }
 
 static int nvme_pci_reg_read64(struct nvme_ctrl *ctrl, u32 off, u64 *val)
 {
+	printk("NVME: readq 1: 0x%x + 0x%x = 0x%x\n", to_nvme_dev(ctrl)->bar, off, to_nvme_dev(ctrl)->bar + off);
 	*val = readq(to_nvme_dev(ctrl)->bar + off);
 	return 0;
 }
@@ -1892,6 +2033,7 @@ static int nvme_dev_map(struct nvme_dev *dev)
 		return -ENODEV;
 
 	dev->bar = ioremap(pci_resource_start(pdev, 0), 8192);
+	printk("NVME: nvme_dev_map remapping 0x%x to 0x%x\n", pci_resource_start(pdev, 0), dev->bar);
 	if (!dev->bar)
 		goto release;
 
@@ -1906,6 +2048,8 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	int node, result = -ENOMEM;
 	struct nvme_dev *dev;
 
+	printk("COMMA: nvme_probe\n");
+	msleep(10);
 	node = dev_to_node(&pdev->dev);
 	if (node == NUMA_NO_NODE)
 		set_dev_node(&pdev->dev, first_memory_node);
@@ -1919,32 +2063,54 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto free;
 
 	dev->dev = get_device(&pdev->dev);
+	printk("COMMA: nvme_probe: pci_set_drvdata\n");
+	msleep(10);
 	pci_set_drvdata(pdev, dev);
 
+	printk("COMMA: nvme_probe: nvme_dev_map\n");
+	msleep(10);
 	result = nvme_dev_map(dev);
 	if (result)
 		goto free;
 
+	printk("COMMA: nvme_probe: nvme_reset_work\n");
+	msleep(10);
 	INIT_WORK(&dev->reset_work, nvme_reset_work);
+	printk("COMMA: nvme_probe: nvme_remove_dead_ctrl_work\n");
+	msleep(10);
 	INIT_WORK(&dev->remove_work, nvme_remove_dead_ctrl_work);
+	printk("COMMA: nvme_probe: nvme_watchdog_timer\n");
+	msleep(10);
 	setup_timer(&dev->watchdog_timer, nvme_watchdog_timer,
 		(unsigned long)dev);
 	mutex_init(&dev->shutdown_lock);
+	printk("COMMA: nvme_probe: init_completion\n");
+	msleep(10);
 	init_completion(&dev->ioq_wait);
 
+	printk("COMMA: nvme_probe: nvme_setup_prp_pools\n");
+	msleep(10);
 	result = nvme_setup_prp_pools(dev);
 	if (result)
 		goto put_pci;
 
+	printk("COMMA: nvme_probe: nvme_init_ctrl\n");
+	msleep(10);
 	result = nvme_init_ctrl(&dev->ctrl, &pdev->dev, &nvme_pci_ctrl_ops,
 			id->driver_data);
 	if (result)
 		goto release_pools;
 
+	printk("COMMA: nvme_probe: nvme_change_ctrl_state: resetting\n");
+	msleep(10);
 	nvme_change_ctrl_state(&dev->ctrl, NVME_CTRL_RESETTING);
 	dev_info(dev->ctrl.device, "pci function %s\n", dev_name(&pdev->dev));
 
+	printk("COMMA: nvme_probe: reset_work\n");
+	msleep(10);
 	queue_work(nvme_workq, &dev->reset_work);
+	printk("COMMA: nvme_probe: DONE!\n");
+	msleep(10);
 	return 0;
 
  release_pools:

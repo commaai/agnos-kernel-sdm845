@@ -350,7 +350,11 @@ int __nvme_submit_sync_cmd(struct request_queue *q, struct nvme_command *cmd,
 	struct request *req;
 	int ret;
 
+	printk("NVME_CORE: __nvme_submit_sync_cmd: 1\n");
+	msleep(10);
 	req = nvme_alloc_request(q, cmd, flags, qid);
+	printk("NVME_CORE: __nvme_submit_sync_cmd: 2\n");
+	msleep(10);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 
@@ -358,15 +362,25 @@ int __nvme_submit_sync_cmd(struct request_queue *q, struct nvme_command *cmd,
 	req->special = cqe;
 
 	if (buffer && bufflen) {
+		printk("NVME_CORE: __nvme_submit_sync_cmd: 3\n");
+		msleep(10);
 		ret = blk_rq_map_kern(q, req, buffer, bufflen, GFP_KERNEL);
+		printk("NVME_CORE: __nvme_submit_sync_cmd: 4\n");
+		msleep(10);
 		if (ret)
 			goto out;
 	}
 
+	printk("NVME_CORE: __nvme_submit_sync_cmd: 5\n");
+	msleep(10);
 	blk_execute_rq(req->q, NULL, req, at_head);
+	printk("NVME_CORE: __nvme_submit_sync_cmd: 6\n");
+	msleep(10);
 	ret = req->errors;
  out:
 	blk_mq_free_request(req);
+	printk("NVME_CORE: __nvme_submit_sync_cmd: 7\n");
+	msleep(10);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(__nvme_submit_sync_cmd);
@@ -1225,13 +1239,21 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 	int ret, page_shift;
 	u32 max_hw_sectors;
 
+	printk("NVME_CORE: nvme_init_identify: 1\n");
+	msleep(10);
 	ret = ctrl->ops->reg_read32(ctrl, NVME_REG_VS, &ctrl->vs);
+	printk("NVME_CORE: nvme_init_identify: 2\n");
+	msleep(10);
 	if (ret) {
 		dev_err(ctrl->device, "Reading VS failed (%d)\n", ret);
 		return ret;
 	}
 
+	printk("NVME_CORE: nvme_init_identify: 3\n");
+	msleep(10);
 	ret = ctrl->ops->reg_read64(ctrl, NVME_REG_CAP, &cap);
+	printk("NVME_CORE: nvme_init_identify: 4\n");
+	msleep(10);
 	if (ret) {
 		dev_err(ctrl->device, "Reading CAP failed (%d)\n", ret);
 		return ret;
@@ -1241,7 +1263,11 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 	if (ctrl->vs >= NVME_VS(1, 1, 0))
 		ctrl->subsystem = NVME_CAP_NSSRC(cap);
 
+	printk("NVME_CORE: nvme_init_identify: 5\n");
+	msleep(10);
 	ret = nvme_identify_ctrl(ctrl, &id);
+	printk("NVME_CORE: nvme_init_identify: 6\n");
+	msleep(10);
 	if (ret) {
 		dev_err(ctrl->device, "Identify Controller failed (%d)\n", ret);
 		return -EIO;
@@ -1262,7 +1288,11 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 	ctrl->max_hw_sectors =
 		min_not_zero(ctrl->max_hw_sectors, max_hw_sectors);
 
+	printk("NVME_CORE: nvme_init_identify: 7\n");
+	msleep(10);
 	nvme_set_queue_limits(ctrl, ctrl->admin_q);
+	printk("NVME_CORE: nvme_init_identify: 8\n");
+	msleep(10);
 	ctrl->sgls = le32_to_cpu(id->sgls);
 	ctrl->kas = le16_to_cpu(id->kas);
 
@@ -1288,6 +1318,8 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 		ctrl->cntlid = le16_to_cpu(id->cntlid);
 	}
 
+	printk("NVME_CORE: nvme_init_identify: 9\n");
+	msleep(10);
 	kfree(id);
 	return ret;
 }
