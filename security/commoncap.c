@@ -138,8 +138,10 @@ int cap_capable(const struct cred *cred, struct user_namespace *targ_ns,
  */
 int cap_settime(const struct timespec64 *ts, const struct timezone *tz)
 {
+/* Comma HACKS
 	if (!capable(CAP_SYS_TIME))
 		return -EPERM;
+*/
 	return 0;
 }
 
