@@ -772,11 +772,14 @@ static irqreturn_t nvme_irq(int irq, void *data)
 {
 	irqreturn_t result;
 	struct nvme_queue *nvmeq = data;
+	printk("NVME: interrupt start %d\n", irq);
 	spin_lock(&nvmeq->q_lock);
+	printk("NVME: interrupt locked %d\n", irq);
 	nvme_process_cq(nvmeq);
 	result = nvmeq->cqe_seen ? IRQ_HANDLED : IRQ_NONE;
 	nvmeq->cqe_seen = 0;
 	spin_unlock(&nvmeq->q_lock);
+	printk("NVME: interrupt end %d\n", irq);
 	return result;
 }
 
@@ -792,10 +795,14 @@ static int nvme_poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
 {
 	struct nvme_queue *nvmeq = hctx->driver_data;
 
+	printk("NVME: poll: tag %d\n", tag);
 	if (nvme_cqe_valid(nvmeq, nvmeq->cq_head, nvmeq->cq_phase)) {
+		printk("NVME: poll: lock\n");
 		spin_lock_irq(&nvmeq->q_lock);
+		printk("NVME: poll: locked\n");
 		__nvme_process_cq(nvmeq, &tag);
 		spin_unlock_irq(&nvmeq->q_lock);
+		printk("NVME: poll: unlocked\n");
 
 		if (tag == -1)
 			return 1;
@@ -1005,7 +1012,9 @@ static int nvme_suspend_queue(struct nvme_queue *nvmeq)
 {
 	int vector;
 
+	printk("NVME PCI: lock 1\n");
 	spin_lock_irq(&nvmeq->q_lock);
+	printk("NVME PCI: lock 1b\n");
 	if (nvmeq->cq_vector == -1) {
 		spin_unlock_irq(&nvmeq->q_lock);
 		return 1;
@@ -1038,7 +1047,9 @@ static void nvme_disable_admin_queue(struct nvme_dev *dev, bool shutdown)
 		nvme_disable_ctrl(&dev->ctrl, lo_hi_readq(
 						dev->bar + NVME_REG_CAP));
 
+	printk("NVME PCI: lock 2\n");
 	spin_lock_irq(&nvmeq->q_lock);
+	printk("NVME PCI: lock 2b\n");
 	nvme_process_cq(nvmeq);
 	spin_unlock_irq(&nvmeq->q_lock);
 }
@@ -1139,7 +1150,9 @@ static void nvme_init_queue(struct nvme_queue *nvmeq, u16 qid)
 {
 	struct nvme_dev *dev = nvmeq->dev;
 
+	printk("NVME PCI: lock 3\n");
 	spin_lock_irq(&nvmeq->q_lock);
+	printk("NVME PCI: lock 3b\n");
 	nvmeq->sq_tail = 0;
 	nvmeq->cq_head = 0;
 	nvmeq->cq_phase = 1;
@@ -1572,8 +1585,10 @@ static void nvme_del_cq_end(struct request *req, int error)
 		 * and the I/O queue q_lock should always
 		 * nest inside the AQ one.
 		 */
+		printk("NVME PCI: lock 4\n");
 		spin_lock_irqsave_nested(&nvmeq->q_lock, flags,
 					SINGLE_DEPTH_NESTING);
+		printk("NVME PCI: lock 4b\n");
 		nvme_process_cq(nvmeq);
 		spin_unlock_irqrestore(&nvmeq->q_lock, flags);
 	}

@@ -823,25 +823,34 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 		bd.list = dptr;
 		bd.last = list_empty(&rq_list);
 
+		printk("BLOCK: __blk_mq_run_hw_queue 1\n");
 		ret = q->mq_ops->queue_rq(hctx, &bd);
+		printk("BLOCK: __blk_mq_run_hw_queue 2\n");
 		switch (ret) {
 		case BLK_MQ_RQ_QUEUE_OK:
+			printk("BLOCK: __blk_mq_run_hw_queue 3\n");
 			queued++;
 			break;
 		case BLK_MQ_RQ_QUEUE_BUSY:
+			printk("BLOCK: __blk_mq_run_hw_queue 4\n");
 			list_add(&rq->queuelist, &rq_list);
 			__blk_mq_requeue_request(rq);
 			break;
 		default:
+			printk("BLOCK: __blk_mq_run_hw_queue 5\n");
 			pr_err("blk-mq: bad return on queue: %d\n", ret);
 		case BLK_MQ_RQ_QUEUE_ERROR:
+			printk("BLOCK: __blk_mq_run_hw_queue 6\n");
 			rq->errors = -EIO;
 			blk_mq_end_request(rq, rq->errors);
 			break;
 		}
+		printk("BLOCK: __blk_mq_run_hw_queue 7\n");
 
-		if (ret == BLK_MQ_RQ_QUEUE_BUSY)
+		if (ret == BLK_MQ_RQ_QUEUE_BUSY) {
+			printk("BLOCK: __blk_mq_run_hw_queue 8\n");
 			break;
+		}
 
 		/*
 		 * We've done the first request. If we have more than 1
@@ -858,9 +867,12 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 	 * that is where we will continue on next queue run.
 	 */
 	if (!list_empty(&rq_list)) {
+		printk("BLOCK: __blk_mq_run_hw_queue 9\n");
 		spin_lock(&hctx->lock);
+		printk("BLOCK: __blk_mq_run_hw_queue 10\n");
 		list_splice(&rq_list, &hctx->dispatch);
 		spin_unlock(&hctx->lock);
+		printk("BLOCK: __blk_mq_run_hw_queue 11\n");
 		/*
 		 * the queue is expected stopped with BLK_MQ_RQ_QUEUE_BUSY, but
 		 * it's possible the queue is stopped and restarted again
@@ -871,6 +883,7 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 		 * blk_mq_run_hw_queue() already checks the STOPPED bit
 		 **/
 		blk_mq_run_hw_queue(hctx, true);
+		printk("BLOCK: __blk_mq_run_hw_queue 12\n");
 	}
 }
 
@@ -908,15 +921,20 @@ void blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx, bool async)
 	if (!async && !(hctx->flags & BLK_MQ_F_BLOCKING)) {
 		int cpu = get_cpu();
 		if (cpumask_test_cpu(cpu, hctx->cpumask)) {
+			printk("BLOCK: blk_mq_run_hw_queue 1\n");
 			__blk_mq_run_hw_queue(hctx);
+			printk("BLOCK: blk_mq_run_hw_queue 2\n");
 			put_cpu();
+			printk("BLOCK: blk_mq_run_hw_queue 3\n");
 			return;
 		}
 
 		put_cpu();
 	}
 
+	printk("BLOCK: blk_mq_run_hw_queue 4\n");
 	kblockd_schedule_work_on(blk_mq_hctx_next_cpu(hctx), &hctx->run_work);
+	printk("BLOCK: blk_mq_run_hw_queue 5\n");
 }
 
 void blk_mq_run_hw_queues(struct request_queue *q, bool async)
@@ -924,6 +942,7 @@ void blk_mq_run_hw_queues(struct request_queue *q, bool async)
 	struct blk_mq_hw_ctx *hctx;
 	int i;
 
+	printk("BLOCK: blk_mq_run_hw_queues 1\n");
 	queue_for_each_hw_ctx(q, hctx, i) {
 		if ((!blk_mq_hctx_has_pending(hctx) &&
 		    list_empty_careful(&hctx->dispatch)) ||
@@ -932,6 +951,7 @@ void blk_mq_run_hw_queues(struct request_queue *q, bool async)
 
 		blk_mq_run_hw_queue(hctx, async);
 	}
+	printk("BLOCK: blk_mq_run_hw_queues 2\n");
 }
 EXPORT_SYMBOL(blk_mq_run_hw_queues);
 

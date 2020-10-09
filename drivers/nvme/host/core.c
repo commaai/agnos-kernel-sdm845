@@ -84,7 +84,9 @@ bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
 	enum nvme_ctrl_state old_state;
 	bool changed = false;
 
+	printk("NVME: lock 1\n");
 	spin_lock_irq(&ctrl->lock);
+	printk("NVME: lock 1b\n");
 
 	old_state = ctrl->state;
 	switch (new_state) {
@@ -204,7 +206,9 @@ void nvme_requeue_req(struct request *req)
 	unsigned long flags;
 
 	blk_mq_requeue_request(req);
+	printk("NVME: lock 2\n");
 	spin_lock_irqsave(req->q->queue_lock, flags);
+	printk("NVME: lock 2b\n");
 	if (!blk_queue_stopped(req->q))
 		blk_mq_kick_requeue_list(req->q);
 	spin_unlock_irqrestore(req->q->queue_lock, flags);
@@ -1909,13 +1913,17 @@ static void nvme_async_event_work(struct work_struct *work)
 	struct nvme_ctrl *ctrl =
 		container_of(work, struct nvme_ctrl, async_event_work);
 
+	printk("NVME: lock 3\n");
 	spin_lock_irq(&ctrl->lock);
+	printk("NVME: lock 3b\n");
 	while (ctrl->event_limit > 0) {
 		int aer_idx = --ctrl->event_limit;
 
 		spin_unlock_irq(&ctrl->lock);
 		ctrl->ops->submit_async_event(ctrl, aer_idx);
+		printk("NVME: lock 4\n");
 		spin_lock_irq(&ctrl->lock);
+		printk("NVME: lock 4b\n");
 	}
 	spin_unlock_irq(&ctrl->lock);
 }
@@ -2106,7 +2114,9 @@ void nvme_stop_queues(struct nvme_ctrl *ctrl)
 
 	mutex_lock(&ctrl->namespaces_mutex);
 	list_for_each_entry(ns, &ctrl->namespaces, list) {
+		printk("NVME: lock 5\n");
 		spin_lock_irq(ns->queue->queue_lock);
+		printk("NVME: lock 5b\n");
 		queue_flag_set(QUEUE_FLAG_STOPPED, ns->queue);
 		spin_unlock_irq(ns->queue->queue_lock);
 
