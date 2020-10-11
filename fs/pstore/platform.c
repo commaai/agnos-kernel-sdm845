@@ -156,7 +156,7 @@ static int compress_zlib(const void *in, void *out, size_t inlen, size_t outlen)
 {
 	int err, ret;
   // HACK compression makes this unreadable
-  memcpy(out, in, outlen);
+  memmove(out, in, outlen);
   return 0;
 
 	ret = -EIO;
