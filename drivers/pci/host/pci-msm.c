@@ -2714,9 +2714,9 @@ static inline int msm_pcie_oper_conf(struct pci_bus *bus, u32 devfn, int oper,
 	rc_idx = dev->rc_idx;
 	rc = (bus->number == 0);
 
-	printk("PCI: lock 2\n");
+	//printk("PCI: lock 2\n");
 	spin_lock_irqsave(&dev->cfg_lock, dev->irqsave_flags);
-	printk("PCI: lock 2b\n");
+	//printk("PCI: lock 2b\n");
 
 	if (!dev->cfg_access) {
 		PCIE_DBG3(dev,
