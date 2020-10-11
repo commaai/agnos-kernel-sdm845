@@ -1126,6 +1126,7 @@ static struct nvme_queue *nvme_alloc_queue(struct nvme_dev *dev, int qid,
 	dev->queues[qid] = nvmeq;
 	dev->queue_count++;
 
+	printk("NVME: nvme_alloc_queue: set nvmeq->cq_dma_addr to 0x%x and nvmeq->sq_dma_addr to 0x%x\n", nvmeq->cq_dma_addr, nvmeq->sq_dma_addr);
 	return nvmeq;
 
  free_cqdma:
