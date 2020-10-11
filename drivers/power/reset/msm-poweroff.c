@@ -56,11 +56,7 @@ static bool scm_deassert_ps_hold_supported;
 /* Download mode master kill-switch */
 static void __iomem *msm_ps_hold;
 static phys_addr_t tcsr_boot_misc_detect;
-
-// COMMA: Disable rebooting in the memory-dump QDL mode
-//static int download_mode = 1;
-static int download_mode = 0;
-
+static int download_mode = 1;
 static struct kobject dload_kobj;
 
 #ifdef CONFIG_QCOM_DLOAD_MODE
