@@ -2172,6 +2172,8 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
 {
 	struct arm_smmu_domain *smmu_domain;
 
+  printk("arm_smmu_domain_alloc\n");
+
 	/* Do not support DOMAIN_DMA for now */
 	if (type != IOMMU_DOMAIN_UNMANAGED)
 		return NULL;
@@ -2608,6 +2610,8 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	struct arm_smmu_device *smmu;
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	int atomic_domain = smmu_domain->attributes & (1 << DOMAIN_ATTR_ATOMIC);
+
+  printk("arm_smmu_attach_dev: %p %s\n", domain, dev_name(dev));
 
 	if (!fwspec || fwspec->ops != &arm_smmu_ops) {
 		dev_err(dev, "cannot attach to SMMU, is it on the same bus?\n");
@@ -5679,6 +5683,8 @@ static int qsmmuv500_arch_init(struct arm_smmu_device *smmu)
 	if (ret)
 		return -EPROBE_DEFER;
 
+  printk("qsmmuv500_arch_init\n");
+
 	return 0;
 }
 
@@ -5701,6 +5707,8 @@ static int qsmmuv500_tbu_probe(struct platform_device *pdev)
 	struct qsmmuv500_tbu_device *tbu;
 	const __be32 *cell;
 	int len;
+
+  printk("qsmmuv500_tbu_probe\n");
 
 	tbu = devm_kzalloc(dev, sizeof(*tbu), GFP_KERNEL);
 	if (!tbu)

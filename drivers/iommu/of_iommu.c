@@ -149,6 +149,8 @@ static const struct iommu_ops
 	const struct iommu_ops *ops;
 	struct of_phandle_args iommu_spec;
 
+  printk("of_pci_iommu_configure\n");
+
 	/*
 	 * Start by tracing the RID alias down the PCI topology as
 	 * far as the host bridge whose OF node we have...
@@ -172,6 +174,7 @@ static const struct iommu_ops
 	    ops->of_xlate(&pdev->dev, &iommu_spec))
 		ops = NULL;
 
+  printk("of_pci_iommu_configure done with fwspec and ops: %p", ops);
 	of_node_put(iommu_spec.np);
 	return ops;
 }

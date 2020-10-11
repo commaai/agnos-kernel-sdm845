@@ -24,6 +24,7 @@
 #include <linux/genhd.h>
 #include <linux/hdreg.h>
 #include <linux/idr.h>
+#include <linux/iommu.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -44,6 +45,9 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <asm/unaligned.h>
 
+#include <linux/platform_device.h>
+#include <asm/dma-iommu.h>
+
 #include "nvme.h"
 #include "../../block/blk-mq.h"
 
@@ -51,6 +55,20 @@
 #define NVME_AQ_DEPTH		256
 #define SQ_SIZE(depth)		(depth * sizeof(struct nvme_command))
 #define CQ_SIZE(depth)		(depth * sizeof(struct nvme_completion))
+
+struct iommu_group {
+	struct kobject kobj;
+	struct kobject *devices_kobj;
+	struct list_head devices;
+	struct mutex mutex;
+	struct blocking_notifier_head notifier;
+	void *iommu_data;
+	void (*iommu_data_release)(void *iommu_data);
+	char *name;
+	int id;
+	struct iommu_domain *default_domain;
+	struct iommu_domain *domain;
+};
 
 /*
  * We handle AEN commands ourselves and don't even let the
@@ -656,12 +674,12 @@ static void nvme_complete_rq(struct request *req)
 	int error = 0;
 
 	printk("NVME: nvme_complete_rq: 1\n");
-	msleep(10);
+	//msleep(10);
 
 	nvme_unmap_data(dev, req);
 
 	printk("NVME: nvme_complete_rq: 2\n");
-	msleep(10);
+	//msleep(10);
 
 	if (unlikely(req->errors)) {
 		if (nvme_req_needs_retry(req, req->errors)) {
@@ -683,12 +701,12 @@ static void nvme_complete_rq(struct request *req)
 	}
 
 	printk("NVME: nvme_complete_rq: 3\n");
-	msleep(10);
+	//msleep(10);
 
 	blk_mq_end_request(req, error);
 
 	printk("NVME: nvme_complete_rq: 4\n");
-	msleep(10);
+	//msleep(10);
 }
 
 /* We read the CQE phase first to check if the rest of the entry is valid */
@@ -754,7 +772,7 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 
 	if (likely(nvmeq->cq_vector >= 0)) {
 		printk("NVME: writel 2: 0x%x + 0x%x = 0x%x\n", nvmeq->q_db, nvmeq->dev->db_stride, nvmeq->q_db + nvmeq->dev->db_stride);
-		msleep(10);
+		//msleep(10);
 		writel(head, nvmeq->q_db + nvmeq->dev->db_stride);
 	}
 	nvmeq->cq_head = head;
@@ -1127,6 +1145,7 @@ static struct nvme_queue *nvme_alloc_queue(struct nvme_dev *dev, int qid,
 	dev->queue_count++;
 
 	printk("NVME: nvme_alloc_queue: set nvmeq->cq_dma_addr to 0x%x and nvmeq->sq_dma_addr to 0x%x\n", nvmeq->cq_dma_addr, nvmeq->sq_dma_addr);
+
 	return nvmeq;
 
  free_cqdma:
@@ -2059,6 +2078,34 @@ static int nvme_dev_map(struct nvme_dev *dev)
        return -ENODEV;
 }
 
+
+#define SMMU_BASE 0x60000000 /* Device address range base */
+#define SMMU_SIZE 0xa0000000 /* Device address range size */
+
+static int nvme_smmu_init(struct device *dev) {
+  int ret;
+	int atomic_ctx = 1, s1_bypass = 1;
+
+  struct dma_iommu_mapping *mapping = NULL;
+  mapping = arm_iommu_create_mapping(&platform_bus_type, SMMU_BASE, SMMU_SIZE);
+
+  if (!mapping) {
+    printk("mapping failed :(\n");
+    return -1;
+  }
+
+	ret = iommu_domain_set_attr(mapping->domain, DOMAIN_ATTR_UPSTREAM_IOVA_ALLOCATOR, &atomic_ctx);
+  printk("set attr: %d\n", ret);
+	ret = iommu_domain_set_attr(mapping->domain, DOMAIN_ATTR_S1_BYPASS, &s1_bypass);
+  printk("set attr: %d\n", ret);
+
+	ret = arm_iommu_attach_device(dev, mapping);
+  printk("attached to IOMMU: %d\n", ret);
+
+	return ret;
+}
+
+
 static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	int node, result = -ENOMEM;
@@ -2082,6 +2129,25 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	printk("COMMA: nvme_probe: pci_set_drvdata\n");
 	msleep(10);
 	pci_set_drvdata(pdev, dev);
+
+  nvme_smmu_init(dev->dev);
+
+  if (iommu_get_domain_for_dev(dev->dev)) {
+    printk("YES IOMMU\n");
+  } else {
+    if (iommu_get_domain_for_dev(dev->dev->parent)) {
+      printk("ALT IOMMU\n");
+    } else {
+      printk("no alt iommu\n");
+    }
+    printk("no iommu %p\n", dev->dev->iommu_group);
+    printk("iommu fwspec? %p\n", dev->dev->iommu_fwspec);
+    {
+      struct iommu_group *gg = dev->dev->iommu_group;
+      printk("iommu group %s %d: %p %p\n", gg->name, gg->id, gg->default_domain, gg->domain);
+    }
+  }
+  printk("driving %s %s\n", dev_name(dev->dev), dev_name(dev->dev->parent));
 
 	printk("COMMA: nvme_probe: nvme_dev_map\n");
 	msleep(10);
@@ -2127,6 +2193,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	queue_work(nvme_workq, &dev->reset_work);
 	printk("COMMA: nvme_probe: DONE!\n");
 	msleep(10);
+
 	return 0;
 
  release_pools:
