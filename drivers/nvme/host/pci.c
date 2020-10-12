@@ -44,6 +44,9 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <asm/unaligned.h>
 
+#include <linux/platform_device.h>
+#include <asm/dma-iommu.h>
+
 #include "nvme.h"
 
 #define NVME_Q_DEPTH		1024
@@ -1901,6 +1904,36 @@ static int nvme_dev_map(struct nvme_dev *dev)
        return -ENODEV;
 }
 
+// TODO: what if it alloced outside this region? any reason for choosing this?
+#define SMMU_BASE 0x60000000 /* Device address range base */
+#define SMMU_SIZE 0xa0000000 /* Device address range size */
+
+static int nvme_smmu_init(struct device *dev) {
+  int ret;
+	int atomic_ctx = 1, s1_bypass = 1;
+
+	// TODO: write this nicely
+
+  struct dma_iommu_mapping *mapping = NULL;
+  mapping = arm_iommu_create_mapping(&platform_bus_type, SMMU_BASE, SMMU_SIZE);
+
+  if (!mapping) {
+    printk("mapping failed :(\n");
+    return -1;
+  }
+
+	ret = iommu_domain_set_attr(mapping->domain, DOMAIN_ATTR_UPSTREAM_IOVA_ALLOCATOR, &atomic_ctx);
+  printk("set attr: %d\n", ret);
+	ret = iommu_domain_set_attr(mapping->domain, DOMAIN_ATTR_S1_BYPASS, &s1_bypass);
+  printk("set attr: %d\n", ret);
+
+	ret = arm_iommu_attach_device(dev, mapping);
+  printk("attached to IOMMU: %d\n", ret);
+
+	return ret;
+}
+
+
 static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	int node, result = -ENOMEM;
@@ -1920,6 +1953,10 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev->dev = get_device(&pdev->dev);
 	pci_set_drvdata(pdev, dev);
+
+	result = nvme_smmu_init(dev->dev);
+	if (result)
+		goto free;
 
 	result = nvme_dev_map(dev);
 	if (result)
