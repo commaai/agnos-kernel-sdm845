@@ -1449,7 +1449,9 @@ int sde_rm_cont_splash_res_init(struct msm_drm_private *priv,
 			splash_data->ctl_ids[splash_data->ctl_top_cnt]
 							= index + CTL_0;
 			splash_data->ctl_top_cnt++;
-			splash_data->cont_splash_en = true;
+			// COMMA HACKS: we don't have this
+			//splash_data->cont_splash_en = true;
+			splash_data->cont_splash_en = false;
 		}
 		index++;
 	}
