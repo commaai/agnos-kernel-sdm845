@@ -129,12 +129,18 @@ struct nvme_ctrl {
 	u32 vs;
 	u32 sgls;
 	u16 kas;
+	u8 npss;
+	u8 apsta;
 	unsigned int kato;
 	bool subsystem;
 	unsigned long quirks;
+	struct nvme_id_power_state psd[32];
 	struct work_struct scan_work;
 	struct work_struct async_event_work;
 	struct delayed_work ka_work;
+
+	/* Power saving configuration */
+	u64 ps_max_latency_us;
 
 	/* Fabrics only */
 	u16 sqsize;
