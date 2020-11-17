@@ -2568,12 +2568,14 @@
     qupv3_se3_4uart_pins: qupv3_se3_4uart_pins {
 			qupv3_se3_ctsrx: qupv3_se3_ctsrx {
 				mux {
-					pins = "gpio41", "gpio44";
+					//pins = "gpio41", "gpio44";
+					pins = "gpio44";
 					function = "qup3";
 				};
 
 				config {
-					pins = "gpio41", "gpio44";
+					//pins = "gpio41", "gpio44";
+					pins = "gpio44";
 					drive-strength = <2>;
 					bias-no-pull;
 				};
