@@ -1688,10 +1688,11 @@ static int _sde_encoder_update_rsc_client(
 				sde_enc->rsc_client))
 			break;
 
-		if (crtc->base.id == wait_vblank_crtc_id)
+		if (crtc->base.id == wait_vblank_crtc_id){
+			printk("COMMA: sde_encoder_wait_for_event 3\n");
 			ret = sde_encoder_wait_for_event(drm_enc,
 					MSM_ENC_VBLANK);
-		else
+		} else
 			drm_wait_one_vblank(drm_enc->dev, pipe);
 
 		if (ret) {
@@ -2195,6 +2196,7 @@ static int sde_encoder_resource_control(struct drm_encoder *drm_enc,
 			sde_enc->rc_state = SDE_ENC_RC_STATE_ON;
 		}
 
+		printk("COMMA: sde_encoder_wait_for_event 4\n");
 		ret = sde_encoder_wait_for_event(drm_enc, MSM_ENC_TX_COMPLETE);
 		if (ret && ret != -EWOULDBLOCK) {
 			SDE_ERROR_ENC(sde_enc,
@@ -2367,6 +2369,8 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	struct sde_rm_hw_iter dsc_iter, pp_iter;
 	int i = 0, ret;
 
+	printk("COMMA: sde_encoder_virt_mode_set\n");
+
 	if (!drm_enc) {
 		SDE_ERROR("invalid encoder\n");
 		return;
@@ -2425,8 +2429,10 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	/* release resources before seamless mode change */
 	if (msm_is_mode_seamless_dms(adj_mode)) {
 		/* restore resource state before releasing them */
+		printk("COMMA: sde_encoder_virt_mode_set:sde_encoder_resource_control PRE_MODESET\n");
 		ret = sde_encoder_resource_control(drm_enc,
 				SDE_ENC_RC_EVENT_PRE_MODESET);
+		printk("COMMA: sde_encoder_virt_mode_set:sde_encoder_resource_control PRE_MODESET: ret: %d\n", ret);
 		if (ret) {
 			SDE_ERROR_ENC(sde_enc,
 					"sde resource control failed: %d\n",
@@ -2818,6 +2824,7 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	SDE_EVT32(DRMID(drm_enc));
 
 	/* wait for idle */
+	printk("COMMA: sde_encoder_wait_for_event 1\n");
 	sde_encoder_wait_for_event(drm_enc, MSM_ENC_TX_COMPLETE);
 
 	kthread_flush_work(&sde_enc->input_event_work);
@@ -4938,6 +4945,7 @@ int sde_encoder_display_failure_notification(struct drm_encoder *enc)
 	 */
 	_sde_encoder_switch_to_watchdog_vsync(enc);
 
+	printk("COMMA: sde_encoder_wait_for_event 2\n");
 	sde_encoder_wait_for_event(enc, MSM_ENC_TX_COMPLETE);
 
 	return 0;
