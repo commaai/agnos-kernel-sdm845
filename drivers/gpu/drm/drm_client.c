@@ -59,22 +59,22 @@ static void drm_client_close(struct drm_client_dev *client)
 EXPORT_SYMBOL(drm_client_close);
 
 /**
- * drm_client_new - Create a DRM client
+ * drm_client_init - Create a DRM client
  * @dev: DRM device
  * @client: DRM client
  * @name: Client name
  * @funcs: DRM client functions (optional)
  *
+ * This initialises the client and opens a &drm_file. Use drm_client_register() to complete the process.
  * The caller needs to hold a reference on @dev before calling this function.
  * The client is freed when the &drm_device is unregistered. See drm_client_release().
  *
  * Returns:
  * Zero on success or negative error code on failure.
  */
-int drm_client_new(struct drm_device *dev, struct drm_client_dev *client,
+int drm_client_init(struct drm_device *dev, struct drm_client_dev *client,
 		   const char *name, const struct drm_client_funcs *funcs)
 {
-	bool registered;
 	int ret;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET) ||
@@ -92,35 +92,43 @@ int drm_client_new(struct drm_device *dev, struct drm_client_dev *client,
 	if (ret)
 		goto err_put_module;
 
-	mutex_lock(&dev->clientlist_mutex);
-	registered = dev->registered;
-	if (registered)
-		list_add(&client->list, &dev->clientlist);
-	mutex_unlock(&dev->clientlist_mutex);
-	if (!registered) {
-		ret = -ENODEV;
-		goto err_close;
-	}
-
 	drm_dev_ref(dev);
 
 	return 0;
 
-err_close:
-	drm_client_close(client);
 err_put_module:
 	if (funcs)
 		module_put(funcs->owner);
 
 	return ret;
 }
-EXPORT_SYMBOL(drm_client_new);
+EXPORT_SYMBOL(drm_client_init);
+
+/**
+ * drm_client_register - Add client to the device list
+ * @client: DRM client
+ *
+ * Add the client to the &drm_device client list to activate its callbacks.
+ * @client must be initialized by a call to drm_client_init(). After
+ * drm_client_register() it is no longer permissible to call drm_client_release()
+ * directly (outside the unregister callback), instead cleanup will happen
+ * automatically on driver unload.
+ */
+void drm_client_register(struct drm_client_dev *client)
+{
+	struct drm_device *dev = client->dev;
+
+	mutex_lock(&dev->clientlist_mutex);
+	list_add(&client->list, &dev->clientlist);
+	mutex_unlock(&dev->clientlist_mutex);
+}
+EXPORT_SYMBOL(drm_client_register);
 
 /**
  * drm_client_release - Release DRM client resources
  * @client: DRM client
  *
- * Releases resources by closing the &drm_file that was opened by drm_client_new().
+ * Releases resources by closing the &drm_file that was opened by drm_client_init().
  * It is called automatically if the &drm_client_funcs.unregister callback is _not_ set.
  *
  * This function should only be called from the unregister callback. An exception
@@ -223,7 +231,8 @@ static void drm_client_buffer_delete(struct drm_client_buffer *buffer)
 	if (buffer->gem)
 		drm_gem_object_unreference_unlocked(buffer->gem);
 
-	drm_mode_destroy_dumb_ioctl(dev, buffer->handle, buffer->client->file);
+	if (buffer->handle)
+		drm_mode_destroy_dumb_ioctl(dev, buffer->handle, buffer->client->file);
 	kfree(buffer);
 }
 
@@ -248,7 +257,7 @@ drm_client_buffer_create(struct drm_client_dev *client, u32 width, u32 height, u
 	dumb_args.bpp = drm_format_plane_cpp(format, 0) * 8;
 	ret = drm_mode_create_dumb_ioctl(dev, &dumb_args, client->file);
 	if (ret)
-		goto err_free;
+		goto err_delete;
 
 	buffer->handle = dumb_args.handle;
 	buffer->pitch = dumb_args.pitch;
@@ -281,8 +290,6 @@ drm_client_buffer_create(struct drm_client_dev *client, u32 width, u32 height, u
 
 err_delete:
 	drm_client_buffer_delete(buffer);
-err_free:
-	kfree(buffer);
 
 	return ERR_PTR(ret);
 }
@@ -382,3 +389,30 @@ void drm_client_framebuffer_delete(struct drm_client_buffer *buffer)
 	drm_client_buffer_delete(buffer);
 }
 EXPORT_SYMBOL(drm_client_framebuffer_delete);
+
+#ifdef CONFIG_DEBUG_FS
+static int drm_client_debugfs_internal_clients(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct drm_client_dev *client;
+
+	mutex_lock(&dev->clientlist_mutex);
+	list_for_each_entry(client, &dev->clientlist, list)
+		printk("drm_client debugfs: %s\n", client->name);
+	mutex_unlock(&dev->clientlist_mutex);
+
+	return 0;
+}
+
+static const struct drm_info_list drm_client_debugfs_list[] = {
+	{ "internal_clients", drm_client_debugfs_internal_clients, 0 },
+};
+
+int drm_client_debugfs_init(struct drm_minor *minor)
+{
+	return drm_debugfs_create_files(drm_client_debugfs_list,
+					ARRAY_SIZE(drm_client_debugfs_list),
+					minor->debugfs_root, minor);
+}
+#endif
