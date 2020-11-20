@@ -1,0 +1,9 @@
+menu "DRM Clients"
+	depends on DRM
+
+config DRM_CLIENT_BOOTSPLASH
+	tristate "DRM Bootsplash"
+	help
+	  DRM Bootsplash
+
+endmenu
