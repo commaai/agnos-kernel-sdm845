@@ -46,6 +46,7 @@
 #include "msm_kms.h"
 #include "sde_wb.h"
 #include "dsi_display.h"
+#include <drm/drm_bootsplash.h>
 
 /*
  * MSM driver version:
@@ -725,6 +726,14 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 	if (fbdev)
 		priv->fbdev = msm_fbdev_init(ddev);
 #endif
+	
+
+#ifdef CONFIG_DRM_CLIENT_BOOTSPLASH
+	ret = drm_bootsplash_init(ddev);
+	if (ret) {
+		dev_err(dev, "bootsplash init failed.\n");
+	}
+#endif
 
 	ret = msm_debugfs_late_init(ddev);
 	if (ret)
@@ -947,6 +956,10 @@ static void msm_lastclose(struct drm_device *dev)
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_kms *kms = priv->kms;
 	int i;
+
+#ifdef CONFIG_DRM_CLIENT_BOOTSPLASH
+	drm_bootsplash_exit();
+#endif
 
 	/* check for splash status before triggering cleanup
 	 * if we end up here with splash status ON i.e before first

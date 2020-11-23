@@ -23,7 +23,6 @@
  * DOC: overview
  *
  * This library provides support for clients running in the kernel like fbdev and bootsplash.
- * Currently it's only partially implemented, just enough to support fbdev.
  *
  * GEM drivers which provide a GEM based dumb buffer with a virtual address are supported.
  */
@@ -77,8 +76,7 @@ int drm_client_init(struct drm_device *dev, struct drm_client_dev *client,
 {
 	int ret;
 
-	if (!drm_core_check_feature(dev, DRIVER_MODESET) ||
-	    !dev->driver->dumb_create || !dev->driver->gem_prime_vmap)
+	if (!drm_core_check_feature(dev, DRIVER_MODESET) || !dev->driver->dumb_create)
 		return -ENOTSUPP;
 
 	if (funcs && !try_module_get(funcs->owner))
@@ -88,14 +86,20 @@ int drm_client_init(struct drm_device *dev, struct drm_client_dev *client,
 	client->name = name;
 	client->funcs = funcs;
 
-	ret = drm_client_open(client);
+	ret = drm_client_modeset_create(client);
 	if (ret)
 		goto err_put_module;
+	
+	ret = drm_client_open(client);
+	if (ret)
+		goto err_free;
 
 	drm_dev_ref(dev);
 
 	return 0;
 
+err_free:
+	drm_client_modeset_free(client);
 err_put_module:
 	if (funcs)
 		module_put(funcs->owner);
@@ -144,6 +148,7 @@ void drm_client_release(struct drm_client_dev *client)
 
 	DRM_DEV_DEBUG_KMS(dev->dev, "%s\n", client->name);
 
+	drm_client_modeset_free(client);
 	drm_client_close(client);
 	drm_dev_unref(dev);
 	if (client->funcs)
@@ -225,8 +230,7 @@ static void drm_client_buffer_delete(struct drm_client_buffer *buffer)
 {
 	struct drm_device *dev = buffer->client->dev;
 
-	if (buffer->vaddr && dev->driver->gem_prime_vunmap)
-		dev->driver->gem_prime_vunmap(buffer->gem, buffer->vaddr);
+	drm_gem_vunmap(buffer->gem, buffer->vaddr);
 
 	if (buffer->gem)
 		drm_gem_object_unreference_unlocked(buffer->gem);
@@ -270,21 +274,11 @@ drm_client_buffer_create(struct drm_client_dev *client, u32 width, u32 height, u
 
 	buffer->gem = obj;
 
-	/*
-	 * FIXME: The dependency on GEM here isn't required, we could
-	 * convert the driver handle to a dma-buf instead and use the
-	 * backend-agnostic dma-buf vmap support instead. This would
-	 * require that the handle2fd prime ioctl is reworked to pull the
-	 * fd_install step out of the driver backend hooks, to make that
-	 * final step optional for internal users.
-	 */
-	vaddr = dev->driver->gem_prime_vmap(obj);
-	if (!vaddr) {
-		ret = -ENOMEM;
+	vaddr = drm_client_buffer_vmap(buffer);
+	if (IS_ERR(vaddr)) {
+		ret = PTR_ERR(vaddr);
 		goto err_delete;
 	}
-
-	buffer->vaddr = vaddr;
 
 	return buffer;
 
@@ -293,6 +287,62 @@ err_delete:
 
 	return ERR_PTR(ret);
 }
+
+/**
+ * drm_client_buffer_vmap - Map DRM client buffer into address space
+ * @buffer: DRM client buffer
+ *
+ * This function maps a client buffer into kernel address space. If the
+ * buffer is already mapped, it returns the mapping's address.
+ *
+ * Client buffer mappings are not ref'counted. Each call to
+ * drm_client_buffer_vmap() should be followed by a call to
+ * drm_client_buffer_vunmap(); or the client buffer should be mapped
+ * throughout its lifetime. The latter is the default.
+ *
+ * Returns:
+ *	The mapped memory's address
+ */
+void *drm_client_buffer_vmap(struct drm_client_buffer *buffer)
+{
+	void *vaddr;
+
+	if (buffer->vaddr)
+		return buffer->vaddr;
+
+	/*
+	 * FIXME: The dependency on GEM here isn't required, we could
+	 * convert the driver handle to a dma-buf instead and use the
+	 * backend-agnostic dma-buf vmap support instead. This would
+	 * require that the handle2fd prime ioctl is reworked to pull the
+	 * fd_install step out of the driver backend hooks, to make that
+	 * final step optional for internal users.
+	 */
+	vaddr = drm_gem_vmap(buffer->gem);
+	if (IS_ERR(vaddr))
+		return vaddr;
+
+	buffer->vaddr = vaddr;
+
+	return vaddr;
+}
+EXPORT_SYMBOL(drm_client_buffer_vmap);
+
+/**
+ * drm_client_buffer_vunmap - Unmap DRM client buffer
+ * @buffer: DRM client buffer
+ *
+ * This function removes a client buffer's memory mapping. This
+ * function is only required by clients that manage their buffers
+ * by themselves. By default, DRM client buffers are mapped throughout
+ * their entire lifetime.
+ */
+void drm_client_buffer_vunmap(struct drm_client_buffer *buffer)
+{
+	drm_gem_vunmap(buffer->gem, buffer->vaddr);
+	buffer->vaddr = NULL;
+}
+EXPORT_SYMBOL(drm_client_buffer_vunmap);
 
 static void drm_client_buffer_rmfb(struct drm_client_buffer *buffer)
 {
