@@ -25,6 +25,8 @@ int drm_client_modeset_create(struct drm_client_dev *client)
 	unsigned int i = 0;
 
 	/* Add terminating zero entry to enable index less iteration */
+	printk("drm_client_modeset_create: allocating %d modesets\n", num_crtc + 1);
+
 	client->modesets = kcalloc(num_crtc + 1, sizeof(*client->modesets), GFP_KERNEL);
 	if (!client->modesets)
 		return -ENOMEM;

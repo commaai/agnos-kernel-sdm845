@@ -73,41 +73,34 @@ static void drm_bootsplash_worker(struct work_struct *work)
 
 static int drm_bootsplash_setup(struct drm_bootsplash *splash)
 {
-	// struct drm_client_dev *client = splash->client;
-	// struct drm_client_buffer *buffer[2];
-	// struct drm_client_display *display;
-	// struct drm_mode_modeinfo *mode;
-	// int ret, i;
+    int ret = 0;
+    struct drm_mode_set *modeset;
+    struct drm_client_buffer *buffer;
+    
+    int i=0;
+    drm_client_for_each_modeset(modeset, splash->client) {
+        if(modeset->crtc->name)
+            printk("BOOTSPLASH: mode %d (%s): x %d y %d. enabled: %d\n", i, modeset->crtc->name, modeset->crtc->x, modeset->crtc->y, modeset->crtc->enabled);
+        else
+            printk("BOOTSPLASH: mode %d (NO MODE NAME): x %d y %d\n", i, modeset->crtc->x, modeset->crtc->y);
+        i++;
+    }
+    printk("BOOTSPLASH: found %d modes\n", i);
 
-	// display = drm_client_display_get_first_enabled(client, false);
-	// if (IS_ERR(display))
-	// 	return PTR_ERR(display);
-	// if (!display)
-	// 	return -ENOENT;
+    // TODO: make generic
+    buffer = drm_client_framebuffer_create(splash->client, 1080, 2160, DRM_FORMAT_RGBA8888);
+    if(IS_ERR(buffer)){
+        printk("BOOTSPLASH: framebuffer create error: %d\n", PTR_ERR(buffer));
+        return -1;
+    }
+    printk("BOOTSPLASH: got buffer: %p\n", buffer);
 
-	// mode = drm_client_display_first_mode(display);
-	// if (!mode) {
-	// 	ret = -EINVAL;
-	// 	goto err_free_display;
-	// }
+    // TODO: put in loop
+    drm_bootsplash_draw(buffer, 0);
 
-	// for (i = 0; i < 2; i++) {
-	// 	buffer[i] = drm_client_framebuffer_create(client, mode, DRM_FORMAT_XRGB8888);
-	// 	if (IS_ERR(buffer[i])) {
-	// 		ret = PTR_ERR(buffer[i]);
-	// 		goto err_free_buffer;
-	// 	}
-	// }
+    // Set backlight
 
-	// ret = drm_client_display_commit_mode(display, buffer[0]->fb_ids[0], mode);
-	// if (ret)
-	// 	goto err_free_buffer;
-
-	// splash->display = display;
-	// splash->buffer[0] = buffer[0];
-	// splash->buffer[1] = buffer[1];
-
-	// schedule_work(&splash->worker);
+	//schedule_work(&splash->worker);
 
 	return 0;
 
@@ -167,28 +160,32 @@ int drm_bootsplash_init(struct drm_device *dev)
     int ret = 0;
     struct drm_bootsplash *splash;
 
+    // TODO: free these structs again!
+
 	splash = kzalloc(sizeof(*splash), GFP_KERNEL);
 	if (!splash)
 		return -ENOMEM;
-
-	INIT_WORK(&splash->worker, drm_bootsplash_worker);
-
-	if (!splash->display) {
-		ret = drm_bootsplash_setup(splash);
-
-        if (ret) {
-            printk("BOOTSPLASH: drm_bootsplash_setup failed: ret %d\n", ret);
-            return ret;
-        }
-    }
     
-    ret = drm_client_init(dev, &splash->client, "drm_bootsplash", &drm_bootsplash_client_funcs);
+    splash->client = kzalloc(sizeof(struct drm_client_dev), GFP_KERNEL);
+	if (!splash->client)
+		return -ENOMEM;
+
+    ret = drm_client_init(dev, splash->client, "drm_bootsplash", &drm_bootsplash_client_funcs);
     if (ret) {
         printk("BOOTSPLASH: drm_client_init setup failed: ret %d\n", ret);
         return ret;
     }
 
-    drm_client_register(&splash->client);
+	// INIT_WORK(&splash->worker, drm_bootsplash_worker);
+
+    ret = drm_bootsplash_setup(splash);
+
+    if (ret) {
+        printk("BOOTSPLASH: drm_bootsplash_setup failed: ret %d\n", ret);
+        return ret;
+    }
+
+    drm_client_register(splash->client);
 
     return ret;
 }
