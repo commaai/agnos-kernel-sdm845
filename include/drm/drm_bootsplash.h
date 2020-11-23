@@ -23,6 +23,5 @@ static u32 drm_bootsplash_color_table[3] = {
 };
 
 int drm_bootsplash_init(struct drm_device *dev);
-void drm_bootsplash_exit(void);
 
 #endif

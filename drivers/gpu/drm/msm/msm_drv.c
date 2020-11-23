@@ -957,10 +957,6 @@ static void msm_lastclose(struct drm_device *dev)
 	struct msm_kms *kms = priv->kms;
 	int i;
 
-#ifdef CONFIG_DRM_CLIENT_BOOTSPLASH
-	drm_bootsplash_exit();
-#endif
-
 	/* check for splash status before triggering cleanup
 	 * if we end up here with splash status ON i.e before first
 	 * commit then ignore the last close call

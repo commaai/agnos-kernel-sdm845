@@ -32,44 +32,43 @@ drm_bootsplash_draw(struct drm_client_buffer *buffer, unsigned int sequence)
 
 static void drm_bootsplash_worker(struct work_struct *work)
 {
-	struct drm_bootsplash *splash = container_of(work, struct drm_bootsplash,
-						     worker);
-	struct drm_event *event;
-	unsigned int i = 0, sequence = 0, fb_id;
-	int ret;
+	// struct drm_bootsplash *splash = container_of(work, struct drm_bootsplash, worker);
+	// struct drm_event *event;
+	// unsigned int i = 0, sequence = 0, fb_id;
+	// int ret;
 
-	while (!splash->stop) {
-		/* Are we still in charge? */
-		// fb_id = drm_client_display_current_fb(splash->display);
-		// if (fb_id != splash->buffer[i]->fb_ids[0])
-		// 	break;
+	// while (!splash->stop) {
+	// 	/* Are we still in charge? */
+	// 	// fb_id = drm_client_display_current_fb(splash->display);
+	// 	// if (fb_id != splash->buffer[i]->fb_ids[0])
+	// 	// 	break;
 
-		/*
-		 * We can race with userspace here between checking and doing
-		 * the page flip, so double buffering isn't such a good idea.
-		 * Tearing probably isn't a problem on a presumably small splash
-		 * animation. I've kept it to test the page flip code.
-		 */
+	// 	/*
+	// 	 * We can race with userspace here between checking and doing
+	// 	 * the page flip, so double buffering isn't such a good idea.
+	// 	 * Tearing probably isn't a problem on a presumably small splash
+	// 	 * animation. I've kept it to test the page flip code.
+	// 	 */
 
-		i = !i;
-		drm_bootsplash_draw(splash->buffer[i], sequence++);
-		if (sequence == 3)
-			sequence = 0;
+	// 	i = !i;
+	// 	drm_bootsplash_draw(splash->buffer[i], sequence++);
+	// 	if (sequence == 3)
+	// 		sequence = 0;
 
-		// ret = drm_client_display_page_flip(splash->display,
-		// 				   splash->buffer[i]->fb_ids[0],
-		// 				   true);
-		// if (!ret) {
-		// 	event = drm_client_read_event(splash->client, true);
-		// 	if (!IS_ERR(event))
-		// 		kfree(event);
-		// }
-		msleep(500);
-	}
+	// 	// ret = drm_client_display_page_flip(splash->display,
+	// 	// 				   splash->buffer[i]->fb_ids[0],
+	// 	// 				   true);
+	// 	// if (!ret) {
+	// 	// 	event = drm_client_read_event(splash->client, true);
+	// 	// 	if (!IS_ERR(event))
+	// 	// 		kfree(event);
+	// 	// }
+	// 	msleep(500);
+	// }
 
-	for (i = 0; i < 2; i++)
-		drm_client_framebuffer_delete(splash->buffer[i]);
-	//drm_client_display_free(splash->display);
+	// for (i = 0; i < 2; i++)
+	// 	drm_client_framebuffer_delete(splash->buffer[i]);
+	// //drm_client_display_free(splash->display);
 }
 
 static int drm_bootsplash_setup(struct drm_bootsplash *splash)
@@ -123,11 +122,16 @@ static int drm_bootsplash_setup(struct drm_bootsplash *splash)
 
 static int drm_bootsplash_client_hotplug(struct drm_client_dev *client)
 {
-	struct drm_bootsplash *splash = drm_bootsplash_from_client(client);
 	int ret = 0;
+    // struct drm_bootsplash *splash = drm_bootsplash_from_client(client);
 
-	if (!splash->display)
-	    ret = drm_bootsplash_setup(splash);
+    // if(!splash) {
+    //     printk("BOOTSPLASH: splash is null!");
+    //     return 0;
+    // }
+
+	// if (!splash->display)
+	//     ret = drm_bootsplash_setup(splash);
 
 	return ret;
 }
@@ -135,14 +139,19 @@ static int drm_bootsplash_client_hotplug(struct drm_client_dev *client)
 
 static int drm_bootsplash_client_remove(struct drm_client_dev *client)
 {
-    struct drm_bootsplash *splash = drm_bootsplash_from_client(client);
+    // struct drm_bootsplash *splash = drm_bootsplash_from_client(client);
 
-	if (splash->display) {
-		splash->stop = true;
-		flush_work(&splash->worker);
-	}
+    // if(!splash) {
+    //     printk("BOOTSPLASH: splash is null!");
+    //     return 0;
+    // }
 
-	kfree(splash);
+	// if (splash->display) {
+	// 	splash->stop = true;
+	// 	flush_work(&splash->worker);
+	// }
+
+	// kfree(splash);
 
 	return 0;
 }
@@ -157,15 +166,12 @@ int drm_bootsplash_init(struct drm_device *dev)
 {
     int ret = 0;
     struct drm_bootsplash *splash;
-    struct drm_client_dev *client;
 
 	splash = kzalloc(sizeof(*splash), GFP_KERNEL);
 	if (!splash)
 		return -ENOMEM;
 
 	INIT_WORK(&splash->worker, drm_bootsplash_worker);
-
-	splash->client = client;
 
 	if (!splash->display) {
 		ret = drm_bootsplash_setup(splash);
@@ -176,20 +182,14 @@ int drm_bootsplash_init(struct drm_device *dev)
         }
     }
     
-	ret = drm_client_init(dev, &client, "drm_bootsplash", &drm_bootsplash_client_funcs);
+    ret = drm_client_init(dev, &splash->client, "drm_bootsplash", &drm_bootsplash_client_funcs);
     if (ret) {
         printk("BOOTSPLASH: drm_client_init setup failed: ret %d\n", ret);
         return ret;
     }
 
-    drm_client_register(&client);
+    drm_client_register(&splash->client);
 
     return ret;
 }
 EXPORT_SYMBOL(drm_bootsplash_init);
-
-void drm_bootsplash_exit(void)
-{
-	//drm_client_unregister(&drm_bootsplash_client_funcs);
-}
-EXPORT_SYMBOL(drm_bootsplash_exit);
