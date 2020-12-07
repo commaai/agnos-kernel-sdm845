@@ -472,6 +472,8 @@
 		gdsc-vdd-supply = <&pcie_1_gdsc>;
 		vreg-1.8-supply = <&pm8998_l26>;
 		vreg-0.9-supply = <&pm8998_l1>;
+		// This doesn't work
+		//vreg-3.3-supply = <&ssd3v3>;
 		vreg-cx-supply = <&pm8998_s9_level>;
 
 		qcom,vreg-1.8-voltage-level = <1200000 1200000 24000>;
