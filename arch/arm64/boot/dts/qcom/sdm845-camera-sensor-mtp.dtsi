@@ -52,7 +52,7 @@
 		status = "ok";
 	};
 
-	actuator_regulator: gpio-regulator@0 {
+	/*actuator_regulator: gpio-regulator@0 {
 		compatible = "regulator-fixed";
 		reg = <0x00 0x00>;
 		regulator-name = "actuator_regulator";
@@ -62,7 +62,7 @@
 		enable-active-high;
 		gpio = <&tlmm 27 0>;
 		vin-supply = <&pmi8998_bob>;
-	};
+	};*/
 
 	camera_rear_ldo: gpio-regulator@1 {
 		compatible = "regulator-fixed";
@@ -122,7 +122,7 @@
 		pinctrl-1 = <&cam_res_mgr_suspend>;
 	};
 
-	actuator_rear: qcom,actuator@0 {
+	/*actuator_rear: qcom,actuator@0 {
 		cell-index = <0>;
 		reg = <0x0>;
 		compatible = "qcom,actuator";
@@ -290,7 +290,7 @@
 		clock-names = "cam_clk";
 		clock-cntl-level = "turbo";
 		clock-rates = <24000000>;
-	};
+	};*/
 
 	qcom,cam-sensor@0 {
 		cell-index = <0>;
