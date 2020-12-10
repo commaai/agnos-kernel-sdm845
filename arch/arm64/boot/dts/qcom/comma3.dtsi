@@ -525,7 +525,8 @@
 };
 
 &sde_dp {
-  status = "ok";
+  //status = "ok";
+  status = "disabled";
 	qcom,dp-usbpd-detection = <&pmi8998_pdphy>;
 	qcom,ext-disp = <&ext_disp>;
 
@@ -543,8 +544,8 @@
 };
 
 &mdss_mdp {
-	connectors = <&sde_rscc &sde_wb &sde_dp>;
-  //connectors = <&sde_rscc &sde_wb>;
+	//connectors = <&sde_rscc &sde_wb &sde_dp>;
+  connectors = <&sde_rscc &sde_wb>;
   // crashes without sde_wb
   //connectors = <&sde_rscc>;
 };
