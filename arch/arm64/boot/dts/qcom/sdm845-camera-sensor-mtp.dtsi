@@ -52,17 +52,17 @@
 		status = "ok";
 	};
 
-	actuator_regulator: gpio-regulator@0 {
-		compatible = "regulator-fixed";
-		reg = <0x00 0x00>;
-		regulator-name = "actuator_regulator";
-		regulator-min-microvolt = <2800000>;
-		regulator-max-microvolt = <2800000>;
-		regulator-enable-ramp-delay = <100>;
-		enable-active-high;
-		gpio = <&tlmm 27 0>;
-		vin-supply = <&pmi8998_bob>;
-	};
+	// actuator_regulator: gpio-regulator@0 {
+	// 	compatible = "regulator-fixed";
+	// 	reg = <0x00 0x00>;
+	// 	regulator-name = "actuator_regulator";
+	// 	regulator-min-microvolt = <2800000>;
+	// 	regulator-max-microvolt = <2800000>;
+	// 	regulator-enable-ramp-delay = <100>;
+	// 	enable-active-high;
+	// 	gpio = <&tlmm 27 0>;
+	// 	vin-supply = <&pmi8998_bob>;
+	// };
 
 	camera_rear_ldo: gpio-regulator@1 {
 		compatible = "regulator-fixed";
@@ -127,7 +127,7 @@
 		reg = <0x0>;
 		compatible = "qcom,actuator";
 		cci-master = <0>;
-		cam_vaf-supply = <&actuator_regulator>;
+		//cam_vaf-supply = <&actuator_regulator>;
 		regulator-names = "cam_vaf";
 		rgltr-cntrl-support;
 		rgltr-min-voltage = <2800000>;
@@ -140,7 +140,7 @@
 		reg = <0x1>;
 		compatible = "qcom,actuator";
 		cci-master = <1>;
-		cam_vaf-supply = <&actuator_regulator>;
+		//cam_vaf-supply = <&actuator_regulator>;
 		regulator-names = "cam_vaf";
 		rgltr-cntrl-support;
 		rgltr-min-voltage = <2800000>;
@@ -153,7 +153,7 @@
 		reg = <0x2>;
 		compatible = "qcom,actuator";
 		cci-master = <1>;
-		cam_vaf-supply = <&actuator_regulator>;
+		//cam_vaf-supply = <&actuator_regulator>;
 		regulator-names = "cam_vaf";
 		rgltr-cntrl-support;
 		rgltr-min-voltage = <2800000>;
@@ -166,7 +166,7 @@
 		reg = <0x0>;
 		compatible = "qcom,ois";
 		cci-master = <0>;
-		cam_vaf-supply = <&actuator_regulator>;
+		//cam_vaf-supply = <&actuator_regulator>;
 		regulator-names = "cam_vaf";
 		rgltr-cntrl-support;
 		rgltr-min-voltage = <2800000>;
@@ -183,7 +183,7 @@
 		cam_vana-supply = <&pmi8998_bob>;
 		cam_vdig-supply = <&camera_rear_ldo>;
 		cam_clk-supply = <&titan_top_gdsc>;
-		cam_vaf-supply = <&actuator_regulator>;
+		//cam_vaf-supply = <&actuator_regulator>;
 		regulator-names = "cam_vio", "cam_vana", "cam_vdig",
 			"cam_clk", "cam_vaf";
 		rgltr-cntrl-support;
@@ -224,7 +224,7 @@
 		cam_vio-supply = <&pm8998_lvs1>;
 		cam_vana-supply = <&pmi8998_bob>;
 		cam_clk-supply = <&titan_top_gdsc>;
-		cam_vaf-supply = <&actuator_regulator>;
+		//cam_vaf-supply = <&actuator_regulator>;
 		regulator-names = "cam_vdig", "cam_vio", "cam_vana",
 			"cam_clk", "cam_vaf";
 		rgltr-cntrl-support;
@@ -262,7 +262,7 @@
 		cam_vana-supply = <&pmi8998_bob>;
 		cam_vdig-supply = <&camera_ldo>;
 		cam_clk-supply = <&titan_top_gdsc>;
-		cam_vaf-supply = <&actuator_regulator>;
+		//cam_vaf-supply = <&actuator_regulator>;
 		regulator-names = "cam_vio", "cam_vana", "cam_vdig",
 			"cam_clk", "cam_vaf";
 		rgltr-cntrl-support;
