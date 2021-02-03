@@ -304,7 +304,6 @@ static void msm_restart_prepare(const char *cmd)
 				(cmd != NULL && cmd[0] != '\0'));
 	}
 
-    force_warm_reboot = true;
 	if (force_warm_reboot)
 		pr_info("Forcing a warm reset of the system\n");
 

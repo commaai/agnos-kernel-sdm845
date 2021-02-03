@@ -633,3 +633,8 @@
 	qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrRight", "SpkrLeft", "SpkrRight";*/
 };
 
+&soc {
+  restart@10ac000 {
+    qcom,force-warm-reboot;
+  };
+};
