@@ -416,24 +416,11 @@ int cam_res_mgr_gpio_request(struct device *dev, uint gpio,
 	 */
 	if (!found) {
 		rc = gpio_request_one(gpio, flags, label);
-                if(rc==0 && gpio==69){
-                 CAM_ERR(CAM_RES, "gpio %d:%s request successly",
-                                gpio, label);
-                }
 		if (rc) {
 			CAM_ERR(CAM_RES, "gpio %d:%s request fails",
 				gpio, label);
-			///ALTEK_TAG_HwMiniISP>>>
-			/*Dual sensor use the same GPIO so that GPIO request fails, bypass this issue*/
-			if((!strcmp(label, "CAM_CUSTOM0") || !strcmp(label, "CAM_CUSTOM2")) && rc == -16){
-				CAM_INFO(CAM_RES, "Miniisp power gpio %d : %s",gpio, label);
-				rc = 0;
-			}
-			else
-				return rc;
-			///ALTEK_TAG_HwMiniISP<<<
+			return rc;
 		}
-                
 	}
 
 	/*
@@ -561,7 +548,6 @@ int cam_res_mgr_gpio_set_value(unsigned int gpio, int value)
 	bool found = false;
 	struct cam_gpio_res *gpio_res = NULL;
 
-        CAM_DBG(CAM_RES,"cansleep0 GPIO(%d) val(%d)", gpio, value);
 	if (cam_res && cam_res->shared_gpio_enabled) {
 		mutex_lock(&cam_res->gpio_res_lock);
 		list_for_each_entry(gpio_res, &cam_res->gpio_res_list, list) {
@@ -572,7 +558,6 @@ int cam_res_mgr_gpio_set_value(unsigned int gpio, int value)
 		}
 		mutex_unlock(&cam_res->gpio_res_lock);
 	}
-        CAM_DBG(CAM_RES,"cansleep1 GPIO(%d) val(%d)", gpio, value);
 
 	/*
 	 * Set the value directly if can't find the gpio from
@@ -580,20 +565,15 @@ int cam_res_mgr_gpio_set_value(unsigned int gpio, int value)
 	 **/
 	if (!found) {
 		gpio_set_value_cansleep(gpio, value);
-                CAM_DBG(CAM_RES,"cansleep2 GPIO(%d) val(%d)", gpio, value);
 	} else {
-                CAM_DBG(CAM_RES,"cansleep3 GPIO(%d) val(%d)", gpio, value);
 		if (value) {
-                        CAM_DBG(CAM_RES,"cansleep4 GPIO(%d) val(%d)", gpio, value);
 			gpio_res->power_on_count++;
 			if (gpio_res->power_on_count < 2) {
-                                CAM_DBG(CAM_RES,"cansleep5 GPIO(%d) val(%d)", gpio, value);
 				gpio_set_value_cansleep(gpio, value);
 				CAM_DBG(CAM_RES,
 					"Shared GPIO(%d) : HIGH", gpio);
 			}
 		} else {
-                        CAM_DBG(CAM_RES,"cansleep6 GPIO(%d) val(%d)", gpio, value);
 			gpio_res->power_on_count--;
 			if (gpio_res->power_on_count < 1) {
 				gpio_set_value_cansleep(gpio, value);

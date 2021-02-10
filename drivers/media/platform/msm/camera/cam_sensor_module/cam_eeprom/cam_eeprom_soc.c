@@ -29,23 +29,6 @@
 		spi_dev->cmd_tbl.name.delay_count = out[4];   \
 	}
 
-bool if_tof_sensor_check(struct cam_eeprom_ctrl_t *e_ctrl)
-{
-	int tof;
-	int rc = 0;
-	struct device_node             *of_node = NULL;
-	struct cam_hw_soc_info         *soc_info = &e_ctrl->soc_info;
-
-	of_node = soc_info->dev->of_node;
-	rc = of_property_read_u32(of_node, "TOF-eeprom",
-		&tof);
-	if (rc < 0 || tof == 0) {
-		CAM_DBG(CAM_EEPROM, "not TOF camera");
-		return false;
-	}
-	return true;
-}
-
 int cam_eeprom_spi_parse_of(struct cam_sensor_spi_client *spi_dev)
 {
 	int rc = -EFAULT;
@@ -139,16 +122,10 @@ int cam_eeprom_spi_parse_of(struct cam_sensor_spi_client *spi_dev)
 int cam_eeprom_parse_dt_memory_map(struct device_node *node,
 	struct cam_eeprom_memory_block_t *data)
 {
-	int       i, tof = 0, rc = 0;
+	int       i, rc = 0;
 	char      property[PROPERTY_MAXSIZE];
 	uint32_t  count = MSM_EEPROM_MEM_MAP_PROPERTIES_CNT;
 	struct    cam_eeprom_memory_map_t *map;
-
-	rc = of_property_read_u32(node, "TOF-eeprom",
-		&tof);
-	if (tof == 1) {
-		count = 6;
-	}
 
 	snprintf(property, PROPERTY_MAXSIZE, "num-blocks");
 	rc = of_property_read_u32(node, property, &data->num_map);

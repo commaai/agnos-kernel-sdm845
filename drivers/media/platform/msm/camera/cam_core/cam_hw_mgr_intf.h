@@ -13,6 +13,9 @@
 #ifndef _CAM_HW_MGR_INTF_H_
 #define _CAM_HW_MGR_INTF_H_
 
+#include <linux/time.h>
+#include <linux/types.h>
+
 /*
  * This file declares Constants, Enums, Structures and APIs to be used as
  * Interface between HW Manager and Context.
@@ -48,7 +51,7 @@ struct cam_hw_update_entry {
 	uint32_t           offset;
 	uint32_t           len;
 	uint32_t           flags;
-	uint64_t           addr;
+	uintptr_t          addr;
 };
 
 /**
@@ -93,7 +96,7 @@ struct cam_hw_acquire_args {
 	void                        *context_data;
 	cam_hw_event_cb_func         event_cb;
 	uint32_t                     num_acq;
-	uint64_t                     acquire_info;
+	uintptr_t                    acquire_info;
 	void                        *ctxt_to_hw_map;
 };
 
@@ -242,6 +245,16 @@ struct cam_hw_dump_pf_args {
 	bool                           *mem_found;
 };
 
+/**
+ * struct cam_hw_reset_args -hw reset arguments
+ *
+ * @ctxt_to_hw_map:        HW context from the acquire
+ *
+ */
+struct cam_hw_reset_args {
+	void                           *ctxt_to_hw_map;
+};
+
 /* enum cam_hw_mgr_command - Hardware manager command type */
 enum cam_hw_mgr_command {
 	CAM_HW_MGR_CMD_INTERNAL,
@@ -291,6 +304,7 @@ struct cam_hw_cmd_args {
  * @hw_open:               Function pointer for HW init
  * @hw_close:              Function pointer for HW deinit
  * @hw_flush:              Function pointer for HW flush
+ * @hw_reset:              Function pointer for HW reset
  *
  */
 struct cam_hw_mgr_intf {
@@ -309,6 +323,7 @@ struct cam_hw_mgr_intf {
 	int (*hw_open)(void *hw_priv, void *fw_download_args);
 	int (*hw_close)(void *hw_priv, void *hw_close_args);
 	int (*hw_flush)(void *hw_priv, void *hw_flush_args);
+	int (*hw_reset)(void *hw_priv, void *hw_reset_args);
 };
 
 #endif /* _CAM_HW_MGR_INTF_H_ */

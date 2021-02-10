@@ -14,9 +14,8 @@
 #define _CAM_SENSOR_CORE_H_
 
 #include "cam_sensor_dev.h"
-/*for tof camera Begin*/
-#include "tl_dev_eeprom.h"
-/*for tof camera End*/
+
+#define MV_TEMP_SET 1
 
 /**
  * @s_ctrl: Sensor ctrl structure
@@ -93,12 +92,4 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl, void *arg);
  */
 void cam_sensor_shutdown(struct cam_sensor_ctrl_t *s_ctrl);
 
-/*for tof camera Begin*/
-int transmit_sensor_reg_setting_get(struct list_head *list_head,enum EEPROM_DATA_OP_T);
-
-int transmit_sensor_reg_setting_ret(struct list_head *list_head,enum EEPROM_DATA_OP_T);
-
-extern void tl_dev_fill_afe_reg(struct cam_sensor_ctrl_t *s_ctrl);
-
-/*for tof camera End*/
 #endif /* _CAM_SENSOR_CORE_H_ */

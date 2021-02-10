@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -272,7 +272,7 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 	int rc = 0;
 	struct cam_ctx_request *req = NULL;
 	struct cam_hw_prepare_update_args cfg;
-	uint64_t packet_addr;
+	uintptr_t packet_addr;
 	struct cam_packet *packet;
 	size_t len = 0;
 	size_t remain_len = 0;
@@ -316,8 +316,7 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 	/* for config dev, only memory handle is supported */
 	/* map packet from the memhandle */
 	rc = cam_mem_get_cpu_buf((int32_t) cmd->packet_handle,
-		(uint64_t *) &packet_addr,
-		&len);
+		&packet_addr, &len);
 	if (rc != 0) {
 		CAM_ERR(CAM_CTXT, "[%s][%d] Can not get packet address",
 			ctx->dev_name, ctx->ctx_id);
@@ -385,6 +384,17 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 			CAM_INFO(CAM_CTXT,
 				"[%s][%d] : Moving req[%llu] from free_list to pending_list",
 				ctx->dev_name, ctx->ctx_id, req->request_id);
+
+		for (j = 0; j < req->num_in_map_entries; j++) {
+			rc = cam_sync_check_valid(
+				req->in_map_entries[j].sync_id);
+			if (rc) {
+				CAM_ERR(CAM_CTXT,
+					"invalid in map sync object %d",
+					req->in_map_entries[j].sync_id);
+				goto put_ref;
+			}
+		}
 
 		for (j = 0; j < req->num_in_map_entries; j++) {
 			cam_context_getref(ctx);

@@ -21,9 +21,6 @@
 #define VALIDATE_VOLTAGE(min, max, config_val) ((config_val) && \
 	(config_val >= min) && (config_val <= max))
 
-///ALTEK_TAG_HwMiniISP>>>
-uint8_t g_SensorPowerState = 0;
-///ALTEK_TAG_HwMiniISP<<<
 static struct i2c_settings_list*
 	cam_sensor_get_i2c_ptr(struct i2c_settings_array *i2c_reg_settings,
 		uint32_t size)
@@ -94,12 +91,13 @@ int32_t cam_sensor_handle_delay(
 	if (offset > 0) {
 		i2c_list =
 			list_entry(list_ptr, struct i2c_settings_list, list);
+		CAM_ERR(CAM_SENSOR, "generic_op_code: %d delay %d", generic_op_code, cmd_uncond_wait->delay);
 		if (generic_op_code ==
-			CAMERA_SENSOR_WAIT_OP_HW_UCND)
+			CAMERA_SENSOR_WAIT_OP_HW_UCND && cmd_uncond_wait->delay < 1000)
 			i2c_list->i2c_settings.reg_setting[offset - 1].delay =
 				cmd_uncond_wait->delay;
 		else
-			i2c_list->i2c_settings.delay = cmd_uncond_wait->delay;
+			i2c_list->i2c_settings.delay = (cmd_uncond_wait->delay + 500) / 1000;
 		(*cmd_buf) +=
 			sizeof(
 			struct cam_cmd_unconditional_wait) / sizeof(uint32_t);
@@ -299,7 +297,7 @@ int cam_sensor_i2c_command_parser(
 {
 	int16_t                   rc = 0, i = 0;
 	size_t                    len_of_buff = 0;
-	uint64_t                  generic_ptr;
+	uintptr_t                  generic_ptr;
 	uint16_t                  cmd_length_in_bytes = 0;
 	size_t                    remain_len = 0;
 	size_t                    tot_size = 0;
@@ -326,7 +324,7 @@ int cam_sensor_i2c_command_parser(
 			&generic_ptr, &len_of_buff);
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
-				"cmd hdl failed:%d, Err: %d, Buffer_len: %ld",
+				"cmd hdl failed:%d, Err: %d, Buffer_len: %zd",
 				cmd_desc[i].mem_handle, rc, len_of_buff);
 			return rc;
 		}
@@ -1094,8 +1092,6 @@ int cam_get_dt_power_setting_data(struct device_node *of_node,
 			ps[i].seq_type = SENSOR_VANA;
 		} else if (!strcmp(seq_name, "cam_clk")) {
 			ps[i].seq_type = SENSOR_MCLK;
-		} else if (!strcmp(seq_name, "cam_reset")) {
-			ps[i].seq_type = SENSOR_RESET;
 		} else {
 			CAM_ERR(CAM_SENSOR, "unrecognized seq-type %s",
 				seq_name);
@@ -1641,15 +1637,6 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 		case SENSOR_STANDBY:
 		case SENSOR_CUSTOM_GPIO1:
 		case SENSOR_CUSTOM_GPIO2:
-			///ALTEK_TAG_HwMiniISP>>>
-			/*if altek sensor power up, then g_SensorPowerState++*/
-			if(power_setting->seq_type == SENSOR_CUSTOM_GPIO2) {
-				g_SensorPowerState++;
-				CAM_INFO(CAM_SENSOR, "Sensor power up g_SensorPowerState = %d", g_SensorPowerState);
-			}
-			///ALTEK_TAG_HwMiniISP<<<
-
-
 			if (no_gpio) {
 				CAM_ERR(CAM_SENSOR, "request gpio failed");
 				return no_gpio;
@@ -1944,9 +1931,7 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 		case SENSOR_RESET:
 		case SENSOR_STANDBY:
 		case SENSOR_CUSTOM_GPIO1:
-                ///ALTEK_TAG_HwMiniISP>>>
-		//case SENSOR_CUSTOM_GPIO2:
-		///ALTEK_TAG_HwMiniISP<<<
+		case SENSOR_CUSTOM_GPIO2:
 
 			if (!gpio_num_info->valid[pd->seq_type])
 				continue;
@@ -1957,22 +1942,6 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 				(int) pd->config_val);
 
 			break;
-		///ALTEK_TAG_HwMiniISP>>>
-                /*if all sensor power down, then pull AL6100 power low*/
-		case SENSOR_CUSTOM_GPIO2:
-			if(g_SensorPowerState)
-				g_SensorPowerState--;
-			if(g_SensorPowerState == 0){
-				if (!gpio_num_info->valid[pd->seq_type])
-					continue;
-				cam_res_mgr_gpio_set_value(
-					gpio_num_info->gpio_num
-					[pd->seq_type],
-					(int) pd->config_val);
-			}
-			CAM_INFO(CAM_SENSOR,"Sensor power down g_SensorPowerState = %d", g_SensorPowerState);
-			break;
-		///ALTEK_TAG_HwMiniISP<<<
 		case SENSOR_VANA:
 		case SENSOR_VDIG:
 		case SENSOR_VIO:

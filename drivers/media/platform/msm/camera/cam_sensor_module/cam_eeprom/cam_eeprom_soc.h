@@ -20,6 +20,4 @@ int cam_eeprom_parse_dt_memory_map(struct device_node *of,
 	struct cam_eeprom_memory_block_t *data);
 
 int cam_eeprom_parse_dt(struct cam_eeprom_ctrl_t *e_ctrl);
-
-bool if_tof_sensor_check(struct cam_eeprom_ctrl_t *e_ctrl);
 #endif/* _CAM_EEPROM_SOC_H_ */

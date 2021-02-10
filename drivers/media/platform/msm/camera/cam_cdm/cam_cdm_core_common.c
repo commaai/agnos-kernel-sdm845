@@ -110,7 +110,7 @@ struct cam_cdm_bl_cb_request_entry *cam_cdm_find_request_by_bl_tag(
 		if (node->bl_tag == tag)
 			return node;
 	}
-	CAM_DBG(CAM_CDM, "Could not find the bl request for tag=%x", tag);
+	CAM_ERR(CAM_CDM, "Could not find the bl request for tag=%x", tag);
 
 	return NULL;
 }

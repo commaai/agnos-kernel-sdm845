@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -212,6 +212,8 @@ static int cam_vfe_camif_resource_start(
 	uint32_t                             epoch0_irq_mask;
 	uint32_t                             epoch1_irq_mask;
 	uint32_t                             computed_epoch_line_cfg;
+	uint32_t                             camera_hw_version = 0;
+	int                                  rc = 0;
 
 	if (!camif_res) {
 		CAM_ERR(CAM_ISP, "Error! Invalid input arguments");
@@ -251,16 +253,50 @@ static int cam_vfe_camif_resource_start(
 		rsrc_data->common_reg->module_ctrl[
 		CAM_VFE_TOP_VER2_MODULE_STATS]->cgc_ovd);
 
+	/* get the HW version */
+	rc = cam_cpas_get_cpas_hw_version(&camera_hw_version);
+
+	if (rc) {
+		CAM_ERR(CAM_ISP, "Couldn't find HW version. rc: %d", rc);
+		return rc;
+	}
+
 	/* epoch config */
-	epoch0_irq_mask = ((rsrc_data->last_line - rsrc_data->first_line) / 2) +
-		rsrc_data->first_line;
-	epoch1_irq_mask = rsrc_data->reg_data->epoch_line_cfg & 0xFFFF;
-	computed_epoch_line_cfg = (epoch0_irq_mask << 16) | epoch1_irq_mask;
-	cam_io_w_mb(computed_epoch_line_cfg,
-		rsrc_data->mem_base + rsrc_data->camif_reg->epoch_irq);
-	CAM_DBG(CAM_ISP, "first_line:%u last_line:%u epoch_line_cfg: 0x%x",
-		rsrc_data->first_line, rsrc_data->last_line,
-		computed_epoch_line_cfg);
+	switch (camera_hw_version) {
+	case CAM_CPAS_TITAN_175_V101:
+	case CAM_CPAS_TITAN_175_V100:
+		epoch0_irq_mask = ((rsrc_data->last_line -
+				rsrc_data->first_line) / 2) +
+				rsrc_data->first_line;
+		epoch1_irq_mask = rsrc_data->reg_data->epoch_line_cfg &
+				0xFFFF;
+		computed_epoch_line_cfg = (epoch0_irq_mask << 16) |
+				epoch1_irq_mask;
+		cam_io_w_mb(computed_epoch_line_cfg,
+				rsrc_data->mem_base +
+				rsrc_data->camif_reg->epoch_irq);
+		CAM_DBG(CAM_ISP, "first_line: %u\n"
+				"last_line: %u\n"
+				"epoch_line_cfg: 0x%x",
+				rsrc_data->first_line,
+				rsrc_data->last_line,
+				computed_epoch_line_cfg);
+		break;
+	case CAM_CPAS_TITAN_170_V100:
+	case CAM_CPAS_TITAN_170_V110:
+	case CAM_CPAS_TITAN_170_V120:
+		cam_io_w_mb(rsrc_data->reg_data->epoch_line_cfg,
+				rsrc_data->mem_base +
+				rsrc_data->camif_reg->epoch_irq);
+		break;
+	default:
+		cam_io_w_mb(rsrc_data->reg_data->epoch_line_cfg,
+				rsrc_data->mem_base +
+				rsrc_data->camif_reg->epoch_irq);
+		CAM_WARN(CAM_ISP, "Hardware version not proper: 0x%x",
+				camera_hw_version);
+		break;
+	}
 
 	camif_res->res_state = CAM_ISP_RESOURCE_STATE_STREAMING;
 
@@ -339,6 +375,40 @@ static int cam_vfe_camif_reg_dump(
 		CAM_CPAS_REG_CAMNOC, 0x820, true, &val);
 	CAM_INFO(CAM_ISP, "IFE13_MAXWR_LOW offset 0x820 val 0x%x", val);
 
+	return rc;
+}
+
+static int cam_vfe_camif_irq_reg_dump(
+	struct cam_isp_resource_node *camif_res)
+{
+	struct cam_vfe_mux_camif_data *camif_priv;
+	struct cam_vfe_soc_private *soc_private;
+	int rc = 0;
+
+	if (!camif_res) {
+		CAM_ERR(CAM_ISP, "Error! Invalid input arguments\n");
+		return -EINVAL;
+	}
+
+	if ((camif_res->res_state == CAM_ISP_RESOURCE_STATE_RESERVED) ||
+		(camif_res->res_state == CAM_ISP_RESOURCE_STATE_AVAILABLE)) {
+		CAM_ERR(CAM_ISP, "Error! Invalid state\n");
+		return 0;
+	}
+
+	camif_priv = (struct cam_vfe_mux_camif_data *)camif_res->res_priv;
+	soc_private = camif_priv->soc_info->soc_private;
+
+	CAM_INFO(CAM_ISP,
+		"Core Id =%d Mask reg: offset 0x%x val 0x%x offset 0x%x val 0x%x",
+		camif_priv->hw_intf->hw_idx,
+		0x5c, cam_io_r_mb(camif_priv->mem_base + 0x5c),
+		0x60, cam_io_r_mb(camif_priv->mem_base + 0x60));
+	CAM_INFO(CAM_ISP,
+		"Core Id =%d Status reg: offset 0x%x val 0x%x offset 0x%x val 0x%x",
+		camif_priv->hw_intf->hw_idx,
+		0x6c, cam_io_r_mb(camif_priv->mem_base + 0x6c),
+		0x70, cam_io_r_mb(camif_priv->mem_base + 0x70));
 	return rc;
 }
 
@@ -429,6 +499,9 @@ static int cam_vfe_camif_process_cmd(struct cam_isp_resource_node *rsrc_node,
 			(struct cam_vfe_mux_camif_data *)rsrc_node->res_priv;
 		camif_priv->camif_debug = *((uint32_t *)cmd_args);
 		break;
+	case CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP:
+		rc = cam_vfe_camif_irq_reg_dump(rsrc_node);
+		break;
 	default:
 		CAM_ERR(CAM_ISP,
 			"unsupported process command:%d", cmd_type);
@@ -488,33 +561,57 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 				CAM_DBG(CAM_ISP, "Received SOF");
 			}
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS0] &=
+				~(camif_priv->reg_data->sof_irq_mask);
+			cam_vfe_put_evt_payload(payload->core_info, &payload);
 		}
 		break;
 	case CAM_ISP_HW_EVENT_EPOCH:
 		if (irq_status0 & camif_priv->reg_data->epoch0_irq_mask) {
 			CAM_DBG(CAM_ISP, "Received EPOCH");
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS0] &=
+				~(camif_priv->reg_data->epoch0_irq_mask);
+			cam_vfe_put_evt_payload(payload->core_info, &payload);
 		}
 		break;
 	case CAM_ISP_HW_EVENT_REG_UPDATE:
 		if (irq_status0 & camif_priv->reg_data->reg_update_irq_mask) {
 			CAM_DBG(CAM_ISP, "Received REG_UPDATE_ACK");
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS0] &=
+				~(camif_priv->reg_data->reg_update_irq_mask);
+			cam_vfe_put_evt_payload(payload->core_info, &payload);
 		}
 		break;
 	case CAM_ISP_HW_EVENT_EOF:
 		if (irq_status0 & camif_priv->reg_data->eof_irq_mask) {
 			CAM_DBG(CAM_ISP, "Received EOF\n");
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS0] &=
+				~(camif_priv->reg_data->eof_irq_mask);
+			cam_vfe_put_evt_payload(payload->core_info, &payload);
 		}
 		break;
 	case CAM_ISP_HW_EVENT_ERROR:
-		if (irq_status1 & camif_priv->reg_data->error_irq_mask1) {
+		if (irq_status0 & camif_priv->reg_data->error_irq_mask0) {
+			CAM_DBG(CAM_ISP, "Received Fatal ERROR\n");
+			ret = CAM_VFE_IRQ_STATUS_VIOLATION;
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS0] &=
+				~(camif_priv->reg_data->error_irq_mask0);
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS1] &=
+				~(camif_priv->reg_data->error_irq_mask1);
+			cam_vfe_put_evt_payload(payload->core_info, &payload);
+		} else if (irq_status1 &
+				camif_priv->reg_data->error_irq_mask1) {
 			CAM_DBG(CAM_ISP, "Received ERROR\n");
-			ret = CAM_ISP_HW_ERROR_OVERFLOW;
+			ret = CAM_VFE_IRQ_STATUS_OVERFLOW;
 			cam_vfe_camif_reg_dump(camif_node);
-		} else {
-			ret = CAM_ISP_HW_ERROR_NONE;
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS0] &=
+				~(camif_priv->reg_data->error_irq_mask0);
+			payload->irq_reg_val[CAM_IFE_IRQ_CAMIF_REG_STATUS1] &=
+				~(camif_priv->reg_data->error_irq_mask1);
+			cam_vfe_put_evt_payload(payload->core_info, &payload);
 		}
 
 		if (camif_priv->camif_debug &

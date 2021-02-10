@@ -27,9 +27,6 @@
 #include <cam_mem_mgr.h>
 #include <cam_subdev.h>
 #include "cam_soc_util.h"
-/*for tof camera Begin*/
-#include "tl_dev_eeprom_map.h"
-/*for tof camera End*/
 #include "cam_context.h"
 
 #define DEFINE_MSM_MUTEX(mutexname) \
@@ -38,9 +35,16 @@
 #define PROPERTY_MAXSIZE 32
 
 #define MSM_EEPROM_MEMORY_MAP_MAX_SIZE         80
-#define MSM_EEPROM_MAX_MEM_MAP_CNT             8
+#define MSM_EEPROM_MAX_MEM_MAP_CNT             36
 #define MSM_EEPROM_MEM_MAP_PROPERTIES_CNT      8
-#define TL_MODE_MAX                          2
+
+#ifdef CONFIG_USE_ROHM_BU64753
+#define EEPROM_MAP_DATA_CNT 60
+#define EEPROM_READ_START_INDEX 7856
+#define EEPROM_READ_END_INDEX 7915
+#define LITEON_VENDOR_ID 0x15
+#define BACK_CAMERA_LILTEON_EEPROM_ADDR 0xA0
+#endif
 
 enum cam_eeprom_state {
 	CAM_EEPROM_INIT,
@@ -79,6 +83,7 @@ struct cam_eeprom_memory_map_t {
 	struct cam_eeprom_map_t page;
 	struct cam_eeprom_map_t pageen;
 	struct cam_eeprom_map_t poll;
+	struct cam_eeprom_map_t delay;
 	struct cam_eeprom_map_t mem;
 	uint32_t saddr;
 };
@@ -187,24 +192,6 @@ struct cam_eeprom_ctrl_t {
 	bool userspace_probe;
 	struct cam_eeprom_memory_block_t cal_data;
 };
-
-struct cam_eeprom_list_head {
-	struct list_head list_head_init;
-	struct list_head list_head_config;
-	struct list_head list_head_streamon;
-	struct list_head list_head_streamoff;
-	bool   list_state;
-};
-
-enum cam_eeprom_free {
-	LIST_HEAD_ALL,
-	LIST_HEAD_INITIAL,
-	LIST_HEAD_RESOLUTION,
-	LIST_HEAD_STREAMON,
-	LIST_HEAD_STREAMOFF,
-};
-
-/*for tof camera End*/
 
 int32_t cam_eeprom_update_i2c_info(struct cam_eeprom_ctrl_t *e_ctrl,
 	struct cam_eeprom_i2c_info_t *i2c_info);

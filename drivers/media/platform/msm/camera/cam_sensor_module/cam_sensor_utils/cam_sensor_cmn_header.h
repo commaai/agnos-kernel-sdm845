@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,7 +26,7 @@
 #define MAX_REGULATOR 5
 #define MAX_POWER_CONFIG 12
 
-#define MAX_PER_FRAME_ARRAY 32
+#define MAX_PER_FRAME_ARRAY 33
 #define BATCH_SIZE_MAX      16
 
 #define CAM_SENSOR_NAME    "cam-sensor"
@@ -35,6 +35,7 @@
 #define CAM_FLASH_NAME     "cam-flash"
 #define CAM_EEPROM_NAME    "cam-eeprom"
 #define CAM_OIS_NAME       "cam-ois"
+#define CAM_SL_EEPROM_NAME "cam-sl-eeprom"
 
 #define MAX_SYSTEM_PIPELINE_DELAY 2
 
@@ -132,6 +133,7 @@ enum sensor_sub_module {
 	SUB_MODULE_CSID,
 	SUB_MODULE_CSIPHY,
 	SUB_MODULE_OIS,
+	SUB_MODULE_IR_LED,
 	SUB_MODULE_EXT,
 	SUB_MODULE_MAX,
 };
@@ -384,14 +386,4 @@ struct msm_camera_gpio_conf {
 	struct msm_camera_gpio_num_info *gpio_num_info;
 };
 
-/*for tof camera  Begin*/
-enum EEPROM_DATA_OP_T{
-	EEPROM_DEFAULT_DATA = 0,
-	EEPROM_INIT_DATA,
-	EEPROM_CONFIG_DATA,
-	EEPROM_STREAMON_DATA,
-	EEPROM_STREAMOFF_DATA,
-	EEPROM_OTHER_DATA,
-};
-/*for tof camera  End*/
 #endif /* _CAM_SENSOR_CMN_HEADER_ */

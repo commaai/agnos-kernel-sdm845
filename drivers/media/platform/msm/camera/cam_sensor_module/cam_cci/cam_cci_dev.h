@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,6 +26,7 @@
 #include <linux/timer.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/mutex.h>
 #include <media/cam_sensor.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ioctl.h>
@@ -45,7 +46,7 @@
 #define CYCLES_PER_MICRO_SEC_DEFAULT 4915
 #define CCI_MAX_DELAY 1000000
 
-#define CCI_TIMEOUT msecs_to_jiffies(1500)
+#define CCI_TIMEOUT msecs_to_jiffies(800)
 
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
@@ -198,12 +199,15 @@ enum cam_cci_state_t {
  * @lock_status: to protect changes to irq_status1
  * @is_burst_read: Flag to determine if we are performing
  *                 a burst read operation or not
+ * @init_mutex: Mutex for maintaining refcount for attached
+ *              devices to cci during init/deinit.
  */
 struct cci_device {
 	struct v4l2_subdev subdev;
 	struct cam_hw_soc_info soc_info;
 	uint32_t hw_version;
 	uint8_t ref_count;
+	uint8_t ref_count_cci[MASTER_MAX];
 	enum cam_cci_state_t cci_state;
 	struct cam_cci_i2c_queue_info
 		cci_i2c_queue_info[NUM_MASTERS][NUM_QUEUES];
@@ -225,6 +229,7 @@ struct cci_device {
 	uint32_t irq_status1;
 	spinlock_t lock_status;
 	bool is_burst_read;
+	struct mutex init_mutex;
 };
 
 enum cam_cci_i2c_cmd_type {
@@ -304,6 +309,6 @@ static inline struct v4l2_subdev *cam_cci_get_subdev(void)
 #endif
 
 #define VIDIOC_MSM_CCI_CFG \
-	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct cam_cci_ctrl *)
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct cam_cci_ctrl)
 
 #endif /* _CAM_CCI_DEV_H_ */

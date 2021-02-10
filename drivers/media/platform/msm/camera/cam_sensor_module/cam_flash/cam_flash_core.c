@@ -11,6 +11,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/gpio.h>
 
 #include "cam_sensor_cmn_header.h"
 #include "cam_flash_core.h"
@@ -21,6 +22,10 @@
 static int cam_flash_prepare(struct cam_flash_ctrl *flash_ctrl,
 	bool regulator_enable)
 {
+	struct cam_flash_private_soc *soc_private =
+		(struct cam_flash_private_soc *) flash_ctrl->soc_info
+		.soc_private;
+	struct cam_soc_gpio_data *gpio_conf = soc_private->gpio_data;
 	int rc = 0;
 
 	if (!(flash_ctrl->switch_trigger)) {
@@ -48,6 +53,11 @@ static int cam_flash_prepare(struct cam_flash_ctrl *flash_ctrl,
 			return rc;
 		}
 		flash_ctrl->is_regulator_enabled = false;
+	} else if ((gpio_conf != NULL) &&
+		(gpio_conf->cam_gpio_common_tbl_size > 0)) {
+		CAM_INFO(CAM_FLASH,
+			"gpio based flash not need regulator");
+		return rc;
 	} else {
 		CAM_ERR(CAM_FLASH, "Wrong Flash State : %d",
 			flash_ctrl->flash_state);
@@ -380,6 +390,45 @@ end:
 	return rc;
 }
 
+static void cam_flash_set_gpios(struct cam_flash_ctrl *flash_ctrl, bool enable)
+{
+
+	struct cam_flash_private_soc *soc_private =
+		(struct cam_flash_private_soc *) flash_ctrl->soc_info
+		.soc_private;
+	struct cam_soc_gpio_data *gpio_conf = soc_private->gpio_data;
+	int i;
+
+	if (gpio_conf != NULL && gpio_conf->cam_gpio_common_tbl_size > 0) {
+		struct gpio *gpio_tbl = gpio_conf->cam_gpio_req_tbl;
+		int size = (int) gpio_conf->cam_gpio_req_tbl_size;
+
+		if (enable) {
+			for (i = 0; i < size; i++) {
+				CAM_DBG(CAM_FLASH, "enabling gpio %d",
+					gpio_tbl[i].gpio);
+				gpio_set_value_cansleep(gpio_tbl[i].gpio, 1);
+				if (soc_private->gpio_delay_tbl_size > 0) {
+					CAM_DBG(CAM_FLASH, "sleeping for %d ms",
+						soc_private->gpio_delay_tbl[i]);
+					msleep(soc_private->gpio_delay_tbl[i]);
+				}
+			}
+		} else {
+			for (i = size-1; i >= 0; i--) {
+				CAM_DBG(CAM_FLASH, "disabling gpio %d",
+					gpio_tbl[i].gpio);
+				gpio_set_value_cansleep(gpio_tbl[i].gpio, 0);
+				if (soc_private->gpio_delay_tbl_size > 0) {
+					CAM_DBG(CAM_FLASH, "sleeping for %d ms",
+						soc_private->gpio_delay_tbl[i]);
+					msleep(soc_private->gpio_delay_tbl[i]);
+				}
+			}
+		}
+	}
+}
+
 static int cam_flash_ops(struct cam_flash_ctrl *flash_ctrl,
 	struct cam_flash_frame_setting *flash_data, enum camera_flash_opcode op)
 {
@@ -396,6 +445,7 @@ static int cam_flash_ops(struct cam_flash_ctrl *flash_ctrl,
 		flash_ctrl->soc_info.soc_private;
 
 	if (op == CAMERA_SENSOR_FLASH_OP_FIRELOW) {
+		cam_flash_set_gpios(flash_ctrl, true);
 		for (i = 0; i < flash_ctrl->torch_num_sources; i++) {
 			if (flash_ctrl->torch_trigger[i]) {
 				max_current = soc_private->torch_max_current[i];
@@ -439,7 +489,7 @@ static int cam_flash_ops(struct cam_flash_ctrl *flash_ctrl,
 	if (flash_ctrl->switch_trigger)
 		cam_res_mgr_led_trigger_event(
 			flash_ctrl->switch_trigger,
-			LED_SWITCH_ON);
+			(enum led_brightness)LED_SWITCH_ON);
 
 	return 0;
 }
@@ -453,8 +503,9 @@ int cam_flash_off(struct cam_flash_ctrl *flash_ctrl)
 
 	if (flash_ctrl->switch_trigger)
 		cam_res_mgr_led_trigger_event(flash_ctrl->switch_trigger,
-			LED_SWITCH_OFF);
+			(enum led_brightness)LED_SWITCH_OFF);
 
+	cam_flash_set_gpios(flash_ctrl, false);
 	flash_ctrl->flash_state = CAM_FLASH_STATE_START;
 	return 0;
 }
@@ -707,7 +758,12 @@ int cam_flash_pmic_apply_setting(struct cam_flash_ctrl *fctrl,
 					fctrl->flash_state);
 					return -EINVAL;
 				}
-
+				rc = cam_flash_prepare(fctrl, true);
+				if (rc) {
+					CAM_ERR(CAM_FLASH,
+					"Enable Regulator Failed rc = %d", rc);
+					return rc;
+				}
 				rc = cam_flash_high(fctrl, flash_data);
 				if (rc)
 					CAM_ERR(CAM_FLASH,
@@ -722,7 +778,12 @@ int cam_flash_pmic_apply_setting(struct cam_flash_ctrl *fctrl,
 					fctrl->flash_state);
 					return -EINVAL;
 				}
-
+				rc = cam_flash_prepare(fctrl, true);
+				if (rc) {
+					CAM_ERR(CAM_FLASH,
+					"Enable Regulator Failed rc = %d", rc);
+					return rc;
+				}
 				rc = cam_flash_low(fctrl, flash_data);
 				if (rc)
 					CAM_ERR(CAM_FLASH,
@@ -736,6 +797,15 @@ int cam_flash_pmic_apply_setting(struct cam_flash_ctrl *fctrl,
 					"LED OFF FAILED: %d",
 					rc);
 					return rc;
+				}
+				if ((fctrl->flash_state ==
+					CAM_FLASH_STATE_START) &&
+					(fctrl->is_regulator_enabled == true)) {
+					rc = cam_flash_prepare(fctrl, false);
+					if (rc)
+						CAM_ERR(CAM_FLASH,
+						"Disable Regulator failed: %d",
+						rc);
 				}
 			}
 		} else if (fctrl->nrt_info.cmn_attr.cmd_type ==
@@ -867,7 +937,7 @@ apply_setting_err:
 int cam_flash_i2c_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 {
 	int rc = 0, i = 0;
-	uint64_t generic_ptr;
+	uintptr_t generic_ptr;
 	uint32_t total_cmd_buf_in_bytes = 0;
 	uint32_t processed_cmd_buf_in_bytes = 0;
 	uint16_t cmd_length_in_bytes = 0;
@@ -894,14 +964,14 @@ int cam_flash_i2c_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 	/* getting CSL Packet */
 	ioctl_ctrl = (struct cam_control *)arg;
 
-	if (copy_from_user((&config), (void __user *) ioctl_ctrl->handle,
+	if (copy_from_user((&config), u64_to_user_ptr(ioctl_ctrl->handle),
 		sizeof(config))) {
 		CAM_ERR(CAM_FLASH, "Copy cmd handle from user failed");
 		return -EFAULT;
 	}
 
 	rc = cam_mem_get_cpu_buf(config.packet_handle,
-		(uint64_t *)&generic_ptr, &len_of_buffer);
+		&generic_ptr, &len_of_buffer);
 	if (rc) {
 		CAM_ERR(CAM_FLASH, "Failed in getting the buffer : %d", rc);
 		return rc;
@@ -909,7 +979,7 @@ int cam_flash_i2c_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 
 	remain_len = len_of_buffer;
 	if ((sizeof(struct cam_packet) > len_of_buffer) ||
-		((size_t)config.offset > len_of_buffer -
+		((size_t)config.offset >= len_of_buffer -
 		sizeof(struct cam_packet))) {
 		CAM_ERR(CAM_FLASH,
 			"offset is out of bounds: offset: %lld len: %zu",
@@ -942,7 +1012,7 @@ int cam_flash_i2c_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 			if (!total_cmd_buf_in_bytes)
 				continue;
 			rc = cam_mem_get_cpu_buf(cmd_desc[i].mem_handle,
-				(uint64_t *)&generic_ptr, &len_of_buffer);
+				&generic_ptr, &len_of_buffer);
 			if (rc < 0) {
 				CAM_ERR(CAM_FLASH, "Failed to get cpu buf");
 				return rc;
@@ -1204,7 +1274,7 @@ update_req_mgr:
 int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 {
 	int rc = 0, i = 0;
-	uint64_t generic_ptr;
+	uintptr_t generic_ptr;
 	uint32_t *cmd_buf =  NULL;
 	uint32_t *offset = NULL;
 	uint32_t frm_offset = 0;
@@ -1229,7 +1299,8 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 	/* getting CSL Packet */
 	ioctl_ctrl = (struct cam_control *)arg;
 
-	if (copy_from_user((&config), (void __user *) ioctl_ctrl->handle,
+	if (copy_from_user((&config),
+		u64_to_user_ptr(ioctl_ctrl->handle),
 		sizeof(config))) {
 		CAM_ERR(CAM_FLASH, "Copy cmd handle from user failed");
 		rc = -EFAULT;
@@ -1237,7 +1308,7 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 	}
 
 	rc = cam_mem_get_cpu_buf(config.packet_handle,
-		(uint64_t *)&generic_ptr, &len_of_buffer);
+		&generic_ptr, &len_of_buffer);
 	if (rc) {
 		CAM_ERR(CAM_FLASH, "Failed in getting the buffer : %d", rc);
 		return rc;
@@ -1245,7 +1316,7 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 
 	remain_len = len_of_buffer;
 	if ((sizeof(struct cam_packet) > len_of_buffer) ||
-		((size_t)config.offset > len_of_buffer -
+		((size_t)config.offset >= len_of_buffer -
 		sizeof(struct cam_packet))) {
 		CAM_ERR(CAM_FLASH,
 			"offset is out of bounds: offset: %lld len: %zu",
