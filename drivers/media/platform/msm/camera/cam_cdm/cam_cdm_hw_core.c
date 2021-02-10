@@ -566,32 +566,28 @@ static void cam_hw_cdm_work(struct work_struct *work)
 		CAM_DBG(CAM_CDM, "IRQ status=%x", payload->irq_status);
 		if (payload->irq_status &
 			CAM_CDM_IRQ_STATUS_INFO_INLINE_IRQ_MASK) {
-			struct cam_cdm_bl_cb_request_entry *node;
+			struct cam_cdm_bl_cb_request_entry *node, *tnode;
 
 			CAM_DBG(CAM_CDM, "inline IRQ data=%x",
 				payload->irq_data);
 			mutex_lock(&cdm_hw->hw_mutex);
-			node = cam_cdm_find_request_by_bl_tag(
-					payload->irq_data,
-					&core->bl_request_list);
-			if (node) {
+			list_for_each_entry_safe(node, tnode, &core->bl_request_list, entry) {
 				if (node->request_type ==
 					CAM_HW_CDM_BL_CB_CLIENT) {
 					cam_cdm_notify_clients(cdm_hw,
 						CAM_CDM_CB_STATUS_BL_SUCCESS,
 						(void *)node);
-				} else if (node->request_type ==
-						CAM_HW_CDM_BL_CB_INTERNAL) {
+				} else if (node->request_type == CAM_HW_CDM_BL_CB_INTERNAL) {
 					CAM_ERR(CAM_CDM,
 						"Invalid node=%pK %d", node,
 						node->request_type);
 				}
 				list_del_init(&node->entry);
+				if (node->bl_tag == payload->irq_data) {
+					kfree(node);
+					break;
+				}
 				kfree(node);
-			} else {
-				CAM_ERR(CAM_CDM,
-					"Inval node, inline_irq st=%x data=%x",
-					payload->irq_status, payload->irq_data);
 			}
 			mutex_unlock(&cdm_hw->hw_mutex);
 		}
