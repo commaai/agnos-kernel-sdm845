@@ -184,7 +184,7 @@ static int32_t cam_sensor_i2c_pkt_parse(struct cam_sensor_ctrl_t *s_ctrl,
 
 	remain_len = len_of_buff;
 	if ((sizeof(struct cam_packet) > len_of_buff) ||
-		((size_t)config.offset >= len_of_buff -
+		((size_t)config.offset > len_of_buff -
 		sizeof(struct cam_packet))) {
 		CAM_ERR(CAM_SENSOR,
 			"Inval cam_packet strut size: %zu, len_of_buff: %zu",

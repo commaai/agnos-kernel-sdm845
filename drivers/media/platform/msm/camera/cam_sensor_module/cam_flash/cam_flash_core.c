@@ -909,7 +909,7 @@ int cam_flash_i2c_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 
 	remain_len = len_of_buffer;
 	if ((sizeof(struct cam_packet) > len_of_buffer) ||
-		((size_t)config.offset >= len_of_buffer -
+		((size_t)config.offset > len_of_buffer -
 		sizeof(struct cam_packet))) {
 		CAM_ERR(CAM_FLASH,
 			"offset is out of bounds: offset: %lld len: %zu",
@@ -1245,7 +1245,7 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 
 	remain_len = len_of_buffer;
 	if ((sizeof(struct cam_packet) > len_of_buffer) ||
-		((size_t)config.offset >= len_of_buffer -
+		((size_t)config.offset > len_of_buffer -
 		sizeof(struct cam_packet))) {
 		CAM_ERR(CAM_FLASH,
 			"offset is out of bounds: offset: %lld len: %zu",
