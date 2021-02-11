@@ -7730,7 +7730,9 @@ static int __hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			ret = hdd_driver_ioctl(adapter, ifr);
 		break;
 	default:
-		hdd_warn("unknown ioctl %d", cmd);
+		if (cmd != SIOCGIWMODE) {
+			hdd_warn("unknown ioctl %d", cmd);
+		}
 		ret = -EINVAL;
 		break;
 	}
