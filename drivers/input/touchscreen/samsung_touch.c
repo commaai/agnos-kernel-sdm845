@@ -40,6 +40,9 @@
 /* Touchscreen registers */
 #define SS_ONE_EVENT_CMD                    0x60
 #define SS_ONE_EVENT_SIZE                   15
+#define SS_BOOT_STATUS_CMD                  0x55
+#define SS_ENTER_FW_MODE_CMD                0x57
+#define SS_CHIP_ID_CMD                      0x52
 
 /* Touchscreen events */
 #define SS_EVENT_COORDINATE		            0
@@ -56,7 +59,10 @@
 /* Constants */
 #define SS_STOP                             0
 #define SS_CONTINUE                         1
-
+#define SS_BOOT_STATUS_BOOT                 0x10
+#define SS_BOOT_STATUS_APP                  0x20
+#define SS_FIRMWARE                         "samsung_touch.img"
+uint8_t expected_chip_id[3] =               {0xBA, 0xB6, 0x61};
 
 struct ss_ts_data {
 	struct i2c_client *client;
@@ -65,6 +71,8 @@ struct ss_ts_data {
 	struct gpio_desc *interrupt_gpio;
 	struct gpio_desc *reset_gpio;
     struct gpio_desc *ta_gpio;
+
+    uint8_t chip_id[3];
 };
 
 /* Event structures */
@@ -102,6 +110,17 @@ static int ss_read(struct ss_ts_data *ts, uint8_t command, uint8_t *data, uint8_
     return 0;
 }
 
+static int ss_write(struct ss_ts_data *ts, uint8_t command, uint8_t *data, uint8_t len)
+{
+    int ret;
+    ret = i2c_smbus_write_i2c_block_data(ts->client, command, len, data);
+    if(ret != 0){
+        dev_err(&ts->client->dev, "%s: i2c_smbus_write_i2c_block_data: %d\n", __func__, ret);
+        return ret;
+    }
+    return 0;
+}
+
 static int ss_report_touch(struct ss_ts_data *ts, int touch_id, int action, int x, int y, int z, int type, int major, int minor, int ewx, int ewy)
 {
     input_mt_slot(ts->input, touch_id);
@@ -117,7 +136,7 @@ static int ss_report_touch(struct ss_ts_data *ts, int touch_id, int action, int 
             break;
         case SS_EVENT_COORDINATE_ACTION_UP:
             input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, false);
-            break;        
+            break;
     }
     input_mt_report_pointer_emulation(ts->input, true);
 	input_sync(ts->input);
@@ -133,7 +152,7 @@ static int ss_handle_coordinate_event(struct ss_ts_data *ts, uint8_t *event)
     touch_id = (event_coord->tid - 1);
 
     if(touch_id < SS_MAX_FINGERS + SS_MAX_HOVER && touch_id >= 0){
-        dev_dbg(&ts->client->dev, "%s: coordinate event: ID: %d ACT: %d X: %d, Y: %d Z: %d Type: %d Major: %d Minor: %d WX: %d WY: %d EWX: %d EWY: %d", 
+        dev_dbg(&ts->client->dev, "%s: coordinate event: ID: %d ACT: %d X: %d, Y: %d Z: %d Type: %d Major: %d Minor: %d WX: %d WY: %d EWX: %d EWY: %d\n",
             __func__,
             touch_id,
             event_coord->tchsta,
@@ -149,7 +168,7 @@ static int ss_handle_coordinate_event(struct ss_ts_data *ts, uint8_t *event)
 
         ret = ss_report_touch(
             ts,
-            touch_id, 
+            touch_id,
             event_coord->tchsta,
             (event_coord->x_11_4 << 4) | (event_coord->x_3_0),
             (event_coord->y_11_4 << 4) | (event_coord->y_3_0),
@@ -161,7 +180,7 @@ static int ss_handle_coordinate_event(struct ss_ts_data *ts, uint8_t *event)
             event_coord->ewy
         );
         if(ret < 0){
-            dev_err(&ts->client->dev, "%s: report touch failed: %d", __func__, ret);
+            dev_err(&ts->client->dev, "%s: report touch failed: %d\n", __func__, ret);
         }
 
         // Maybe there's more???
@@ -239,12 +258,67 @@ static void ss_ts_reset(struct ss_ts_data *ts)
 	}
 }
 
+static int ss_get_boot_status(struct ss_ts_data *ts)
+{
+    uint8_t ret = 0;
+    uint8_t result[1];
+    ret = ss_read(ts, SS_BOOT_STATUS_CMD, result, 1);
+    if(ret < 0){
+        dev_err(&ts->client->dev, "%s: reading boot status: %d\n", __func__, ret);
+        return ret;
+    }
+
+    return result[0];
+}
+
+static int ss_enter_boot_mode(struct ss_ts_data *ts)
+{
+    uint8_t ret = 0;
+    uint8_t boot_status = 0;
+    uint8_t firmware_password[2] = {0x55, 0xAC};
+    boot_status = ss_get_boot_status(ts);
+    if(boot_status < 0) return boot_status;
+
+    if(boot_status != SS_BOOT_STATUS_BOOT){
+        // Enter firmware mode
+        ret = ss_write(ts, SS_ENTER_FW_MODE_CMD, firmware_password, sizeof(firmware_password));
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: entering fw mode: %d\n", __func__, ret);
+            return ret;
+        }
+
+        msleep(200);
+
+        // Check that it worked
+        boot_status = ss_get_boot_status(ts);
+        if(boot_status != SS_BOOT_STATUS_BOOT) {
+            dev_err(&ts->client->dev, "%s: didn't enter fw mode. Boot status: %d\n", __func__, boot_status);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int ss_read_chip_id(struct ss_ts_data *ts)
+{
+    uint8_t ret = 0;
+    ret = ss_read(ts, SS_CHIP_ID_CMD, ts->chip_id, 3);
+    if(ret < 0){
+        dev_err(&ts->client->dev, "%s: reading chip id: %d\n", __func__, ret);
+        return ret;
+    }
+
+    return 0;
+}
+
 static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct ss_ts_data *ts;
-	int error;
+    struct firmware *firmware;
+	int error, boot_status;
 
-    dev_info(&client->dev, "SAMSUNG PANEL probe");
+    dev_info(&client->dev, "SAMSUNG PANEL probe\n");
 
     ts = devm_kzalloc(&client->dev, sizeof(*ts), GFP_KERNEL);
 	if (!ts)
@@ -277,7 +351,38 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 		return error;
 	}
 
+    // Reset panel
 	ss_ts_reset(ts);
+
+    // Check that the panel is running in app mode, otherwise flash
+    boot_status = ss_get_boot_status(ts);
+    if (boot_status != SS_BOOT_STATUS_APP) {
+        dev_info(&client->dev, "Device not in app mode (current mode:). Attempting reflash\n");
+
+        // Enter boot mode
+        error = ss_enter_boot_mode(ts);
+        if(error < 0) {
+            return error;
+        }
+
+        // Check that the chip ID matches
+        error = ss_read_chip_id(ts);
+        if(error < 0) {
+            return error;
+        } else if(memcmp(ts->chip_id, expected_chip_id, sizeof(expected_chip_id))){
+            dev_err(&client->dev, "Chip ID does not match expected: 0x%x%x%x\n", ts->chip_id[0], ts->chip_id[1], ts->chip_id[2]);
+            return -1;
+        }
+
+        // Load firmware
+        error = request_firmware(firmware, SS_FIRMWARE, &client->dev);
+        if(error < 0){
+            dev_err(&client->dev, "firmware request failed: %d\n", error);
+            return error;
+        }
+
+
+    }
 
 	ts->input = devm_input_allocate_device(&client->dev);
 	if (!ts->input) {
@@ -321,7 +426,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
 static int ss_ts_remove(struct i2c_client *client)
 {
-    dev_info(&client->dev, "SAMSUNG PANEL remove");
+    dev_info(&client->dev, "SAMSUNG PANEL remove\n");
 	return 0;
 }
 
