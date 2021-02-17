@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1323,6 +1323,7 @@ static int cam_icp_hw_mgr_create_debugfs_entry(void)
 		rc = -ENOMEM;
 		goto err;
 	}
+	icp_hw_mgr.icp_pc_flag = false;
 
 	if (!debugfs_create_bool("ipe_bps_pc",
 		0644,
@@ -1332,6 +1333,7 @@ static int cam_icp_hw_mgr_create_debugfs_entry(void)
 		rc = -ENOMEM;
 		goto err;
 	}
+	icp_hw_mgr.ipe_bps_pc_flag = false;
 
 	if (!debugfs_create_file("icp_debug_clk",
 		0644,
@@ -3694,6 +3696,9 @@ static int cam_icp_mgr_prepare_hw_update(void *hw_mgr_priv,
 
 	packet = prepare_args->packet;
 
+	if (cam_packet_util_validate_packet(packet, prepare_args->remain_len))
+		return -EINVAL;
+
 	rc = cam_icp_mgr_pkt_validation(packet);
 	if (rc) {
 		mutex_unlock(&ctx_data->ctx_mutex);
@@ -4592,9 +4597,6 @@ static int cam_icp_mgr_create_wq(void)
 	rc = cam_icp_hw_mgr_create_debugfs_entry();
 	if (rc)
 		goto debugfs_create_failed;
-
-	icp_hw_mgr.icp_pc_flag = true;
-	icp_hw_mgr.ipe_bps_pc_flag = true;
 
 	for (i = 0; i < ICP_WORKQ_NUM_TASK; i++)
 		icp_hw_mgr.msg_work->task.pool[i].payload =
