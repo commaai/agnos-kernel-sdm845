@@ -46,6 +46,10 @@
 #define SS_CHIP_ID_CMD                      0x52
 #define SS_FLASH_ERASE_CMD                  0xD8
 #define SS_FLASH_WRITE_CMD                  0xD9
+#define SS_PROTOCOL_ID_CMD                  0xDD
+#define SS_SW_RESET_APP_CMD                 0x12
+#define SS_SW_RESET_BOOT_CMD                0x42
+#define SS_ENABLE_SENSING_CMD               0x10
 
 /* Touchscreen events */
 #define SS_EVENT_COORDINATE		            0
@@ -59,6 +63,9 @@
 #define SS_EVENT_COORDINATE_ACTION_MOVE     2
 #define SS_EVENT_COORDINATE_ACTION_UP       3
 
+/* Touchscreen ACKs */
+#define SS_ACK_BOOT_COMPLETE                0x00
+
 /* Constants */
 #define SS_STOP                             0
 #define SS_CONTINUE                         1
@@ -68,6 +75,7 @@
 #define SS_HEADER_SIGNATURE                 0x53494654
 #define SS_CHUNK_SIGNATURE                  0x53434654
 #define SS_PAGE_SIZE                        256
+#define SS_PROTOCOL_APP                     0x1
 uint8_t expected_chip_id[3] =               {0xBA, 0xB6, 0x61};
 
 struct ss_ts_data {
@@ -321,6 +329,19 @@ static int ss_get_boot_status(struct ss_ts_data *ts)
     return result[0];
 }
 
+static int ss_get_protocol_id(struct ss_ts_data *ts)
+{
+    int ret = 0;
+    uint8_t result[1];
+    ret = ss_read(ts, SS_PROTOCOL_ID_CMD, result, 1);
+    if(ret < 0){
+        dev_err(&ts->client->dev, "%s: reading protocol id: %d\n", __func__, ret);
+        return ret;
+    }
+
+    return result[0];
+}
+
 static int ss_enter_boot_mode(struct ss_ts_data *ts)
 {
     int ret = 0;
@@ -350,20 +371,64 @@ static int ss_enter_boot_mode(struct ss_ts_data *ts)
     return 0;
 }
 
+static int ss_wait_for_ack(struct ss_ts_data *ts, uint8_t ack)
+{
+    int ret = 0;
+    uint8_t event[8];
+    uint32_t i;
+
+    dev_info(&ts->client->dev, "%s: waiting for ack %d\n", __func__, ack);
+    for(i = 0; i < 100; i++){
+        // Read event
+        ret = ss_read(ts, SS_ONE_EVENT_CMD, event, 8);
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: reading event failed: %d\n", __func__, ret);
+            return ret;
+        }
+
+        // Check if it's right
+        if(((event[0] >> 2) & 0xF) == ack){
+            dev_info(&ts->client->dev, "%s: ack received\n", __func__);
+            return 0;
+        }
+
+        msleep(20);
+    }
+    dev_err(&ts->client->dev, "%s: timed out\n", __func__);
+    return -ETIMEDOUT;
+}
+
 static int ss_exit_boot_mode(struct ss_ts_data *ts)
 {
     int ret = 0;
-    int boot_status = 0;
+    int boot_status = 0, protocol_id;
     uint8_t firmware_password[2] = {0x55, 0xAC};
     boot_status = ss_get_boot_status(ts);
     if(boot_status < 0) return boot_status;
 
     if(boot_status != SS_BOOT_STATUS_APP){
-        // TODO: SW reset
+        // Software reset
+        protocol_id = ss_get_protocol_id(ts);
+        if(IS_ERR(protocol_id)){
+            dev_err(&ts->client->dev, "%s: couldn't read protocol ID: %d\n", __func__, protocol_id);
+            return protocol_id;
+        }
+
+        ret = ss_write(ts, (protocol_id == SS_PROTOCOL_APP) ? SS_SW_RESET_APP_CMD : SS_SW_RESET_BOOT_CMD, NULL, 0);
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: couldn't perform SW reset: %d\n", __func__, ret);
+            return ret;
+        }
 
         msleep(100);
 
-        // TODO: wait for ready
+
+        // Wait for boot acknowledge
+        ret = ss_wait_for_ack(ts, SS_ACK_BOOT_COMPLETE);
+        if(ret != 0){
+            dev_err(&ts->client->dev, "%s: SW reset failed: %d\n", __func__, ret);
+            return ret;
+        }
 
         // Check that it worked
         boot_status = ss_get_boot_status(ts);
@@ -519,6 +584,19 @@ static int ss_flash_firmware(struct ss_ts_data *ts, struct firmware *fw)
     }
 }
 
+static int ss_enable_sensing(struct ss_ts_data *ts)
+{
+    int ret = 0;
+    ret = ss_write(ts, SS_ENABLE_SENSING_CMD, NULL, 0);
+    if(ret < 0){
+        dev_err(&ts->client->dev, "%s: enabling sensing failed: %d\n", __func__, ret);
+        return ret;
+    }
+    dev_info(&ts->client->dev, "%s: enabled sensing\n", __func__);
+
+    return 0;
+}
+
 static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct ss_ts_data *ts;
@@ -606,6 +684,12 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
         if(error < 0) {
             return error;
         }
+    }
+
+    // Enable sensing
+    error = ss_enable_sensing(ts);
+    if(error < 0) {
+        return error;
     }
 
 	ts->input = devm_input_allocate_device(&client->dev);
