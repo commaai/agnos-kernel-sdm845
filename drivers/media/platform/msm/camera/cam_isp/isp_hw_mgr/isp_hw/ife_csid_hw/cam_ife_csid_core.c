@@ -32,6 +32,7 @@
 /* Timeout values in usec */
 #define CAM_IFE_CSID_TIMEOUT_SLEEP_US                  1000
 #define CAM_IFE_CSID_TIMEOUT_ALL_US                    100000
+static uint32_t current_rst_stb = 0;
 
 /*
  * Constant Factors needed to change QTimer ticks to nanoseconds
@@ -2311,6 +2312,10 @@ static int cam_ife_csid_reset_retain_sw_reg(
 	struct cam_hw_soc_info          *soc_info;
 
 	soc_info = &csid_hw->hw_info->soc_info;
+	if (current_rst_stb == csid_reg->cmn_reg->csid_rst_stb) {
+		return 0;
+	}
+
 	/* clear the top interrupt first */
 	cam_io_w_mb(1, soc_info->reg_map[0].mem_base +
 		csid_reg->cmn_reg->csid_top_irq_clear_addr);
@@ -2435,6 +2440,7 @@ static int cam_ife_csid_deinit_hw(void *hw_priv,
 		return -EINVAL;
 	}
 
+	current_rst_stb = 0;
 	CAM_DBG(CAM_ISP, "Enter");
 	res = (struct cam_isp_resource_node *)deinit_args;
 	csid_hw_info = (struct cam_hw_info  *)hw_priv;
