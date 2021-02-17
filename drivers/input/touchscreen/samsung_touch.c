@@ -24,6 +24,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/firmware.h>
 #include <asm/unaligned.h>
 
 #define SS_I2C_NAME "samsung_i2c_touchpanel"
@@ -43,6 +44,8 @@
 #define SS_BOOT_STATUS_CMD                  0x55
 #define SS_ENTER_FW_MODE_CMD                0x57
 #define SS_CHIP_ID_CMD                      0x52
+#define SS_FLASH_ERASE_CMD                  0xD8
+#define SS_FLASH_WRITE_CMD                  0xD9
 
 /* Touchscreen events */
 #define SS_EVENT_COORDINATE		            0
@@ -62,11 +65,15 @@
 #define SS_BOOT_STATUS_BOOT                 0x10
 #define SS_BOOT_STATUS_APP                  0x20
 #define SS_FIRMWARE                         "samsung_touch.img"
+#define SS_HEADER_SIGNATURE                 0x53494654
+#define SS_CHUNK_SIGNATURE                  0x53434654
+#define SS_PAGE_SIZE                        256
 uint8_t expected_chip_id[3] =               {0xBA, 0xB6, 0x61};
 
 struct ss_ts_data {
 	struct i2c_client *client;
 	struct input_dev *input;
+    struct regulator *vdd;
 
 	struct gpio_desc *interrupt_gpio;
 	struct gpio_desc *reset_gpio;
@@ -74,6 +81,33 @@ struct ss_ts_data {
 
     uint8_t chip_id[3];
 };
+
+/* Firmware header structures */
+typedef struct {
+	uint32_t signature;
+	uint32_t version;
+	uint32_t totalsize;
+	uint32_t checksum;
+	uint32_t img_ver;
+	uint32_t img_date;
+	uint32_t img_description;
+	uint32_t fw_ver;
+	uint32_t fw_date;
+	uint32_t fw_description;
+	uint32_t para_ver;
+	uint32_t para_date;
+	uint32_t para_description;
+	uint32_t num_chunk;
+	uint32_t reserved1;
+	uint32_t reserved2;
+} ss_ts_fw_header;
+
+typedef struct {
+	uint32_t signature;
+	uint32_t addr;
+	uint32_t size;
+	uint32_t reserved;
+} ss_ts_fw_chunk;
 
 /* Event structures */
 struct sec_ts_event_coordinate {
@@ -116,6 +150,22 @@ static int ss_write(struct ss_ts_data *ts, uint8_t command, uint8_t *data, uint8
     ret = i2c_smbus_write_i2c_block_data(ts->client, command, len, data);
     if(ret != 0){
         dev_err(&ts->client->dev, "%s: i2c_smbus_write_i2c_block_data: %d\n", __func__, ret);
+        return ret;
+    }
+    return 0;
+}
+
+// This doesn't have the 32 byte limit
+static int ss_write_bulk(struct ss_ts_data *ts, uint8_t command, uint8_t *data, uint16_t len)
+{
+    int ret;
+    uint8_t buffer[len + 1];
+    buffer[0] = command;
+    memcpy(&buffer[1], data, len);
+
+    ret = i2c_master_send(ts->client, buffer, len + 1);
+    if(ret != (len + 1)){
+        dev_err(&ts->client->dev, "%s: i2c_master_send: %d\n", __func__, ret);
         return ret;
     }
     return 0;
@@ -260,7 +310,7 @@ static void ss_ts_reset(struct ss_ts_data *ts)
 
 static int ss_get_boot_status(struct ss_ts_data *ts)
 {
-    uint8_t ret = 0;
+    int ret = 0;
     uint8_t result[1];
     ret = ss_read(ts, SS_BOOT_STATUS_CMD, result, 1);
     if(ret < 0){
@@ -273,8 +323,8 @@ static int ss_get_boot_status(struct ss_ts_data *ts)
 
 static int ss_enter_boot_mode(struct ss_ts_data *ts)
 {
-    uint8_t ret = 0;
-    uint8_t boot_status = 0;
+    int ret = 0;
+    int boot_status = 0;
     uint8_t firmware_password[2] = {0x55, 0xAC};
     boot_status = ss_get_boot_status(ts);
     if(boot_status < 0) return boot_status;
@@ -300,9 +350,35 @@ static int ss_enter_boot_mode(struct ss_ts_data *ts)
     return 0;
 }
 
+static int ss_exit_boot_mode(struct ss_ts_data *ts)
+{
+    int ret = 0;
+    int boot_status = 0;
+    uint8_t firmware_password[2] = {0x55, 0xAC};
+    boot_status = ss_get_boot_status(ts);
+    if(boot_status < 0) return boot_status;
+
+    if(boot_status != SS_BOOT_STATUS_APP){
+        // TODO: SW reset
+
+        msleep(100);
+
+        // TODO: wait for ready
+
+        // Check that it worked
+        boot_status = ss_get_boot_status(ts);
+        if(boot_status != SS_BOOT_STATUS_APP) {
+            dev_err(&ts->client->dev, "%s: didn't exit fw mode. Boot status: %d\n", __func__, boot_status);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 static int ss_read_chip_id(struct ss_ts_data *ts)
 {
-    uint8_t ret = 0;
+    int ret = 0;
     ret = ss_read(ts, SS_CHIP_ID_CMD, ts->chip_id, 3);
     if(ret < 0){
         dev_err(&ts->client->dev, "%s: reading chip id: %d\n", __func__, ret);
@@ -312,10 +388,141 @@ static int ss_read_chip_id(struct ss_ts_data *ts)
     return 0;
 }
 
+static int ss_power_init(struct ss_ts_data *ts)
+{
+    int ret = 0;
+    ts->vdd = devm_regulator_get(&ts->client->dev, "vdd");
+    if(IS_ERR(ts->vdd)){
+        ret = PTR_ERR(ts->vdd);
+        if(ret == -EPROBE_DEFER){
+            dev_info(&ts->client->dev, "%s: regulator vdd not ready. Deferring probe...\n", __func__);
+        } else {
+            dev_err(&ts->client->dev, "%s: getting regulator vdd: %d\n", __func__, ret);
+        }
+        goto err;
+    }
+
+    // Enabling crashes the kernel.
+    // Not sure why, but it's a fixed regulator which is always enabled anyway
+    //ret = regulator_enable(ts->vdd);
+    if(ret){
+        dev_err(&ts->client->dev, "%s: enabling regulator vdd: %d\n", __func__, ret);
+    }
+err:
+    return ret;
+}
+
+static int ss_erase_pages(struct ss_ts_data *ts, uint32_t start_page, uint32_t len)
+{
+    uint8_t data[4];
+    data[0] = (uint8_t)((start_page >> 8) & 0xFF);
+    data[1] = (uint8_t)(start_page & 0xFF);
+    data[2] = (uint8_t)((len >> 8) & 0xFF);
+    data[3] = (uint8_t)(len & 0xFF);
+
+    dev_info(&ts->client->dev, "%s: erasing pages: 0x%x - 0x%x\n", __func__, start_page, start_page + len);
+    return ss_write(ts, SS_FLASH_ERASE_CMD, data, sizeof(data));
+}
+
+static uint8_t ss_calculate_checksum(uint8_t *data, uint32_t len){
+    uint8_t result = 0;
+    uint32_t i;
+    for(i = 0; i<len; i++){
+        result += data[i];
+    }
+    return result;
+}
+
+static int ss_flash_memory(struct ss_ts_data *ts, uint32_t addr, uint8_t *data, uint32_t len)
+{
+    int ret = 0;
+    uint32_t page_index, data_len, i;
+    uint8_t buf[2 + SS_PAGE_SIZE + 1];
+
+    uint32_t num_pages = (len / SS_PAGE_SIZE) + ((len % SS_PAGE_SIZE) != 0);
+    uint32_t start_page = (addr / SS_PAGE_SIZE);
+    if ((start_page * SS_PAGE_SIZE) != addr) {
+        dev_err(&ts->client->dev, "%s: non-aligned flashing is not supported!\n", __func__);
+        return -EINVAL;
+    }
+
+    ret = ss_erase_pages(ts, start_page, num_pages);
+    if(IS_ERR(ret)){
+        dev_err(&ts->client->dev, "%s: failed to erase pages: %d\n", __func__, ret);
+        goto err;
+    }
+    msleep(100);
+
+    dev_info(&ts->client->dev, "%s: flashing pages: 0x%x - 0x%x\n", __func__, start_page, start_page + num_pages);
+    for(i = 0; i<num_pages; i++){
+        page_index = start_page + i;
+
+        // Set page index
+        buf[0] = (uint8_t)((page_index >> 8) & 0xFF);
+        buf[1] = (uint8_t)(page_index & 0xFF);
+
+        // Append data (zero padded)
+        memset(&buf[2], 0, SS_PAGE_SIZE);
+        data_len = min(SS_PAGE_SIZE, (len - (i * SS_PAGE_SIZE)));
+        memcpy(&buf[2], (data + (i * SS_PAGE_SIZE)), data_len);
+
+        // Append checksum
+        buf[SS_PAGE_SIZE + 2] = ss_calculate_checksum(buf, (SS_PAGE_SIZE + 2));
+
+        // Write the page
+        ret = ss_write_bulk(ts, SS_FLASH_WRITE_CMD, buf, sizeof(buf));
+        if(IS_ERR(ret)){
+            dev_err(&ts->client->dev, "%s: failed to write page %d: %d\n", __func__, page_index, ret);
+            goto err;
+        }
+        msleep(5);
+    }
+    dev_info(&ts->client->dev, "%s: flashed pages: 0x%x - 0x%x\n", __func__, start_page, start_page + num_pages);
+
+err:
+    return ret;
+}
+
+static int ss_flash_firmware(struct ss_ts_data *ts, struct firmware *fw)
+{
+    int ret = 0;
+    uint32_t i;
+    uint8_t *data_ptr = (uint8_t *) fw->data;
+    ss_ts_fw_header *header;
+    ss_ts_fw_chunk *chunk_header;
+
+    // Parse header
+    header = (ss_ts_fw_header *) data_ptr;
+    data_ptr += sizeof(ss_ts_fw_header);
+    if(header->signature != SS_HEADER_SIGNATURE){
+        dev_err(&ts->client->dev, "%s: header signature mismatch\n", __func__);
+        return -ENODATA;
+    }
+
+    for (i = 0; i<header->num_chunk; i++){
+        // Parse chunk
+        chunk_header = (ss_ts_fw_chunk *) data_ptr;
+        data_ptr += sizeof(ss_ts_fw_chunk);
+        if(chunk_header->signature != SS_CHUNK_SIGNATURE){
+            dev_err(&ts->client->dev, "%s: chunk %d signature mismatch\n", __func__, i);
+            return -ENODATA;
+        }
+
+        // Flash chunk
+        ret = ss_flash_memory(ts, chunk_header->addr, data_ptr, chunk_header->size);
+        if(IS_ERR(ret)){
+            return ret;
+        }
+        data_ptr += chunk_header->size;
+
+        // TODO: check that flashed pages match
+    }
+}
+
 static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct ss_ts_data *ts;
-    struct firmware *firmware;
+    struct firmware *fw;
 	int error, boot_status;
 
     dev_info(&client->dev, "SAMSUNG PANEL probe\n");
@@ -326,6 +533,12 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
 	ts->client = client;
 	i2c_set_clientdata(client, ts);
+
+    // Init regulator
+    error = ss_power_init(ts);
+    if(IS_ERR(error)) {
+        return error;
+    }
 
 	ts->interrupt_gpio = devm_gpiod_get(&client->dev, "interrupt", GPIOD_IN);
 	if (IS_ERR(ts->interrupt_gpio)) {
@@ -357,7 +570,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
     // Check that the panel is running in app mode, otherwise flash
     boot_status = ss_get_boot_status(ts);
     if (boot_status != SS_BOOT_STATUS_APP) {
-        dev_info(&client->dev, "Device not in app mode (current mode:). Attempting reflash\n");
+        dev_info(&client->dev, "Device not in app mode (current status: 0x%x). Attempting reflash\n", boot_status);
 
         // Enter boot mode
         error = ss_enter_boot_mode(ts);
@@ -375,13 +588,24 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
         }
 
         // Load firmware
-        error = request_firmware(firmware, SS_FIRMWARE, &client->dev);
+        error = request_firmware(&fw, SS_FIRMWARE, &client->dev);
         if(error < 0){
             dev_err(&client->dev, "firmware request failed: %d\n", error);
             return error;
         }
 
+        // Flash firmware
+        error = ss_flash_firmware(ts, fw);
+        if(error < 0){
+            dev_err(&client->dev, "firmware flash failed: %d\n", error);
+            return error;
+        }
 
+        // Exit boot mode
+        error = ss_exit_boot_mode(ts);
+        if(error < 0) {
+            return error;
+        }
     }
 
 	ts->input = devm_input_allocate_device(&client->dev);
@@ -420,6 +644,9 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 		dev_err(&client->dev, "failed to register input device: %d\n", error);
 		return error;
 	}
+
+    // Handle all events currently stored
+    ss_ts_irq_handler(client->irq, ts);
 
 	return 0;
 }
