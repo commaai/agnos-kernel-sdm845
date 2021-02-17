@@ -73,6 +73,7 @@
     interrupt-gpios = <&tlmm 125 0x2002>;
     reset-gpios = <&tlmm 104 0>;
     ta-gpios = <&tlmm 128 0>;
+    vdd-supply = <&tp3v3>;
   };
 };
 
@@ -151,6 +152,7 @@
 
    gpio = <&pm8998_gpios 10 0>;
    regulator-boot-on;
+   regulator-always-on;
   };
 
   ssd3v3: ssd3v3 {
