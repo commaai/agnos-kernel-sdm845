@@ -280,7 +280,7 @@ static int ss_handle_one_event(struct ss_ts_data *ts, uint8_t *event)
 static irqreturn_t ss_ts_irq_handler(int irq, void *dev_id)
 {
     struct ss_ts_data *ts = dev_id;
-    int ret;
+    int ret, retry_count = 0;
 
     // Keep handling packets until the IRQ pin has gone high again
     uint8_t event[SS_ONE_EVENT_SIZE];
@@ -289,7 +289,14 @@ static irqreturn_t ss_ts_irq_handler(int irq, void *dev_id)
         ret = ss_read(ts, SS_ONE_EVENT_CMD, event, SS_ONE_EVENT_SIZE);
         if(ret < 0){
             dev_err(&ts->client->dev, "%s: reading event failed: %d\n", __func__, ret);
-            return IRQ_HANDLED;
+            if(retry_count < 10){
+                retry_count++;
+                msleep(10);
+                continue;
+            } else {
+                dev_err(&ts->client->dev, "%s: retry count reached\n", __func__);
+                return IRQ_HANDLED;
+            }
         }
 
         // Handle
