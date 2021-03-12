@@ -1382,6 +1382,135 @@ error:
 	return rc;
 }
 
+static ssize_t debugfs_tp_color_read(struct file *file,
+				 char __user *user_buf,
+				 size_t user_len,
+				 loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	char *buf;
+	int rc = 0;
+	size_t len = user_len;
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (!display->panel) {
+		pr_err("invalid panel data\n");
+		return -EINVAL;
+	}
+
+	buf = kzalloc(len, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(buf))
+		return -ENOMEM;
+
+	// Perform command
+	rc = mipi_dsi_dcs_read(&display->panel->mipi_device, 0xDC, buf, 1);
+	pr_info("got color 0x%x\n", buf[0]);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	if (copy_to_user(user_buf, buf, len)) {
+		rc = -EFAULT;
+		goto error;
+	}
+
+	*ppos += len;
+
+error:
+	kfree(buf);
+	return len;
+}
+
+static ssize_t debugfs_oem_read(struct file *file,
+				 char __user *user_buf,
+				 size_t user_len,
+				 loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	char *buf;
+	char param[2];
+	int rc = 0, i;
+	size_t len = min_t(size_t, user_len, 32);
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (!display->panel) {
+		pr_err("invalid panel data\n");
+		return -EINVAL;
+	}
+
+	buf = kzalloc(len, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(buf))
+		return -ENOMEM;
+
+	// Unlock read A
+	param[0] = 0xFF; param[1] = 0x29;
+	rc = mipi_dsi_generic_write(&display->panel->mipi_device, param, 2);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	// Perform read A
+	for(i = 0; i<26; i++){
+		param[0] = (0xc8 + i);
+		rc = mipi_dsi_generic_read(&display->panel->mipi_device, param, 1, (buf + i), 1);
+		if (IS_ERR_VALUE(rc)) {
+			goto error;
+		}
+		pr_info("read 0x%x, got 0x%x\n", param[0], buf[i]);
+	}
+
+	// Unlock read B
+	param[0] = 0xFF; param[1] = 0x23;
+	rc = mipi_dsi_generic_write(&display->panel->mipi_device, param, 2);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	// Perform read B
+	for(i = 0; i<5; i++){
+		param[0] = (0xf0 + i);
+		rc = mipi_dsi_generic_read(&display->panel->mipi_device, param, 1, (buf + 26 + i), 1);
+		if (IS_ERR_VALUE(rc)) {
+			goto error;
+		}
+		pr_info("read 0x%x, got 0x%x\n", param[0], buf[i + 26]);
+	}
+	param[0] = 0xd5;
+	rc = mipi_dsi_generic_read(&display->panel->mipi_device, param, 1, (buf + 31), 1);
+	pr_info("read 0x%x, got 0x%x\n", param[0], buf[31]);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	// Back to User
+	param[0] = 0xFF; param[1] = 0x10;
+	rc = mipi_dsi_generic_write(&display->panel->mipi_device, param, 2);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	if (copy_to_user(user_buf, buf, len)) {
+		rc = -EFAULT;
+		goto error;
+	}
+
+	*ppos += len;
+
+error:
+	kfree(buf);
+	return len;
+}
+
 static const struct file_operations dump_info_fops = {
 	.open = simple_open,
 	.read = debugfs_dump_info_read,
@@ -1410,10 +1539,20 @@ static const struct file_operations mipi_command_fops = {
 	.write = debugfs_mipi_command_write,
 };
 
+static const struct file_operations tp_color_fops = {
+	.open = simple_open,
+	.read = debugfs_tp_color_read,
+};
+
+static const struct file_operations oem_fops = {
+	.open = simple_open,
+	.read = debugfs_oem_read,
+};
+
 static int dsi_display_debugfs_init(struct dsi_display *display)
 {
 	int rc = 0;
-	struct dentry *dir, *dump_file, *misr_data, *mipi_command;
+	struct dentry *dir, *dump_file, *misr_data, *mipi_command, *tp_color, *oem;
 	char name[MAX_NAME_SIZE];
 	int i;
 
@@ -1481,6 +1620,30 @@ static int dsi_display_debugfs_init(struct dsi_display *display)
 	if (IS_ERR_OR_NULL(mipi_command)) {
 		rc = PTR_ERR(mipi_command);
 		pr_err("[%s] debugfs create mipi command failed, rc=%d\n",
+		       display->name, rc);
+		goto error_remove_dir;
+	}
+
+	tp_color = debugfs_create_file("tp_color",
+					0600,
+					dir,
+					display,
+					&tp_color_fops);
+	if (IS_ERR_OR_NULL(tp_color)) {
+		rc = PTR_ERR(tp_color);
+		pr_err("[%s] debugfs create tp_color failed, rc=%d\n",
+		       display->name, rc);
+		goto error_remove_dir;
+	}
+
+	oem = debugfs_create_file("oem",
+					0600,
+					dir,
+					display,
+					&oem_fops);
+	if (IS_ERR_OR_NULL(oem)) {
+		rc = PTR_ERR(oem);
+		pr_err("[%s] debugfs create oem failed, rc=%d\n",
 		       display->name, rc);
 		goto error_remove_dir;
 	}
