@@ -350,7 +350,7 @@ int mipi_dsi_detach(struct mipi_dsi_device *dsi)
 }
 EXPORT_SYMBOL(mipi_dsi_detach);
 
-static ssize_t mipi_dsi_device_transfer(struct mipi_dsi_device *dsi,
+ssize_t mipi_dsi_device_transfer(struct mipi_dsi_device *dsi,
 					struct mipi_dsi_msg *msg)
 {
 	const struct mipi_dsi_host_ops *ops = dsi->host->ops;
@@ -364,6 +364,7 @@ static ssize_t mipi_dsi_device_transfer(struct mipi_dsi_device *dsi,
 
 	return ops->transfer(dsi->host, msg);
 }
+EXPORT_SYMBOL(mipi_dsi_device_transfer);
 
 /**
  * mipi_dsi_packet_format_is_short - check if a packet is of the short format
