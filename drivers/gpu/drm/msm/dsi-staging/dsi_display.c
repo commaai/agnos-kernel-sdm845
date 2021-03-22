@@ -1393,7 +1393,7 @@ static ssize_t debugfs_tp_color_read(struct file *file,
 	char *buf;
 	char param[1];
 	int rc = 0;
-	size_t len = user_len;
+	size_t len = min_t(size_t, user_len, 1);
 
 	if (!display)
 		return -ENODEV;
@@ -3111,7 +3111,7 @@ static ssize_t dsi_host_transfer(struct mipi_dsi_host *host,
 			flags_local |= DSI_CTRL_CMD_READ;
 
 		rc = dsi_ctrl_cmd_transfer(display->ctrl[ctrl_idx].ctrl, msg, flags_local);
-		if (rc) {
+		if (rc < 0) {
 			pr_err("[%s] cmd transfer failed, rc=%d\n",
 			       display->name, rc);
 			goto error_disable_cmd_engine;
