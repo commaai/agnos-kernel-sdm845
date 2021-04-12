@@ -122,7 +122,7 @@
 					39 01 00 00 00 00 03 51 00 01
 					39 01 00 00 01 00 02 53 23];
 				qcom,mdss-dsi-nolp-command = [
-					39 01 00 00 00 00 02 53 25];	
+					39 01 00 00 00 00 02 53 25];
 				qcom,mdss-dsi-doze-hbm-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-doze-lbm-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-nolp-command-state = "dsi_lp_mode";
@@ -139,6 +139,11 @@
 				qcom,mdss-dsi-dispparam-hbm-on-command = [39 01 00 00 00 00 02 53 e0];
 				qcom,mdss-dsi-dispparam-hbm-on-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-h-sync-pulse = <0>;
+
+				qcom,mdss-dsi-displayon-command = [05 01 00 00 14 00 02 29 00];
+				qcom,mdss-dsi-displayon-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-displayoff-command = [05 01 00 00 16 00 02 28 00];
+				qcom,mdss-dsi-displayoff-command-state = "dsi_lp_mode";
 			};
 		};
 	};

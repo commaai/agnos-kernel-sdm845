@@ -190,6 +190,7 @@ struct dsi_panel {
 	bool sync_broadcast_en;
 
 	u32 last_bl_lvl;
+	bool dsi_panel_off_mode;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)
@@ -270,6 +271,8 @@ int dsi_panel_unprepare(struct dsi_panel *panel);
 int dsi_panel_post_unprepare(struct dsi_panel *panel);
 
 int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl);
+
+int dsi_panel_set_display_power(struct dsi_panel *panel, bool on);
 
 int dsi_panel_update_pps(struct dsi_panel *panel);
 

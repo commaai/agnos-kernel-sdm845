@@ -661,7 +661,8 @@ static void dsi_panel_offon_mode_control(struct dsi_panel *panel, u32 bl_lvl)
 			if (!panel->dsi_panel_off_mode) {
 				pr_debug("%s: set display off when bl_level=0\n", __func__);
 				panel->dsi_panel_off_mode = true;
-				panel_disp_param_send_lock(panel, DISPLAY_OFF_MODE);
+
+				dsi_panel_set_display_power(panel, false);
 			}
 		}
 	} else {
@@ -669,7 +670,7 @@ static void dsi_panel_offon_mode_control(struct dsi_panel *panel, u32 bl_lvl)
 			pr_debug("%s: set display on when last_bl_lvl=0\n", __func__);
 			panel->dsi_panel_off_mode = false;
 
-			panel_disp_param_send_lock(panel, DISPLAY_ON_MODE);
+			dsi_panel_set_display_power(panel, true);
 		}
 	}
 
@@ -699,6 +700,27 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 
 	panel->last_bl_lvl = bl_lvl;
 
+	return rc;
+}
+
+int dsi_panel_set_display_power(struct dsi_panel *panel, bool on)
+{
+	int rc = 0;
+
+	if (!panel) {
+		pr_err("invalid params\n");
+		return -EINVAL;
+	}
+
+	if (panel->type == EXT_BRIDGE)
+		return 0;
+
+	mutex_lock(&panel->panel_lock);
+	rc = dsi_panel_tx_cmd_set(panel, on ? DSI_CMD_SET_DISP_ON_MODE : DSI_CMD_SET_DISP_OFF_MODE);
+	if (rc)
+		pr_err("[%s] failed to set display power, rc=%d\n",
+		       panel->name, rc);
+	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
 
@@ -1503,6 +1525,8 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command",
 	"qcom,mdss-dsi-post-mode-switch-on-command",
+	"qcom,mdss-dsi-displayon-command",
+	"qcom,mdss-dsi-displayoff-command",
 };
 
 const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
@@ -1527,6 +1551,8 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command-state",
 	"qcom,mdss-dsi-post-mode-switch-on-command-state",
+	"qcom,mdss-dsi-displayon-command-state",
+	"qcom,mdss-dsi-displayff-command-state",
 };
 
 static int dsi_panel_get_cmd_pkt_count(const char *data, u32 length, u32 *cnt)
