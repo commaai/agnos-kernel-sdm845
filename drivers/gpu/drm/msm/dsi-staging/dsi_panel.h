@@ -188,6 +188,8 @@ struct dsi_panel {
 	enum dsi_dms_mode dms_mode;
 
 	bool sync_broadcast_en;
+
+	u32 last_bl_lvl;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)

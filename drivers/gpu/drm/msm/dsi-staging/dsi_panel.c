@@ -651,10 +651,37 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 	return rc;
 }
 
+static void dsi_panel_offon_mode_control(struct dsi_panel *panel, u32 bl_lvl)
+{
+	struct dsi_backlight_config *bl = &panel->bl_config;
+	int ret;
+
+	if (bl_lvl == 0) {
+		if (panel->last_bl_lvl != 0) {
+			if (!panel->dsi_panel_off_mode) {
+				pr_debug("%s: set display off when bl_level=0\n", __func__);
+				panel->dsi_panel_off_mode = true;
+				panel_disp_param_send_lock(panel, DISPLAY_OFF_MODE);
+			}
+		}
+	} else {
+		if (panel->last_bl_lvl == 0 && panel->dsi_panel_off_mode == true) {
+			pr_debug("%s: set display on when last_bl_lvl=0\n", __func__);
+			panel->dsi_panel_off_mode = false;
+
+			panel_disp_param_send_lock(panel, DISPLAY_ON_MODE);
+		}
+	}
+
+	return;
+}
+
 int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 {
 	int rc = 0;
 	struct dsi_backlight_config *bl = &panel->bl_config;
+
+  dsi_panel_offon_mode_control(panel, bl_lvl);
 
 	pr_debug("backlight type:%d lvl:%d\n", bl->type, bl_lvl);
 	switch (bl->type) {
@@ -669,6 +696,8 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		rc = -ENOTSUPP;
 		break;
 	}
+
+	panel->last_bl_lvl = bl_lvl;
 
 	return rc;
 }
