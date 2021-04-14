@@ -50,6 +50,7 @@
 #define SS_SW_RESET_APP_CMD                 0x12
 #define SS_SW_RESET_BOOT_CMD                0x42
 #define SS_ENABLE_SENSING_CMD               0x10
+#define SS_NVM_CMD                          0x85
 
 /* Touchscreen events */
 #define SS_EVENT_COORDINATE		            0
@@ -76,6 +77,9 @@
 #define SS_CHUNK_SIGNATURE                  0x53434654
 #define SS_PAGE_SIZE                        256
 #define SS_PROTOCOL_APP                     0x1
+#define SS_COLOR_CAL_OFFSET                 0x20
+#define SS_COLOR_CAL_SIZE                   ((9*2) + 1) // 3x3 matrix of float16s + 1 checksum byte
+#define SS_COLOR_CAL_MAGIC                  0xC0
 uint8_t expected_chip_id[3] =               {0xBA, 0xB6, 0x61};
 
 struct ss_ts_data {
@@ -604,6 +608,90 @@ static int ss_enable_sensing(struct ss_ts_data *ts)
     return 0;
 }
 
+static char ss_color_cal_calculate_checksum(char *dat)
+{
+    int i = 0;
+    char res = SS_COLOR_CAL_MAGIC;
+    for(i = 0; i < SS_COLOR_CAL_SIZE - 1; i++){
+        res += dat[i];
+    }
+    return res;
+}
+
+static ssize_t ss_color_cal_read(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    int ret = 0;
+    struct ss_ts_data *ts = dev_get_drvdata(dev);
+    char data[SS_COLOR_CAL_SIZE];
+    char checksum;
+
+    data[0] = SS_COLOR_CAL_OFFSET;
+    data[1] = SS_COLOR_CAL_SIZE - 1;
+    ret = ss_write(ts, SS_NVM_CMD, data, 2);
+    if(ret < 0){
+        dev_err(&ts->client->dev, "%s: writing NVM command failed: %d\n", __func__, ret);
+        return ret;
+    }
+
+    msleep(50);
+
+    ret = ss_read(ts, SS_NVM_CMD, data, SS_COLOR_CAL_SIZE);
+    if(ret < 0){
+        dev_err(&ts->client->dev, "%s: reading NVM command failed: %d\n", __func__, ret);
+        return ret;
+    }
+
+    // Make sure checksum is correct
+    checksum = ss_color_cal_calculate_checksum(data);
+    if(checksum != data[SS_COLOR_CAL_SIZE - 1]){
+        dev_err(&ts->client->dev, "%s: checksum 0x%x did not match expected 0x%x\n", __func__, data[SS_COLOR_CAL_SIZE - 1], checksum);
+        return -ENODATA;
+    }
+
+    memcpy(buf, data, SS_COLOR_CAL_SIZE);
+    return SS_COLOR_CAL_SIZE;
+}
+
+static ssize_t ss_color_cal_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+    int ret = 0;
+    struct ss_ts_data *ts = dev_get_drvdata(dev);
+    char data[SS_COLOR_CAL_SIZE + 2];
+
+    if(size != SS_COLOR_CAL_SIZE){
+        dev_err(&ts->client->dev, "%s: expected data of length %d, got length %d\n", __func__, SS_COLOR_CAL_SIZE, size);
+        return -EINVAL;
+    }
+
+    if(ss_color_cal_calculate_checksum(buf) != buf[SS_COLOR_CAL_SIZE - 1]){
+        dev_err(&ts->client->dev, "%s: wrong checksum value\n", __func__);
+        return -EINVAL;
+    }
+
+    data[0] = SS_COLOR_CAL_OFFSET;
+    data[1] = SS_COLOR_CAL_SIZE - 1;
+    memcpy(&data[2], buf, SS_COLOR_CAL_SIZE);
+    ret = ss_write(ts, SS_NVM_CMD, data, SS_COLOR_CAL_SIZE + 2);
+    if(ret < 0){
+        dev_err(&ts->client->dev, "%s: writing NVM command failed: %d\n", __func__, ret);
+        return ret;
+    }
+
+    dev_info(&ts->client->dev, "%s: color cal succesfully written!\n", __func__);
+    return size;
+}
+
+static DEVICE_ATTR(color_cal, 0664, ss_color_cal_read, ss_color_cal_store);
+
+static struct attribute *ss_attributes[] = {
+    &dev_attr_color_cal.attr,
+    NULL
+};
+
+static const struct attribute_group ss_attr_group = {
+    .attrs = ss_attributes,
+};
+
 static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct ss_ts_data *ts;
@@ -739,12 +827,20 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
     // Handle all events currently stored
     ss_ts_irq_handler(client->irq, ts);
 
+    // Init sysfs
+    error = sysfs_create_group(&client->dev.kobj, &ss_attr_group);
+    if (error) {
+        dev_err(&client->dev, "failed to create sysfs group: %d\n", error);
+		return error;
+    }
+
 	return 0;
 }
 
 static int ss_ts_remove(struct i2c_client *client)
 {
     dev_info(&client->dev, "SAMSUNG PANEL remove\n");
+    sysfs_remove_group(&client->dev.kobj, &ss_attr_group);
 	return 0;
 }
 
