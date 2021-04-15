@@ -78,7 +78,7 @@
 #define SS_PAGE_SIZE                        256
 #define SS_PROTOCOL_APP                     0x1
 #define SS_COLOR_CAL_OFFSET                 0x20
-#define SS_COLOR_CAL_SIZE                   ((9*2) + 1) // 3x3 matrix of float16s + 1 checksum byte
+#define SS_COLOR_CAL_SIZE                   ((15*2) + 1) // 15 float16s + 1 checksum byte
 #define SS_COLOR_CAL_MAGIC                  0xC0
 uint8_t expected_chip_id[3] =               {0xBA, 0xB6, 0x61};
 
@@ -654,7 +654,7 @@ static ssize_t ss_color_cal_read(struct device *dev, struct device_attribute *at
 
 static ssize_t ss_color_cal_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
 {
-    int ret = 0;
+    int ret = 0, i, write_size, block_size;
     struct ss_ts_data *ts = dev_get_drvdata(dev);
     char data[SS_COLOR_CAL_SIZE + 2];
 
@@ -668,13 +668,17 @@ static ssize_t ss_color_cal_store(struct device *dev, struct device_attribute *a
         return -EINVAL;
     }
 
-    data[0] = SS_COLOR_CAL_OFFSET;
-    data[1] = SS_COLOR_CAL_SIZE - 1;
-    memcpy(&data[2], buf, SS_COLOR_CAL_SIZE);
-    ret = ss_write(ts, SS_NVM_CMD, data, SS_COLOR_CAL_SIZE + 2);
-    if(ret < 0){
-        dev_err(&ts->client->dev, "%s: writing NVM command failed: %d\n", __func__, ret);
-        return ret;
+    block_size = I2C_SMBUS_BLOCK_MAX - 2;
+    for(i=0; i<=((SS_COLOR_CAL_SIZE - 1) / block_size); i++) {
+        write_size = min(SS_COLOR_CAL_SIZE - (i * block_size), block_size);
+        data[0] = SS_COLOR_CAL_OFFSET + (i * block_size);
+        data[1] = write_size - 1;
+        memcpy(&data[2], buf + (i * block_size), write_size);
+        ret = ss_write(ts, SS_NVM_CMD, data, write_size + 2);
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: writing NVM command failed: %d\n", __func__, ret);
+            return ret;
+        }
     }
 
     dev_info(&ts->client->dev, "%s: color cal succesfully written!\n", __func__);
