@@ -140,7 +140,6 @@
 
     gpio = <&pm8998_gpios 13 0>;
     regulator-boot-on;
-    // regulator-always-on;
   };
 
   tp3v3: tp3v3 {
@@ -473,15 +472,15 @@
 			qcom,supply-disable-load = <80>;
 			qcom,supply-post-on-sleep = <20>;
 		};
-    qcom,panel-supply-entry@1 {
-      reg = <1>;
-      qcom,supply-name = "vddcore";
-      qcom,supply-min-voltage = <3300000>;
-      qcom,supply-max-voltage = <3300000>;
-      qcom,supply-enable-load = <0>;
-      qcom,supply-disable-load = <0>;
-      qcom,supply-post-on-sleep = <0>;
-    };
+		qcom,panel-supply-entry@1 {
+			reg = <1>;
+			qcom,supply-name = "vddcore";
+			qcom,supply-min-voltage = <3300000>;
+			qcom,supply-max-voltage = <3300000>;
+			qcom,supply-enable-load = <0>;
+			qcom,supply-disable-load = <0>;
+			qcom,supply-post-on-sleep = <0>;
+		};
 	};
 
   dsi_ss_ea8074_fhd_cmd_display: qcom,dsi-display@0 {
