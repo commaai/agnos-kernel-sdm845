@@ -128,8 +128,18 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 	panel = dsi_display->panel;
 
 	mutex_lock(&panel->panel_lock);
+
 	if (!dsi_panel_initialized(panel)) {
-		rc = -EINVAL;
+		if (bl_lvl == 0) {
+			pr_err("Turning off panel power\n");
+			dsi_panel_power_off(panel);
+		} else if (bl_lvl == 1023){
+			pr_err("Turning on panel power\n");
+			dsi_panel_power_on(panel);
+		} else {
+			rc = -EINVAL;
+		}
+
 		goto error;
 	}
 
