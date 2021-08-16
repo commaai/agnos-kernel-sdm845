@@ -165,7 +165,6 @@
 
     gpio = <&tlmm 41 0>;
     enable-active-high;
-    regulator-always-on;
   };
 };
 
