@@ -4457,6 +4457,12 @@ static void smblib_handle_typec_cc_state_change(struct smb_charger *chg)
 		return;
 
 	typec_mode = smblib_get_prop_typec_mode(chg);
+
+	// COMMA HACK to always get an FP when an external panda is connected
+	if (typec_mode == POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) {
+		typec_mode = POWER_SUPPLY_TYPEC_SINK;
+	}
+
 	if (chg->typec_present && (typec_mode != chg->typec_mode))
 		smblib_handle_rp_change(chg, typec_mode);
 
