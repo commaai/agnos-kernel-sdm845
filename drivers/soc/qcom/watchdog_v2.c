@@ -335,6 +335,27 @@ static ssize_t wdog_user_pet_enabled_set(struct device *dev,
 static DEVICE_ATTR(user_pet_enabled, S_IWUSR | S_IRUSR,
 		wdog_user_pet_enabled_get, wdog_user_pet_enabled_set);
 
+static ssize_t wdog_user_trigger_get(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", 0);
+}
+
+static ssize_t wdog_user_trigger_set(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+
+	struct msm_watchdog_data *wdog_dd = dev_get_drvdata(dev);
+	dev_err(wdog_dd->dev, "user trigger!\n");
+	msm_trigger_wdog_bite();
+	return count;
+}
+
+static DEVICE_ATTR(user_trigger, S_IWUSR | S_IRUSR,
+		wdog_user_trigger_get, wdog_user_trigger_set);
+
+
 static ssize_t wdog_pet_time_get(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
@@ -483,6 +504,7 @@ static int msm_watchdog_remove(struct platform_device *pdev)
 
 	mutex_unlock(&wdog_dd->disable_lock);
 	device_remove_file(wdog_dd->dev, &dev_attr_disable);
+	device_remove_file(wdog_dd->dev, &dev_attr_user_trigger);
 	if (wdog_dd->irq_ppi)
 		free_percpu(wdog_dd->wdog_cpu_dd);
 	dev_info(wdog_dd->dev, "MSM Watchdog Exit - Deactivated\n");
@@ -669,6 +691,7 @@ static int init_watchdog_sysfs(struct msm_watchdog_data *wdog_dd)
 	int error = 0;
 
 	error |= device_create_file(wdog_dd->dev, &dev_attr_disable);
+	error |= device_create_file(wdog_dd->dev, &dev_attr_user_trigger);
 
 	if (of_property_read_bool(wdog_dd->dev->of_node,
 					"qcom,userspace-watchdog")) {
