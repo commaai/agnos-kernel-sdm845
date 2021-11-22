@@ -26,20 +26,6 @@
 		//vin-supply = <&pm8998_s3>;
 	};
 
-	camera_ldo: gpio-regulator@2 {
-		compatible = "regulator-fixed";
-		reg = <0x02 0x00>;
-		regulator-name = "camera_ldo";
-		regulator-min-microvolt = <1050000>;
-		regulator-max-microvolt = <1050000>;
-		regulator-enable-ramp-delay = <233>;
-		enable-active-high;
-		gpio = <&pm8998_gpios 9 0>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&camera_dvdd_en_default>;
-		//vin-supply = <&pm8998_s3>;
-	};
-
 	camera_vana_ldo: gpio-regulator@4 {
 		compatible = "regulator-fixed";
 		reg = <0x04 0x00>;
@@ -201,7 +187,7 @@
 		sensor-position-yaw = <0>;
 		cam_vio-supply = <&pm8998_lvs1>;
 		cam_vana-supply = <&camera_vana_ldo>;
-		cam_vdig-supply = <&camera_ldo>;
+		cam_vdig-supply = <&camera_rear_ldo>;
 		cam_clk-supply = <&titan_top_gdsc>;
 		regulator-names = "cam_vio", "cam_vana", "cam_vdig", "cam_clk";
 		rgltr-cntrl-support;

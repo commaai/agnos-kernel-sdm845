@@ -18,6 +18,8 @@
 		compatible = "qcom,pci-msm";
 		cell-index = <0>;
 
+		status = "disabled";
+
 		reg = <0x1c00000 0x2000>,
 		      <0x1c06000 0x1000>,
 		      <0x60000000 0xf1d>,
@@ -467,7 +469,9 @@
 			&pcie1_wake_default>;
 
 		perst-gpio = <&tlmm 102 0>;
-		/*wake-gpio = <&tlmm 104 0>;*/
+		wake-gpio = <&tlmm 11 0>;
+		clkreq-gpio = <&tlmm 103 0>;
+		qcom,clk-power-manage-en;
 
 		gdsc-vdd-supply = <&pcie_1_gdsc>;
 		vreg-1.8-supply = <&pm8998_l26>;
@@ -483,7 +487,7 @@
 
 		qcom,l1-supported;
 		qcom,l1ss-supported;
-		qcom,aux-clk-sync;
+		// qcom,aux-clk-sync;
 
 		qcom,ep-latency = <10>;
 
@@ -500,7 +504,7 @@
 
 		qcom,max-link-speed = <0x3>;
 
-		qcom,use-19p2mhz-aux-clk;
+		// qcom,use-19p2mhz-aux-clk;
 
 		qcom,smmu-sid-base = <0x1c00>;
 

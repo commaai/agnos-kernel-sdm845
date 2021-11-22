@@ -2989,6 +2989,54 @@ static void msm_pcie_vreg_deinit(struct msm_pcie_dev_t *dev)
 	PCIE_DBG(dev, "RC%d: exit\n", dev->rc_idx);
 }
 
+struct clk_core {
+	const char		*name;
+	const struct clk_ops	*ops;
+	struct clk_hw		*hw;
+	struct module		*owner;
+	struct clk_core		*parent;
+	const char		**parent_names;
+	struct clk_core		**parents;
+	u8			num_parents;
+	u8			new_parent_index;
+	unsigned long		rate;
+	unsigned long		req_rate;
+	unsigned long		new_rate;
+	struct clk_core		*new_parent;
+	struct clk_core		*new_child;
+	unsigned long		flags;
+	bool			orphan;
+	unsigned int		enable_count;
+	unsigned int		prepare_count;
+	bool			need_handoff_enable;
+	bool			need_handoff_prepare;
+	unsigned long		min_rate;
+	unsigned long		max_rate;
+	unsigned long		accuracy;
+	int			phase;
+	struct hlist_head	children;
+	struct hlist_node	child_node;
+	struct hlist_head	clks;
+	unsigned int		notifier_count;
+#ifdef CONFIG_DEBUG_FS
+	struct dentry		*dentry;
+	struct hlist_node	debug_node;
+#endif
+	struct kref		ref;
+	struct clk_vdd_class	*vdd_class;
+	unsigned long		*rate_max;
+	int			num_rate_max;
+};
+
+struct clk {
+	struct clk_core	*core;
+	const char *dev_id;
+	const char *con_id;
+	unsigned long min_rate;
+	unsigned long max_rate;
+	struct hlist_node clks_node;
+};
+
 static int msm_pcie_clk_init(struct msm_pcie_dev_t *dev)
 {
 	int i, rc = 0;
@@ -3054,6 +3102,7 @@ static int msm_pcie_clk_init(struct msm_pcie_dev_t *dev)
 				dev->rc_idx, info->name);
 		}
 
+		printk("COMMA: enabling clock %s, flags: %lld enable cnt: %d\n", info->name, info->hdl->core->flags, info->hdl->core->enable_count);
 		rc = clk_prepare_enable(info->hdl);
 
 		if (rc)
@@ -3074,10 +3123,11 @@ static int msm_pcie_clk_init(struct msm_pcie_dev_t *dev)
 				clk_disable_unprepare(hdl);
 		}
 
-		if (dev->gdsc_smmu)
+		if (dev->gdsc_smmu != NULL && !IS_ERR(dev->gdsc_smmu))
 			regulator_disable(dev->gdsc_smmu);
 
-		regulator_disable(dev->gdsc);
+		if (dev->gdsc != NULL && !IS_ERR(dev->gdsc))
+			regulator_disable(dev->gdsc);
 	}
 
 	for (i = 0; i < MSM_PCIE_MAX_RESET; i++) {
@@ -3120,9 +3170,12 @@ static void msm_pcie_clk_deinit(struct msm_pcie_dev_t *dev)
 
 	PCIE_DBG(dev, "RC%d: entry\n", dev->rc_idx);
 
-	for (i = 0; i < MSM_PCIE_MAX_CLK; i++)
-		if (dev->clk[i].hdl)
+	for (i = MSM_PCIE_MAX_CLK - 1; i >= 0; i--)
+		if (dev->clk[i].hdl && !IS_ERR(dev->clk[i].hdl)){
+
+			printk("COMMA: Disabling clock %s, flags: %lld enable cnt: %d\n", dev->clk[i].name, dev->clk[i].hdl->core->flags, dev->clk[i].hdl->core->enable_count);
 			clk_disable_unprepare(dev->clk[i].hdl);
+		}
 
 	if (dev->bus_client) {
 		PCIE_DBG(dev, "PCIe: removing bus vote for RC%d\n",
@@ -3139,10 +3192,11 @@ static void msm_pcie_clk_deinit(struct msm_pcie_dev_t *dev)
 				dev->rc_idx);
 	}
 
-	if (dev->gdsc_smmu)
+	if (dev->gdsc_smmu && !IS_ERR(dev->gdsc_smmu))
 		regulator_disable(dev->gdsc_smmu);
 
-	regulator_disable(dev->gdsc);
+	if (dev->gdsc && !IS_ERR(dev->gdsc))
+		regulator_disable(dev->gdsc);
 
 	PCIE_DBG(dev, "RC%d: exit\n", dev->rc_idx);
 }
@@ -3238,7 +3292,7 @@ static void msm_pcie_pipe_clk_deinit(struct msm_pcie_dev_t *dev)
 	PCIE_DBG(dev, "RC%d: entry\n", dev->rc_idx);
 
 	for (i = 0; i < MSM_PCIE_MAX_PIPE_CLK; i++)
-		if (dev->pipeclk[i].hdl)
+		if (!IS_ERR(dev->pipeclk[i].hdl))
 			clk_disable_unprepare(
 				dev->pipeclk[i].hdl);
 
@@ -6117,6 +6171,7 @@ static int msm_pcie_remove(struct platform_device *pdev)
 		PCIE_GEN_DBG("%s: RC index is 0x%x.", __func__, rc_idx);
 	}
 
+	msm_pcie_disable(&msm_pcie_dev[rc_idx], PM_ALL);
 	msm_pcie_irq_deinit(&msm_pcie_dev[rc_idx]);
 	msm_pcie_vreg_deinit(&msm_pcie_dev[rc_idx]);
 	msm_pcie_clk_deinit(&msm_pcie_dev[rc_idx]);

@@ -373,11 +373,12 @@
 				mux {
 					pins = "gpio103";
 					function = "pci_e1";
+					//function = "gpio";
 				};
 
 				config {
 					pins = "gpio103";
-					drive-strength = <2>;
+					drive-strength = <8>;
 					bias-pull-up;
 				};
 			};
@@ -397,14 +398,14 @@
 
 			pcie1_wake_default: pcie1_wake_default {
 				mux {
-					pins = "gpio104";
+					pins = "gpio11";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio104";
+					pins = "gpio11";
 					drive-strength = <2>;
-					bias-pull-down;
+					bias-pull-up;
 				};
 			};
 		};
@@ -3790,15 +3791,6 @@
 	led_wifi {
 		led_wifi_default: led_wifi_default {
 			pins = "gpio9";
-			function = "normal";
-			power-source = <0>;
-			output-low;
-		};
-	};
-
-	camera_dvdd_en {
-		camera_dvdd_en_default: camera_dvdd_en_default {
-			pins = "gpio11";
 			function = "normal";
 			power-source = <0>;
 			output-low;
