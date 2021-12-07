@@ -129,6 +129,8 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 
 	mutex_lock(&panel->panel_lock);
 
+  bl_lvl = clamp(bl_lvl, 0, panel->bl_config.bl_max_level);
+
 	if (!dsi_panel_initialized(panel)) {
 		if (bl_lvl == 0) {
 			pr_err("Turning off panel power\n");
@@ -4327,8 +4329,73 @@ static DEVICE_ATTR(dynamic_dsi_clock, 0644,
 			sysfs_dynamic_dsi_clk_read,
 			sysfs_dynamic_dsi_clk_write);
 
+static ssize_t sysfs_clipped_brightness_read(struct device *dev,
+  struct device_attribute *attr, char *buf)
+{
+  return -1;
+}
+
+static ssize_t sysfs_clipped_brightness_write(struct device *dev,
+  struct device_attribute *attr, const char *buf, size_t count)
+{
+  int rc = 0;
+  int input_brightness;
+  u32 bl_level;
+  u32 clamped_brightness;
+  struct dsi_display *display;
+  struct dsi_panel *panel;
+
+  const int min_brightness = 100;
+  const int max_brightness = 1024;
+
+  display = dev_get_drvdata(dev);
+  if (!display) {
+    pr_err("Invalid display\n");
+    return -EINVAL;
+  }
+
+  panel = display->panel;
+  if (!panel) {
+    pr_err("Invalid panel\n");
+    return -EINVAL;
+  }
+
+  rc = kstrtoint(buf, 10, &input_brightness);
+  if (rc) {
+    pr_err("%s: kstrtoint failed. rc=%d\n", __func__, rc);
+    return rc;
+  }
+
+  clamped_brightness = (u32)clamp(input_brightness, min_brightness, max_brightness);
+  if (clamped_brightness != input_brightness) {
+    pr_err("%s: clipped brightness must be in the range %d-%d\n", __func__, min_brightness, max_brightness);
+    return -EINVAL;
+  }
+
+  pr_err("got brightness %d clamped to %d\n", input_brightness, clamped_brightness);
+
+  mutex_lock(&panel->panel_lock);
+
+  bl_level = panel->bl_config.bl_level;
+  panel->bl_config.bl_max_level = clamped_brightness;
+
+  mutex_unlock(&panel->panel_lock);
+
+  if (bl_level > clamped_brightness) {
+    dsi_display_set_backlight(display, bl_level);
+  }
+
+  return count;
+}
+
+static DEVICE_ATTR(clipped_brightness, 0644,
+      sysfs_clipped_brightness_read,
+      sysfs_clipped_brightness_write);
+
+
 static struct attribute *dynamic_dsi_clock_fs_attrs[] = {
 	&dev_attr_dynamic_dsi_clock.attr,
+	&dev_attr_clipped_brightness.attr,
 	NULL,
 };
 static struct attribute_group dynamic_dsi_clock_fs_attrs_group = {
