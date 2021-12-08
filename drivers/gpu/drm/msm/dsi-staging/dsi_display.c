@@ -4372,8 +4372,6 @@ static ssize_t sysfs_clipped_brightness_write(struct device *dev,
     return -EINVAL;
   }
 
-  pr_err("got brightness %d clamped to %d\n", input_brightness, clamped_brightness);
-
   mutex_lock(&panel->panel_lock);
 
   bl_level = panel->bl_config.bl_level;
