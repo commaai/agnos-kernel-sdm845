@@ -119,6 +119,7 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 	struct dsi_display *dsi_display = display;
 	struct dsi_panel *panel;
 	u32 bl_scale, bl_scale_ad;
+	u32 max_brightness;
 	u64 bl_temp;
 	int rc = 0;
 
@@ -129,7 +130,8 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 
 	mutex_lock(&panel->panel_lock);
 
-  bl_lvl = clamp(bl_lvl, 0, panel->bl_config.bl_max_level);
+	max_brightness = panel->bl_config.bl_max_level * dsi_display->max_brightness_percent / 100;
+	bl_lvl = clamp(bl_lvl, 0, max_brightness);
 
 	if (!dsi_panel_initialized(panel)) {
 		if (bl_lvl == 0) {
@@ -4329,24 +4331,24 @@ static DEVICE_ATTR(dynamic_dsi_clock, 0644,
 			sysfs_dynamic_dsi_clk_read,
 			sysfs_dynamic_dsi_clk_write);
 
-static ssize_t sysfs_clipped_brightness_read(struct device *dev,
+static ssize_t sysfs_max_brightness_percent_read(struct device *dev,
   struct device_attribute *attr, char *buf)
 {
   return -1;
 }
 
-static ssize_t sysfs_clipped_brightness_write(struct device *dev,
+static ssize_t sysfs_max_brightness_percent_write(struct device *dev,
   struct device_attribute *attr, const char *buf, size_t count)
 {
   int rc = 0;
   int input_brightness;
-  u32 bl_level;
-  u32 clamped_brightness;
+  int clamped_brightness;
   struct dsi_display *display;
   struct dsi_panel *panel;
 
-  const int min_brightness = 100;
-  const int max_brightness = 1024;
+  // percent
+  const int min_brightness = 30;
+  const int max_brightness = 100;
 
   display = dev_get_drvdata(dev);
   if (!display) {
@@ -4366,34 +4368,28 @@ static ssize_t sysfs_clipped_brightness_write(struct device *dev,
     return rc;
   }
 
-  clamped_brightness = (u32)clamp(input_brightness, min_brightness, max_brightness);
+  clamped_brightness = clamp(input_brightness, min_brightness, max_brightness);
   if (clamped_brightness != input_brightness) {
-    pr_err("%s: clipped brightness must be in the range %d-%d\n", __func__, min_brightness, max_brightness);
+    pr_err("%s: max brightness must be in the range %d%%-%d%%\n", __func__, min_brightness, max_brightness);
     return -EINVAL;
   }
 
-  mutex_lock(&panel->panel_lock);
+  display->max_brightness_percent = clamped_brightness;
 
-  bl_level = panel->bl_config.bl_level;
-  panel->bl_config.bl_max_level = clamped_brightness;
-
-  mutex_unlock(&panel->panel_lock);
-
-  if (bl_level > clamped_brightness) {
-    dsi_display_set_backlight(display, bl_level);
-  }
+  // update brightness with the new limit
+  dsi_display_set_backlight(display, panel->bl_config.bl_level);
 
   return count;
 }
 
-static DEVICE_ATTR(clipped_brightness, 0644,
-      sysfs_clipped_brightness_read,
-      sysfs_clipped_brightness_write);
+static DEVICE_ATTR(max_brightness_percent, 0644,
+      sysfs_max_brightness_percent_read,
+      sysfs_max_brightness_percent_write);
 
 
 static struct attribute *dynamic_dsi_clock_fs_attrs[] = {
 	&dev_attr_dynamic_dsi_clock.attr,
-	&dev_attr_clipped_brightness.attr,
+	&dev_attr_max_brightness_percent.attr,
 	NULL,
 };
 static struct attribute_group dynamic_dsi_clock_fs_attrs_group = {
@@ -4733,6 +4729,8 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 	display = devm_kzalloc(&pdev->dev, sizeof(*display), GFP_KERNEL);
 	if (!display)
 		return -ENOMEM;
+
+	display->max_brightness_percent = 100;
 
 	display->name = of_get_property(pdev->dev.of_node, "label", NULL);
 	if (!display->name)
