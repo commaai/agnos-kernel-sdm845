@@ -4334,7 +4334,15 @@ static DEVICE_ATTR(dynamic_dsi_clock, 0644,
 static ssize_t sysfs_max_brightness_percent_read(struct device *dev,
   struct device_attribute *attr, char *buf)
 {
-  return -1;
+  struct dsi_display *display;
+
+  display = dev_get_drvdata(dev);
+  if (!display) {
+    pr_err("Invalid display\n");
+    return -EINVAL;
+  }
+
+  return sprintf(buf, "%d\n", display->max_brightness_percent);
 }
 
 static ssize_t sysfs_max_brightness_percent_write(struct device *dev,
