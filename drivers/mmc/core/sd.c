@@ -283,7 +283,7 @@ static int mmc_read_ssr(struct mmc_card *card)
  */
 static int mmc_read_switch(struct mmc_card *card)
 {
-	int err;
+	int err, i;
 	u8 *status;
 
 	if (card->scr.sda_vsn < SCR_SPEC_VER_1)
@@ -325,6 +325,11 @@ static int mmc_read_switch(struct mmc_card *card)
 
 		goto out;
 	}
+
+	printk("COMMA: SD read switch: ");
+	for (i=0; i<15; i++)
+		printk(" %d:%x", i, status[i]);
+	printk("\n");
 
 	if (status[13] & SD_MODE_HIGH_SPEED)
 		card->sw_caps.hs_max_dtr = HIGH_SPEED_MAX_DTR;
@@ -396,20 +401,29 @@ static int sd_select_driver_type(struct mmc_card *card, u8 *status)
 
 	card_drv_type = card->sw_caps.sd3_drv_type | SD_DRIVER_TYPE_B;
 
-	drive_strength = mmc_select_drive_strength(card,
-						   card->sw_caps.uhs_max_dtr,
-						   card_drv_type, &drv_type);
+	printk("COMMA: setting SD UHS driver type: 0x%x\n", card_drv_type);
+
+	// drive_strength = mmc_select_drive_strength(card,
+	// 					   card->sw_caps.uhs_max_dtr,
+	// 					   card_drv_type, &drv_type);
+
+	// COMMA HACK: make drive strength class D to reduce EMI
+	drive_strength = 0x03;
+
+	printk("COMMA: setting SD UHS drive strength: 0x%x\n", drive_strength);
 
 	if (drive_strength) {
 		err = mmc_sd_switch(card, 1, 2, drive_strength, status);
 		if (err)
 			return err;
 		if ((status[15] & 0xF) != drive_strength) {
-			pr_warn("%s: Problem setting drive strength!\n",
-				mmc_hostname(card->host));
+			pr_warn("%s: Problem setting drive strength! Result: 0x%x\n",
+				mmc_hostname(card->host), (status[15] & 0xF));
 			return 0;
 		}
 		card->drive_strength = drive_strength;
+
+		printk("COMMA: drv strength ok");
 	}
 
 	if (drv_type)
@@ -662,6 +676,8 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
 
 	if (!(card->csd.cmdclass & CCC_SWITCH))
 		return 0;
+
+	printk("COMMA: init SD UHS\n");
 
 	status = kmalloc(64, GFP_KERNEL);
 	if (!status) {
