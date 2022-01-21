@@ -162,7 +162,7 @@
 				pins = "sdc2_clk";
 				bias-disable;		/* NO pull */
 				//drive-strength = <16>;	/* 16 MA */
-				drive-strength = <4>;
+				drive-strength = <8>;
 			};
 		};
 
