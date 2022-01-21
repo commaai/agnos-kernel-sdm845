@@ -1513,9 +1513,9 @@
 		/*qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 201500000>;
 		qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50", "DDR50", "SDR104";*/
 
-		// disable SDR104 and 201500000
-		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000>;
-		qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50", "DDR50";
+		// force 50mhz
+		qcom,clk-rates = <50000000>;
+		qcom,bus-speed-mode = "SDR50";
 
 		qcom,devfreq,freq-table = <50000000 201500000>;
 		clocks = <&clock_gcc GCC_SDCC2_AHB_CLK>,
