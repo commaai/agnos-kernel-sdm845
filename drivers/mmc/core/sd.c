@@ -395,10 +395,10 @@ static int sd_select_driver_type(struct mmc_card *card, u8 *status)
 	card->drive_strength = 0;
 
 	card_drv_type = card->sw_caps.sd3_drv_type | SD_DRIVER_TYPE_B;
-	drive_strength = drv_type = MMC_SET_DRIVER_TYPE_D;
-	/*drive_strength = mmc_select_drive_strength(card,
+
+	drive_strength = mmc_select_drive_strength(card,
 						   card->sw_caps.uhs_max_dtr,
-						   card_drv_type, &drv_type);*/
+						   card_drv_type, &drv_type);
 
 	if (drive_strength) {
 		err = mmc_sd_switch(card, 1, 2, drive_strength, status);
