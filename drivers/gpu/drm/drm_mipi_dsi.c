@@ -1058,11 +1058,20 @@ int mipi_dsi_dcs_set_display_brightness(struct mipi_dsi_device *dsi,
 	//u8 payload[2] = { brightness & 0xff, brightness >> 8 };
 
   // SWITCHED FOR SAMSUNG
-	u8 payload[2] = { brightness >> 8, brightness & 0xff };
+	//u8 payload[2] = { brightness >> 8, brightness & 0xff };
+
+	// ICNL9706
+	u8 payload[1] = { brightness & 0xff };
+
+
+
 	ssize_t err;
 
 	err = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 				 payload, sizeof(payload));
+
+	printk("setting brightness: %d\n", err);
+
 	if (err < 0)
 		return err;
 
