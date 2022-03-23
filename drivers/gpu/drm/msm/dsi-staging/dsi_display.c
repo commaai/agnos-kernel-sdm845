@@ -1317,6 +1317,84 @@ error:
 	return len;
 }
 
+static ssize_t debugfs_mipi_command_write(struct file *file,
+				  const char __user *user_buf,
+				  size_t user_len,
+				  loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	char *buf;
+	int rc = 0;
+	struct dsi_display_debugfs_mipi_command *command;
+	struct mipi_dsi_msg *dsi_msg;
+	struct mipi_dsi_device *dsi;
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (user_len < 12){
+		pr_info("got buffer of %d bytes, expected at least 12\n", user_len);
+		return -EINVAL;
+	}
+
+	buf = kzalloc(user_len, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(buf))
+		return -ENOMEM;
+
+	if (copy_from_user(buf, user_buf, user_len)) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	if (!display->panel) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	// Data is in buf, let's cast it to our struct
+	command = (struct dsi_display_debugfs_mipi_command *) buf;
+	if(command->command_length < 8) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	// Parse and transfer the message
+	dsi = &display->panel->mipi_device;
+	dsi_msg = kzalloc(sizeof(struct mipi_dsi_msg), GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(dsi_msg)) {
+		rc = -ENOMEM;
+		goto error;
+	}
+
+	dsi_msg->tx_buf = kzalloc((command->command_length - 7), GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(dsi_msg)) {
+		rc = -ENOMEM;
+		goto error_two;
+	}
+
+	dsi_msg->channel = dsi->channel;
+	dsi_msg->type = command->command_buf[0];
+	pr_info("msg type: %d\n", dsi_msg->type);
+
+	memcpy(dsi_msg->tx_buf, command->command_buf + 7, (command->command_length - 7));
+	dsi_msg->tx_len = (command->command_length - 7);
+
+	rc = mipi_dsi_device_transfer(dsi, dsi_msg);
+	if(!IS_ERR_VALUE(rc)){
+		pr_info("wrote %d bytes\n", rc);
+		rc = user_len;
+	}
+
+error_two:
+	kfree(dsi_msg);
+error:
+	kfree(buf);
+	return rc;
+}
+
 static const struct file_operations dump_info_fops = {
 	.open = simple_open,
 	.read = debugfs_dump_info_read,
@@ -1339,10 +1417,16 @@ static const struct file_operations esd_check_mode_fops = {
 	.read = debugfs_read_esd_check_mode,
 };
 
+static const struct file_operations mipi_command_fops = {
+	.open = simple_open,
+	//TODO: .read = debugfs_mipi_command_read,
+	.write = debugfs_mipi_command_write,
+};
+
 static int dsi_display_debugfs_init(struct dsi_display *display)
 {
 	int rc = 0;
-	struct dentry *dir, *dump_file, *misr_data;
+	struct dentry *dir, *dump_file, *misr_data, *mipi_command;
 	char name[MAX_NAME_SIZE];
 	int i;
 
@@ -1398,6 +1482,18 @@ static int dsi_display_debugfs_init(struct dsi_display *display)
 	if (IS_ERR_OR_NULL(misr_data)) {
 		rc = PTR_ERR(misr_data);
 		pr_err("[%s] debugfs create misr datafile failed, rc=%d\n",
+		       display->name, rc);
+		goto error_remove_dir;
+	}
+
+	mipi_command = debugfs_create_file("mipi_command",
+					0600,
+					dir,
+					display,
+					&mipi_command_fops);
+	if (IS_ERR_OR_NULL(mipi_command)) {
+		rc = PTR_ERR(mipi_command);
+		pr_err("[%s] debugfs create mipi command failed, rc=%d\n",
 		       display->name, rc);
 		goto error_remove_dir;
 	}

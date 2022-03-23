@@ -242,6 +242,18 @@ struct dsi_display {
 };
 
 /**
+ * struct dsi_display_debugfs_mipi_command - defines mipi command struct through debugfs
+ * @command_length:Length of DSI command
+ * @command_buf:DSI command buffer
+ */
+#define DSI_DISPLAY_MAX_MIPI_COMMAND_LEN
+struct dsi_display_debugfs_mipi_command {
+	int command_length;
+	char command_buf[DSI_DISPLAY_MAX_MIPI_COMMAND_LEN];
+};
+
+
+/**
  * dsi_display_has_ext_bridge() - check whether display has ext bridge
  *                                connected.
  *
