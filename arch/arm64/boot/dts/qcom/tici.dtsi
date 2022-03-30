@@ -158,6 +158,19 @@
    regulator-always-on;
   };
 
+  lcd_backlight: lcd_backlight {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "lcd_backlight";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&tlmm 28 0>;
+    enable-active-high;
+    regulator-always-on;
+  };
+
   ssd3v3: ssd3v3 {
     status = "ok";
 

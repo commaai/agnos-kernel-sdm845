@@ -841,6 +841,9 @@ static int _sde_encoder_phys_vid_wait_for_vblank(
 	ret = sde_encoder_helper_wait_for_irq(phys_enc, INTR_IDX_VSYNC,
 			&wait_info);
 
+	// COMMA HACK
+	ret = 0;
+
 	if (ret == -ETIMEDOUT)
 		event = SDE_ENCODER_FRAME_EVENT_SIGNAL_RELEASE_FENCE
 				| SDE_ENCODER_FRAME_EVENT_SIGNAL_RETIRE_FENCE
