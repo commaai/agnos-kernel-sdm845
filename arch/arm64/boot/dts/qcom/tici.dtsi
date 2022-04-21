@@ -20,6 +20,11 @@
   status = "disabled";
 };
 
+/* disable the modem */
+&pil_modem {
+	status = "disabled";
+};
+
 &soc {
 	clock_audio_lnbb: audio_ext_clk_lnbb {
 		status = "ok";
