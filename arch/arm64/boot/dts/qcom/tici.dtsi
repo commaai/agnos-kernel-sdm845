@@ -203,8 +203,8 @@
 };
 
 &labibb {
-  status = "disabled";
-  qcom,qpnp-labibb-mode = "lcd";
+  status = "enabled";
+  qcom,qpnp-labibb-mode = "amoled";
 };
 
 &ufsphy_mem {
@@ -458,6 +458,25 @@
   status = "disabled";
 };
 
+&lab_regulator {
+  status = "ok";
+  regulator-always-on;
+  qcom,qpnp-lab-init-amoled-voltage = <4600000>;
+};
+
+&ibb_regulator {
+  status = "ok";
+  regulator-always-on;
+  regulator-min-microvolt = <1900000>;
+	qcom,qpnp-ibb-init-amoled-voltage = <2000000>;
+};
+
+&pmi8998_wled {
+  status = "ok";
+  regulator-always-on;
+  qcom,disp-type-amoled;
+};
+
 &soc {
 	dsi_panel_pwr_supply: dsi_panel_pwr_supply {
 		#address-cells = <1>;
@@ -481,6 +500,32 @@
 			qcom,supply-disable-load = <0>;
 			qcom,supply-post-on-sleep = <0>;
 		};
+    // qcom,panel-supply-entry@1 {
+		// 	reg = <1>;
+		// 	qcom,supply-name = "lab";
+		// 	qcom,supply-min-voltage = <4600000>;
+		// 	qcom,supply-max-voltage = <6000000>;
+		// 	qcom,supply-enable-load = <100000>;
+		// 	qcom,supply-disable-load = <100>;
+		// };
+		// qcom,panel-supply-entry@2 {
+		// 	reg = <2>;
+		// 	qcom,supply-name = "ibb";
+		// 	qcom,supply-min-voltage = <1900000>;
+		// 	qcom,supply-max-voltage = <2100000>;
+		// 	qcom,supply-enable-load = <100000>;
+		// 	qcom,supply-disable-load = <100>;
+		// 	qcom,supply-post-on-sleep = <20>;
+		// };
+		// qcom,panel-supply-entry@3 {
+		// 	reg = <3>;
+		// 	qcom,supply-name = "oled-vdda";
+		// 	qcom,supply-min-voltage = <3312000>;
+		// 	qcom,supply-max-voltage = <3312000>;
+		// 	qcom,supply-enable-load = <857000>;
+		// 	qcom,supply-disable-load = <0>;
+		// 	qcom,supply-post-on-sleep = <0>;
+		// };
 	};
 
   dsi_ss_ea8074_fhd_cmd_display: qcom,dsi-display@0 {
@@ -502,7 +547,10 @@
 
     qcom,dsi-panel = <&dsi_ss_fhd_ea8074_cmd>;
     vddio-supply = <&pm8998_l14>;
-    vddcore-supply = <&lcd3v3>;
+    //vddcore-supply = <&lcd3v3>;
+    // lab-supply = <&lab_regulator>;
+    // ibb-supply = <&ibb_regulator>;
+    // oled-vdda-supply = <&pmi8998_wled>;
 
     /*vci-supply = <&disp_vci_vreg>;*/
   };
