@@ -318,6 +318,7 @@ static void nvme_loop_destroy_io_queues(struct nvme_loop_ctrl *ctrl)
 
 	for (i = 1; i < ctrl->queue_count; i++)
 		nvmet_sq_destroy(&ctrl->queues[i].nvme_sq);
+	ctrl->ctrl.queue_count = 1;
 }
 
 static int nvme_loop_init_io_queues(struct nvme_loop_ctrl *ctrl)
