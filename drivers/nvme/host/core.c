@@ -1881,6 +1881,9 @@ static void nvme_async_event_work(struct work_struct *work)
 	while (ctrl->event_limit > 0) {
 		int aer_idx = --ctrl->event_limit;
 
+		if (ctrl->state != NVME_CTRL_LIVE)
+			printk(KERN_ERR "Not live");
+
 		spin_unlock_irq(&ctrl->lock);
 		ctrl->ops->submit_async_event(ctrl, aer_idx);
 		spin_lock_irq(&ctrl->lock);
