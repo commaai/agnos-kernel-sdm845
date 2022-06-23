@@ -1722,12 +1722,12 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		return;
 
 	if (ns->disk && ns->disk->flags & GENHD_FL_UP) {
-		if (blk_get_integrity(ns->disk))
-			blk_integrity_unregister(ns->disk);
 		sysfs_remove_group(&disk_to_dev(ns->disk)->kobj,
 					&nvme_ns_attr_group);
 		del_gendisk(ns->disk);
 		blk_cleanup_queue(ns->queue);
+		if (blk_get_integrity(ns->disk))
+			blk_integrity_unregister(ns->disk);
 	}
 
 	mutex_lock(&ns->ctrl->namespaces_mutex);
