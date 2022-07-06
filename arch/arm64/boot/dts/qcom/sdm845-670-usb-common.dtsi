@@ -175,6 +175,8 @@
 
 	/* Primary USB port related QMP USB DP Combo PHY */
 	usb_qmp_dp_phy: ssphy@88e8000 {
+		status = "disabled";
+
 		compatible = "qcom,usb-ssphy-qmp-dp-combo";
 		reg = <0x88e8000 0x3000>;
 		reg-names = "qmp_phy_base";

@@ -1018,7 +1018,8 @@ static inline bool ufshcd_can_hibern8_during_gating(struct ufs_hba *hba)
 }
 static inline int ufshcd_is_clkscaling_supported(struct ufs_hba *hba)
 {
-	return hba->caps & UFSHCD_CAP_CLK_SCALING;
+	//return hba->caps & UFSHCD_CAP_CLK_SCALING;
+	return 0;
 }
 static inline bool ufshcd_can_autobkops_during_suspend(struct ufs_hba *hba)
 {
@@ -1052,8 +1053,9 @@ static inline bool ufshcd_is_intr_aggr_allowed(struct ufs_hba *hba)
 
 static inline bool ufshcd_is_auto_hibern8_supported(struct ufs_hba *hba)
 {
-	return !!((hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT) &&
-		!(hba->quirks & UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8));
+	/*return !!((hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT) &&
+		!(hba->quirks & UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8));*/
+	return 0;
 }
 
 static inline bool ufshcd_is_crypto_supported(struct ufs_hba *hba)

@@ -8004,6 +8004,7 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	/* UFS device is also active now */
 	ufshcd_set_ufs_dev_active(hba);
 	ufshcd_force_reset_auto_bkops(hba);
+	printk("calling ufshcd_get_max_pwr_mode\n");
 
 	if (ufshcd_get_max_pwr_mode(hba)) {
 		dev_err(hba->dev,
@@ -8014,8 +8015,11 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 		 * Set the right value to bRefClkFreq before attempting to
 		 * switch to HS gears.
 		 */
+		printk("calling ufshcd_set_dev_ref_clk\n");
 		ufshcd_set_dev_ref_clk(hba);
+		printk("return ufshcd_set_dev_ref_clk\n");
 		ret = ufshcd_config_pwr_mode(hba, &hba->max_pwr_info.info);
+		printk("return ufshcd_config_pwr_mode\n");
 		if (ret) {
 			dev_err(hba->dev, "%s: Failed setting power mode, err = %d\n",
 					__func__, ret);
@@ -8030,6 +8034,7 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	 *       bActiveICCLevel as well so it is always safe to set this here.
 	 */
 	ufshcd_set_active_icc_lvl(hba);
+	printk("return ufshcd_set_active_icc_lvl\n");
 
 	/* set the state as operational after switching to desired gear */
 	hba->ufshcd_state = UFSHCD_STATE_OPERATIONAL;
@@ -8039,6 +8044,8 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	 */
 	if (!ufshcd_eh_in_progress(hba) && !hba->pm_op_in_progress) {
 		bool flag;
+
+		printk("call ufshcd_query_flag_retry\n");
 
 		if (!ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_READ_FLAG,
 				QUERY_FLAG_IDN_PWR_ON_WPE, &flag))
@@ -8069,7 +8076,9 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 			hba->clk_scaling.is_allowed = true;
 		}
 
+		printk("call scsi_scan_host\n");
 		scsi_scan_host(hba->host);
+		printk("return scsi_scan_host\n");
 		pm_runtime_put_sync(hba->dev);
 	}
 
@@ -8080,6 +8089,7 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 	if (ufshcd_is_auto_hibern8_supported(hba))
 		ufshcd_set_auto_hibern8_timer(hba,
 				      hba->hibern8_on_idle.delay_ms);
+	printk("return ufshcd_is_auto_hibern8_supported\n");
 out:
 	if (ret) {
 		ufshcd_set_ufs_dev_poweroff(hba);
@@ -8106,6 +8116,8 @@ out:
 		pm_runtime_put_noidle(hba->dev);
 		pm_schedule_suspend(hba->dev, MSEC_PER_SEC * 10);
 	}
+
+	printk("return all\n");
 
 	trace_ufshcd_init(dev_name(hba->dev), ret,
 		ktime_to_us(ktime_sub(ktime_get(), start)),
@@ -8242,9 +8254,13 @@ static void ufshcd_async_scan(void *data, async_cookie_t cookie)
 	 * Don't allow clock gating and hibern8 enter for faster device
 	 * detection.
 	 */
+	printk("ufshcd_hold_all\n");
 	ufshcd_hold_all(hba);
+	printk("ufshcd_probe_hba\n");
 	ufshcd_probe_hba(hba);
+	printk("ufshcd_release_all\n");
 	ufshcd_release_all(hba);
+	printk("ufshcd_extcon_register\n");
 
 	ufshcd_extcon_register(hba);
 }
@@ -10725,13 +10741,18 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	 */
 	ufshcd_set_ufs_dev_active(hba);
 
+	printk("call ufshcd_cmd_log_init\n");
 	ufshcd_cmd_log_init(hba);
 
+	printk("call ufshcd_async_scan\n");
 	async_schedule(ufshcd_async_scan, hba);
 
+	printk("call ufsdbg_add_debugfs\n");
 	ufsdbg_add_debugfs(hba);
 
+	printk("call ufshcd_add_sysfs_nodes\n");
 	ufshcd_add_sysfs_nodes(hba);
+	printk("return ufshcd_add_sysfs_nodes\n");
 
 	return 0;
 

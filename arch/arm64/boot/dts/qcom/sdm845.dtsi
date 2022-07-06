@@ -1211,7 +1211,7 @@
 		#reset-cells = <1>;
 	};
 
-	clock_camcc: qcom,camcc@ad00000 {
+	/*clock_camcc: qcom,camcc@ad00000 {
 		compatible = "qcom,cam_cc-sdm845", "syscon";
 		reg = <0xad00000 0x10000>;
 		reg-names = "cc_base";
@@ -1234,7 +1234,7 @@
 		qcom,cam_cc_bps_clk_src-opp-handle = <&cam_bps>;
 		#clock-cells = <1>;
 		#reset-cells = <1>;
-	};
+	};*/
 
 	clock_dispcc: qcom,dispcc@af00000 {
 		compatible = "qcom,dispcc-sdm845", "syscon";
@@ -1293,7 +1293,7 @@
 		qcom,cc-count = <6>;
 		qcom,gcc = <&clock_gcc>;
 		qcom,videocc = <&clock_videocc>;
-		qcom,camcc = <&clock_camcc>;
+		//qcom,camcc = <&clock_camcc>;
 		qcom,dispcc = <&clock_dispcc>;
 		qcom,gpucc = <&clock_gpucc>;
 		qcom,cpucc = <&cpucc_debug>;
@@ -2885,6 +2885,8 @@
 	};
 
 	dcc: dcc_v2@10a2000 {
+		status = "disabled";
+
 		compatible = "qcom,dcc-v2";
 		reg = <0x10a2000 0x1000>,
 		      <0x10ae000 0x2000>;
@@ -4111,7 +4113,7 @@
 #include "msm-arm-smmu-sdm845.dtsi"
 #include "sdm845-ion.dtsi"
 #include "sdm845-smp2p.dtsi"
-#include "sdm845-camera.dtsi"
+//#include "sdm845-camera.dtsi"
 #include "sdm845-bus.dtsi"
 #include "sdm845-vidc.dtsi"
 #include "sdm845-pm.dtsi"

@@ -661,6 +661,7 @@ static void __device_attach_async_helper(void *_dev, async_cookie_t cookie)
 static int __device_attach(struct device *dev, bool allow_async)
 {
 	int ret = 0;
+	allow_async = false;
 
 	device_lock(dev);
 	if (dev->driver) {

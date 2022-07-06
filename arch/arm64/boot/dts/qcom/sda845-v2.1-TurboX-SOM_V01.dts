@@ -19,7 +19,8 @@
 #include <dt-bindings/clock/qcom,rpmh.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 
-#include "sda845-v2.1.dtsi"
+//#include "sda845-v2.1.dtsi"
+#include "sdm845.dtsi"
 #include "tici.dtsi"
 
 / {
