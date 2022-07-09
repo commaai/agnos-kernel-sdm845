@@ -213,9 +213,10 @@ static irqreturn_t qcom_pmic_typec_interrupt(int irq, void *_qcom_usb)
 {
 	struct qcom_pmic_typec *qcom_usb = _qcom_usb;
 
-	pr_info("TYPEC IRQ!\n");
+	pr_info("TYPEC IRQ! %d\n", irq);
+	qcom_pmic_typec_enable_vbus_regulator(qcom_usb, true);
 
-	qcom_pmic_typec_check_connection(qcom_usb);
+	//qcom_pmic_typec_check_connection(qcom_usb);
 	return IRQ_HANDLED;
 }
 

@@ -20,12 +20,8 @@
 			compatible = "qcom,pmi8998-usb-typec";
 			reg = <0x1300>;
 
-			interrupts =
-				<0x2 0x13 0x1 IRQ_TYPE_EDGE_BOTH>,
-				<0x2 0x13 0x7 IRQ_TYPE_EDGE_RISING>;
-			interrupt-names =
-				"usbin-lt-3p6v",
-				"type-c-change";
+			interrupts = <0x2 0x13 0x1 IRQ_TYPE_EDGE_BOTH>;
+			interrupt-names = "usbin-lt-3p6v";
 
 			usb_vbus-supply = <&pmi8998_vbus>;
 
