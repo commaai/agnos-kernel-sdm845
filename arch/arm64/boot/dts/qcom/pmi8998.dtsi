@@ -9,6 +9,25 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
+		pmi8998_vbus: dcdc@1100 {
+			compatible = "qcom,pmi8998-vbus-reg";
+			reg = <0x1100>;
+
+			status = "disabled";
+		};
+
+		pmi8998_typec: typec@1300 {
+			compatible = "qcom,pmi8998-usb-typec";
+			reg = <0x1300>;
+
+			interrupts = <0x2 0x13 0x7 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "type-c-change";
+
+			usb_vbus-supply = <&pmi8998_vbus>;
+
+			status = "disabled";
+		};
+
 		pmi8998_gpio: gpios@c000 {
 			compatible = "qcom,pmi8998-gpio", "qcom,spmi-gpio";
 			reg = <0xc000>;

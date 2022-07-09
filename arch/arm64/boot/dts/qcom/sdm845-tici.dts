@@ -19,6 +19,20 @@
 	qcom,msm-id = <341 0x20001>;
 	qcom,board-id = <8 0>;
 
+	ssd3v3: ssd3v3 {
+    status = "ok";
+    compatible = "regulator-fixed";
+    regulator-name = "ssd3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&tlmm 41 0>;
+    enable-active-high;
+    regulator-always-on;
+  };
+
+	// dragonboard below this line
+
 	aliases {
 		serial0 = &uart9;
 		hsuart0 = &uart6;
@@ -49,18 +63,6 @@
 			gpios = <&pm8998_gpio 6 GPIO_ACTIVE_LOW>;
 		};
 	};
-
-	ssd3v3: ssd3v3 {
-    status = "ok";
-    compatible = "regulator-fixed";
-    regulator-name = "ssd3v3";
-    regulator-min-microvolt = <3300000>;
-    regulator-max-microvolt = <3300000>;
-
-    gpio = <&tlmm 41 0>;
-    enable-active-high;
-    regulator-always-on;
-  };
 
 	leds {
 		compatible = "gpio-leds";
@@ -952,7 +954,8 @@
 };
 
 &usb_1_dwc3 {
-	dr_mode = "peripheral";
+	//dr_mode = "peripheral";
+	dr_mode = "host";
 };
 
 &usb_1_hsphy {
@@ -1231,3 +1234,10 @@
 		};
 	};
 };
+
+// tici below this line
+
+&pmi8998_vbus {
+	status = "okay";
+};
+
