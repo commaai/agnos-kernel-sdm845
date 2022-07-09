@@ -5075,6 +5075,43 @@ static void regulator_dev_release(struct device *dev)
 	kfree(rdev);
 }
 
+
+#ifdef CONFIG_DEBUG_FS
+
+static int reg_debug_enable_set(void *data, u64 val)
+{
+	struct regulator *regulator = data;
+	int ret;
+
+	if (val) {
+		ret = regulator_enable(regulator);
+		if (ret)
+			rdev_err(regulator->rdev, "enable failed, ret=%d\n",
+				ret);
+	} else {
+		ret = regulator_disable(regulator);
+		if (ret)
+			rdev_err(regulator->rdev, "disable failed, ret=%d\n",
+				ret);
+	}
+
+	return ret;
+}
+
+static int reg_debug_enable_get(void *data, u64 *val)
+{
+	struct regulator *regulator = data;
+
+	*val = regulator_is_enabled(regulator);
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(reg_enable_fops, reg_debug_enable_get,
+			reg_debug_enable_set, "%llu\n");
+
+#endif
+
 static void rdev_init_debugfs(struct regulator_dev *rdev)
 {
 	struct device *parent = rdev->dev.parent;
@@ -5094,6 +5131,8 @@ static void rdev_init_debugfs(struct regulator_dev *rdev)
 		return;
 	}
 
+	debugfs_create_file("enable", 0644, rdev->debugfs, regulator_get(NULL, rdev_get_name(rdev)),
+				&reg_enable_fops);
 	debugfs_create_u32("use_count", 0444, rdev->debugfs,
 			   &rdev->use_count);
 	debugfs_create_u32("open_count", 0444, rdev->debugfs,
