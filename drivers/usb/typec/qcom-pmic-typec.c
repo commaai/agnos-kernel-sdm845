@@ -244,6 +244,7 @@ static int qcom_pmic_typec_remove(struct platform_device *pdev)
 
 static const struct of_device_id qcom_pmic_typec_table[] = {
 	{ .compatible = "qcom,pm8150b-usb-typec" },
+	{ .compatible = "qcom,pmi8998-usb-typec" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, qcom_pmic_typec_table);

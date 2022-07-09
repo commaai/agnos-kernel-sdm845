@@ -1237,6 +1237,10 @@
 
 // tici below this line
 
+&pmi8998_typec {
+	status = "okay";
+};
+
 &pmi8998_vbus {
 	status = "okay";
 };
