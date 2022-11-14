@@ -130,17 +130,19 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 
 	mutex_lock(&panel->panel_lock);
 
-	max_brightness = panel->bl_config.bl_max_level * dsi_display->max_brightness_percent / 100;
-	bl_lvl = clamp(bl_lvl, 0, max_brightness);
+	// max_brightness = panel->bl_config.bl_max_level * dsi_display->max_brightness_percent / 100;
+	// bl_lvl = clamp(bl_lvl, 0, max_brightness);
 
 	if (!dsi_panel_initialized(panel)) {
-		if (bl_lvl == 0) {
-			pr_err("Turning off panel power\n");
-			dsi_panel_power_off(panel);
-		} else {
-			pr_err("Turning on panel power\n");
-			dsi_panel_power_on(panel);
-		}
+		// if (bl_lvl == 0) {
+		// 	pr_err("Turning off panel power\n");
+		// 	dsi_panel_power_off(panel);
+		// } else {
+		// 	pr_err("Turning on panel power\n");
+		// 	dsi_panel_power_on(panel);
+		// }
+
+		rc = -EINVAL;
 
 		goto error;
 	}
