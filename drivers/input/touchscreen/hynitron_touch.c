@@ -148,34 +148,36 @@ static irqreturn_t hyn_ts_irq_handler(int irq, void *dev_id)
     // Keep handling packets until the IRQ pin has gone high again
     uint8_t event[255];
 
-    // Read event
-    while (true) {
-        ret = hyn_read(ts, 0x00, &event[0], 1);
-        if(ret < 0){
-            dev_err(&ts->client->dev, "%s: reading num bytes failed: %d\n", __func__, ret);
-            if(retry_count < 10){
-                retry_count++;
-                msleep(10);
-                continue;
-            } else {
-                dev_err(&ts->client->dev, "%s: retry count reached\n", __func__);
-                return IRQ_HANDLED;
+    do {
+        // Read event
+        while (true) {
+            ret = hyn_read(ts, 0x00, &event[0], 1);
+            if(ret < 0){
+                dev_err(&ts->client->dev, "%s: reading num bytes failed: %d\n", __func__, ret);
+                if(retry_count < 10){
+                    retry_count++;
+                    msleep(10);
+                    continue;
+                } else {
+                    dev_err(&ts->client->dev, "%s: retry count reached\n", __func__);
+                    return IRQ_HANDLED;
+                }
             }
+            break;
         }
-        break;
-    }
-    ret = hyn_read(ts, 0x01, &event[1], event[0]);
-    if(ret < 0){
-        dev_err(&ts->client->dev, "%s: reading event data failed: %d\n", __func__, ret);
-        return IRQ_HANDLED;
-    }
+        ret = hyn_read(ts, 0x01, &event[1], event[0]);
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: reading event data failed: %d\n", __func__, ret);
+            return IRQ_HANDLED;
+        }
 
-    // Handle
-    ret = hyn_handle_event(ts, event);
-    if(ret < 0){
-        dev_err(&ts->client->dev, "%s: handling event failed: %d\n", __func__, ret);
-        return IRQ_HANDLED;
-    }
+        // Handle
+        ret = hyn_handle_event(ts, event);
+        if(ret < 0){
+            dev_err(&ts->client->dev, "%s: handling event failed: %d\n", __func__, ret);
+            return IRQ_HANDLED;
+        }
+    } while (ts->interrupt_gpio && !gpiod_get_value_cansleep(ts->interrupt_gpio));
 
 	return IRQ_HANDLED;
 }
