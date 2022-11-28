@@ -20,11 +20,29 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 
 #include "sda845-v2.1.dtsi"
-#include "tici.dtsi"
 
+#include "comma_common.dtsi"
+
+/* touch panel I2C, /dev/i2c-2 */
+&qupv3_se5_i2c {
+  status = "ok";
+  qcom,clk-freq-out = <100000>;
+};
+
+/* No screen for now */
+&mdss_mdp {
+	status = "disabled";
+};
+
+&sde_wb {
+	status = "disabled";
+};
+
+
+/* Board definition */
 / {
-	model = "Qualcomm Technologies, Inc. sda845 v2.1 TurboX-SOM_V01";
+	model = "comma 3X";
 	compatible = "qcom,sda845-mtp", "qcom,sda845", "qcom,mtp";
 	qcom,msm-id = <341 0x20001>;
-	qcom,board-id = <8 0>;
+	qcom,board-id = <0x21 0>;
 };

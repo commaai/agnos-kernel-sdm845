@@ -1,0 +1,165 @@
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+/dts-v1/;
+
+#include <dt-bindings/clock/qcom,gcc-sdm845.h>
+#include <dt-bindings/clock/qcom,camcc-sdm845.h>
+#include <dt-bindings/clock/qcom,dispcc-sdm845.h>
+#include <dt-bindings/clock/qcom,rpmh.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+
+#include "sda845-v2.1.dtsi"
+
+#include "comma_common.dtsi"
+#include "dsi-panel-ss-fhd-ea8074-cmd.dtsi"
+
+/* light(RPR-0521RS) and touch panel I2C, /dev/i2c-2 */
+&qupv3_se5_i2c {
+  status = "ok";
+  qcom,clk-freq-out = <100000>;
+
+  rpr0521@38 {
+    compatible = "rpr0521";
+    reg = <0x38>;
+  };
+
+  samsung-ts@17 {
+    compatible = "samsung_i2c_touchpanel";
+    reg = <0x17>;
+    interrupt-parent = <&tlmm>;
+		interrupts = <125 0x2002>;
+    interrupt-gpios = <&tlmm 125 0x2002>;
+    reset-gpios = <&tlmm 104 0>;
+    ta-gpios = <&tlmm 128 0>;
+    vdd-supply = <&tp3v3>;
+  };
+};
+
+/* GPS UART */
+&qupv3_gps_uart {
+  status = "ok";
+};
+
+&vendor {
+  main5v: main5v {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "main5v";
+    regulator-min-microvolt = <5000000>;
+    regulator-max-microvolt = <5000000>;
+
+    gpio = <&tlmm 25 0>;
+    enable-active-high;
+    regulator-always-on;
+  };
+
+	lcd3v3: lcd3v3 {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "lcd3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&pm8998_gpios 13 0>;
+    regulator-boot-on;
+  };
+
+  tp3v3: tp3v3 {
+   status = "ok";
+
+   compatible = "regulator-fixed";
+   regulator-name = "tp3v3";
+   regulator-min-microvolt = <3300000>;
+   regulator-max-microvolt = <3300000>;
+
+   gpio = <&pm8998_gpios 10 0>;
+   regulator-boot-on;
+   regulator-always-on;
+  };
+
+  ssd3v3: ssd3v3 {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "ssd3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&tlmm 41 0>;
+    enable-active-high;
+    regulator-always-on;
+  };
+};
+
+&soc {
+	dsi_ss_ea8074_fhd_cmd_display: qcom,dsi-display@0 {
+    compatible = "qcom,dsi-display";
+    label = "dsi_ss_ea8074_fhd_cmd_display";
+    qcom,display-type = "primary";
+    qcom,dsi-display-active;
+
+    qcom,dsi-ctrl = <&mdss_dsi0>;
+    qcom,dsi-phy = <&mdss_dsi_phy0>;
+    clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>, <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+		clock-names = "src_byte_clk", "src_pixel_clk";
+
+    pinctrl-names = "panel_active", "panel_suspend";
+    //pinctrl-0 = <&sde_dsi_active &sde_te_active &lcd_3v3_en_n_active &tp_3v3_en_n_active>;
+    //pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend &lcd_3v3_en_n_suspend &tp_3v3_en_n_suspend>;
+    pinctrl-0 = <&sde_dsi_active &sde_te_active>;
+    pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
+
+    qcom,dsi-panel = <&dsi_ss_fhd_ea8074_cmd>;
+    vddio-supply = <&pm8998_l14>;
+    vddcore-supply = <&lcd3v3>;
+
+    /*vci-supply = <&disp_vci_vreg>;*/
+  };
+};
+
+&mdss_dsi0 {
+	status = "ok";
+  qcom,dsi-pref-prim-pan = <&dsi_ss_fhd_ea8074_cmd>;
+};
+
+/* Panel */
+&dsi_ss_fhd_ea8074_cmd {
+  qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+
+  /* gpios are correct and connected */
+  qcom,platform-te-gpio = <&tlmm 10 0>;
+  qcom,platform-reset-gpio = <&tlmm 6 0>;
+  //qcom,panel-errfg-gpio = <&tlmm 135 0>
+
+  qcom,mdss-dsi-t-clk-post = <0x0e>;
+	qcom,mdss-dsi-t-clk-pre = <0x31>;
+	qcom,mdss-dsi-display-timings {
+		timing@0{
+			qcom,mdss-dsi-panel-phy-timings = [00 20 08 08 24 23 08 08 05 03 04 00];
+			qcom,display-topology = <1 0 1>;
+			qcom,default-topology-index = <0>;
+		};
+	};
+};
+
+/* Board definition */
+/ {
+	model = "comma tici";
+	compatible = "qcom,sda845-mtp", "qcom,sda845", "qcom,mtp";
+	qcom,msm-id = <341 0x20001>;
+	qcom,board-id = <0x8 0>; // Old xbl
+	qcom,board-id = <0x20 0>; // New xbl
+};
