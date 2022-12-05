@@ -92,6 +92,7 @@ struct dsi_backlight_config {
 	u32 bl_level;
 	u32 bl_scale;
 	u32 bl_scale_ad;
+	bool bl_samsung_quirk;
 
 	int en_gpio;
 	/* PWM params */

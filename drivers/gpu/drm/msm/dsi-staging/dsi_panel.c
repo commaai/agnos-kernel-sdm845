@@ -632,6 +632,7 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 {
 	int rc = 0;
 	struct mipi_dsi_device *dsi;
+	struct dsi_backlight_config *bl = &panel->bl_config;
 
 	if (!panel || (bl_lvl > 0xffff)) {
 		pr_err("invalid params\n");
@@ -643,7 +644,7 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
   // commented out to remove double lock
 	//mutex_lock(&panel->panel_lock);
 
-	rc = mipi_dsi_dcs_set_display_brightness(dsi, bl_lvl);
+	rc = mipi_dsi_dcs_set_display_brightness(dsi, bl_lvl, bl->bl_samsung_quirk);
 	if (rc < 0)
 		pr_err("failed to update dcs backlight:%d\n", bl_lvl);
 
@@ -2004,6 +2005,8 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
 	} else {
 		panel->bl_config.brightness_max_level = val;
 	}
+
+	panel->bl_config.bl_samsung_quirk = of_property_read_bool(of_node, "qcom,mdss-dsi-bl-dcs-type-ss");
 
 	if (panel->bl_config.type == DSI_BACKLIGHT_PWM) {
 		rc = dsi_panel_parse_bl_pwm_config(&panel->bl_config, of_node);

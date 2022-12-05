@@ -1053,13 +1053,17 @@ EXPORT_SYMBOL(mipi_dsi_dcs_set_tear_scanline);
  * Return: 0 on success or a negative error code on failure.
  */
 int mipi_dsi_dcs_set_display_brightness(struct mipi_dsi_device *dsi,
-					u16 brightness)
+					u16 brightness,
+					bool samsung_quirk)
 {
 	u8 payload[2] = { brightness & 0xff, brightness >> 8 };
+	ssize_t err;
 
   // SWITCHED FOR SAMSUNG
-	// u8 payload[2] = { brightness >> 8, brightness & 0xff };
-	ssize_t err;
+	if(samsung_quirk) {
+		payload[0] = brightness >> 8;
+		payload[1] = brightness & 0xff;
+	}
 
 	err = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 				 payload, sizeof(payload));
