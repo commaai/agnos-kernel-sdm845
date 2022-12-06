@@ -106,3 +106,4 @@ obj-$(CONFIG_TOUCHSCREEN_ROHM_BU21023)	+= rohm_bu21023.o
 obj-$(CONFIG_TOUCHSCREEN_FTS)		+= focaltech_touch/
 obj-$(CONFIG_TOUCHSCREEN_HIMAX_CHIPSET)	+= hxchipset/
 obj-$(CONFIG_TOUCHSCREEN_SAMSUNG)	+= samsung_touch.o
+obj-$(CONFIG_TOUCHSCREEN_HYNITRON)	+= hynitron_touch.o
