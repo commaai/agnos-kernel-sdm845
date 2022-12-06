@@ -142,8 +142,6 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 			dsi_panel_power_on(panel);
 		}
 
-		rc = -EINVAL;
-
 		goto error;
 	}
 
