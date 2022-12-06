@@ -40,7 +40,6 @@
 struct hyn_ts_data {
 	struct i2c_client *client;
 	struct input_dev *input;
-    struct regulator *vdd;
 
 	struct gpio_desc *interrupt_gpio;
 	struct gpio_desc *reset_gpio;
@@ -194,30 +193,6 @@ static void hyn_ts_reset(struct hyn_ts_data *ts)
 	}
 }
 
-static int hyn_power_init(struct hyn_ts_data *ts)
-{
-    int ret = 0;
-    ts->vdd = devm_regulator_get(&ts->client->dev, "vdd");
-    if(IS_ERR(ts->vdd)){
-        ret = PTR_ERR(ts->vdd);
-        if(ret == -EPROBE_DEFER){
-            dev_info(&ts->client->dev, "%s: regulator vdd not ready. Deferring probe...\n", __func__);
-        } else {
-            dev_err(&ts->client->dev, "%s: getting regulator vdd: %d\n", __func__, ret);
-        }
-        goto err;
-    }
-
-    // Enabling crashes the kernel.
-    // Not sure why, but it's a fixed regulator which is always enabled anyway
-    //ret = regulator_enable(ts->vdd);
-    if(ret){
-        dev_err(&ts->client->dev, "%s: enabling regulator vdd: %d\n", __func__, ret);
-    }
-err:
-    return ret;
-}
-
 static int hyn_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct hyn_ts_data *ts;
@@ -232,12 +207,6 @@ static int hyn_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	ts->client = client;
 	i2c_set_clientdata(client, ts);
-
-    // Init regulator
-    error = hyn_power_init(ts);
-    if(IS_ERR(error)) {
-        return error;
-    }
 
 	ts->interrupt_gpio = devm_gpiod_get(&client->dev, "interrupt", GPIOD_IN);
 	if (IS_ERR(ts->interrupt_gpio)) {

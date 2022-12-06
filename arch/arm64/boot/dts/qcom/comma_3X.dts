@@ -36,7 +36,6 @@
 		interrupts = <125 0x2002>;
     interrupt-gpios = <&tlmm 125 0x2002>;
     reset-gpios = <&tlmm 104 0>;
-    vdd-supply = <&tp3v3>;
   };
 };
 
