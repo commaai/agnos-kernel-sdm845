@@ -22,6 +22,7 @@
 #include "sda845-v2.1.dtsi"
 
 #include "comma_common.dtsi"
+#include "dsi-panel-mate10-lite-video.dtsi"
 
 /* touch panel I2C, /dev/i2c-2 */
 &qupv3_se5_i2c {
@@ -29,15 +30,84 @@
   qcom,clk-freq-out = <100000>;
 };
 
-/* No screen for now */
-&mdss_mdp {
-	status = "disabled";
+&vendor {
+	lcd3v3: lcd3v3 {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "lcd3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&pm8998_gpios 13 0>;
+    regulator-boot-on;
+  };
+
+	lcd_bias: lcd_bias {
+		status = "ok";
+
+		compatible = "regulator-fixed";
+		regulator-name = "lcd_bias";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+
+		gpio = <&pm8998_gpios 10 0>;
+		enable-active-high;
+		regulator-boot-on;
+		regulator-always-on;
+  };
 };
 
-&sde_wb {
-	status = "disabled";
+&soc {
+	dsi_mate10_lite_video_display: qcom,dsi-display@0 {
+    compatible = "qcom,dsi-display";
+    label = "dsi_mate10_lite_video_display";
+    qcom,display-type = "primary";
+    qcom,dsi-display-active;
+
+    qcom,dsi-ctrl = <&mdss_dsi0>;
+    qcom,dsi-phy = <&mdss_dsi_phy0>;
+    clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>, <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+		clock-names = "src_byte_clk", "src_pixel_clk";
+
+    pinctrl-names = "panel_active", "panel_suspend";
+    //pinctrl-0 = <&sde_dsi_active &sde_te_active &lcd_3v3_en_n_active &tp_3v3_en_n_active>;
+    //pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend &lcd_3v3_en_n_suspend &tp_3v3_en_n_suspend>;
+    pinctrl-0 = <&sde_dsi_active &sde_te_active>;
+    pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
+
+    qcom,dsi-panel = <&dsi_mate10_lite_video>;
+    vddio-supply = <&pm8998_l14>;
+    vddcore-supply = <&lcd3v3>;
+
+    /*vci-supply = <&disp_vci_vreg>;*/
+  };
 };
 
+&mdss_dsi0 {
+	status = "ok";
+  qcom,dsi-pref-prim-pan = <&dsi_mate10_lite_video>;
+};
+
+/* Panel */
+&dsi_mate10_lite_video {
+  qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+
+  /* gpios are correct and connected */
+  qcom,platform-te-gpio = <&tlmm 10 0>;
+  qcom,platform-reset-gpio = <&tlmm 6 0>;
+  //qcom,panel-errfg-gpio = <&tlmm 135 0>
+
+  qcom,mdss-dsi-t-clk-post = <0x0e>;
+	qcom,mdss-dsi-t-clk-pre = <0x31>;
+	qcom,mdss-dsi-display-timings {
+		timing@0{
+			qcom,mdss-dsi-panel-phy-timings = [00 20 08 08 24 23 08 08 05 03 04 00];
+			qcom,display-topology = <1 0 1>;
+			qcom,default-topology-index = <0>;
+		};
+	};
+};
 
 /* Board definition */
 / {
