@@ -428,7 +428,7 @@ static int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable)
 }
 
 
-int dsi_panel_power_on(struct dsi_panel *panel)
+static int dsi_panel_power_on(struct dsi_panel *panel)
 {
 	int rc = 0;
 
@@ -468,7 +468,7 @@ exit:
 	return rc;
 }
 
-int dsi_panel_power_off(struct dsi_panel *panel)
+static int dsi_panel_power_off(struct dsi_panel *panel)
 {
 	int rc = 0;
 
