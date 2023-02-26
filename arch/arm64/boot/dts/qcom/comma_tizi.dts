@@ -50,6 +50,7 @@
 
     gpio = <&pm8998_gpios 13 0>;
     regulator-boot-on;
+    regulator-always-on;
   };
 
 	lcd_bias: lcd_bias {

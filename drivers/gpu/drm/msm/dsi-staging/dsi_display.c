@@ -134,14 +134,7 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 	bl_lvl = clamp(bl_lvl, 0, max_brightness);
 
 	if (!dsi_panel_initialized(panel)) {
-		if (bl_lvl == 0) {
-			pr_err("Turning off panel power\n");
-			dsi_panel_power_off(panel);
-		} else {
-			pr_err("Turning on panel power\n");
-			dsi_panel_power_on(panel);
-		}
-
+		rc = -EINVAL;
 		goto error;
 	}
 
