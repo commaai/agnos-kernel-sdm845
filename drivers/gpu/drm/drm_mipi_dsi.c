@@ -1065,10 +1065,24 @@ int mipi_dsi_dcs_set_display_brightness(struct mipi_dsi_device *dsi,
 		payload[1] = brightness & 0xff;
 	}
 
+	if (dsi->zero_brightness && brightness > 0) {
+		err = mipi_dsi_dcs_set_display_on(dsi);
+		if (err < 0)
+			return err;
+	}
+
 	err = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 				 payload, sizeof(payload));
 	if (err < 0)
 		return err;
+
+	if (!dsi->zero_brightness && brightness == 0) {
+		err = mipi_dsi_dcs_set_display_off(dsi);
+		if (err < 0)
+			return err;
+	}
+
+	dsi->zero_brightness = (brightness == 0);
 
 	return 0;
 }
