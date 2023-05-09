@@ -190,6 +190,8 @@ struct mipi_dsi_device {
 	unsigned int lanes;
 	enum mipi_dsi_pixel_format format;
 	unsigned long mode_flags;
+
+	bool zero_brightness;
 };
 
 #define MIPI_DSI_MODULE_PREFIX "mipi-dsi:"
