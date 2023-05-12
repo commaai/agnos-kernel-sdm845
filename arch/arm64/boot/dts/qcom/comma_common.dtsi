@@ -6,6 +6,28 @@
 #include <dt-bindings/clock/mdss-10nm-pll-clk.h>
 #include <dt-bindings/clock/qcom,audio-ext-clk.h>
 
+#include "dsi-panel-ss-fhd-ea8074-cmd.dtsi"
+
+/* Panel */
+&dsi_ss_fhd_ea8074_cmd {
+  qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+
+  /* gpios are correct and connected */
+  qcom,platform-te-gpio = <&tlmm 10 0>;
+  qcom,platform-reset-gpio = <&tlmm 6 0>;
+  //qcom,panel-errfg-gpio = <&tlmm 135 0>
+
+  qcom,mdss-dsi-t-clk-post = <0x0e>;
+	qcom,mdss-dsi-t-clk-pre = <0x31>;
+	qcom,mdss-dsi-display-timings {
+		timing@0{
+			qcom,mdss-dsi-panel-phy-timings = [00 20 08 08 24 23 08 08 05 03 04 00];
+			qcom,display-topology = <1 0 1>;
+			qcom,default-topology-index = <0>;
+		};
+	};
+};
+
 /* disable the SPI */
 &qupv3_se5_spi {
   status = "disabled";
