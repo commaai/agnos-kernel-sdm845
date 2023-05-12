@@ -56,15 +56,13 @@
 	lcd_bias: lcd_bias {
 		status = "ok";
 
-		compatible = "regulator-fixed";
+		compatible = "regulator-gpio";
 		regulator-name = "lcd_bias";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
 
 		gpio = <&pm8998_gpios 10 0>;
 		enable-active-high;
+    enable-at-boot;
 		regulator-boot-on;
-		regulator-always-on;
   };
 };
 
@@ -111,8 +109,7 @@
     qcom,dsi-panel = <&dsi_mate10_lite_video>;
     vddio-supply = <&pm8998_l14>;
     vddcore-supply = <&lcd3v3>;
-
-    /*vci-supply = <&disp_vci_vreg>;*/
+    vci-supply = <&lcd_bias>;
   };
 };
 
