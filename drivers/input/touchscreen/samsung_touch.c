@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/firmware.h>
 #include <asm/unaligned.h>
+#include <linux/regulator/consumer.h>
 
 #define SS_I2C_NAME "samsung_i2c_touchpanel"
 
@@ -707,7 +708,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
     dev_info(&client->dev, "SAMSUNG PANEL probe\n");
 
-    ts = devm_kzalloc(&client->dev, sizeof(*ts), GFP_KERNEL);
+    ts = devm_kzalloc(&client->dev, sizeof(struct ss_ts_data), GFP_KERNEL);
 	if (!ts)
 		return -ENOMEM;
 
