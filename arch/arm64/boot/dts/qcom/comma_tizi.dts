@@ -29,14 +29,14 @@
   status = "ok";
   qcom,clk-freq-out = <100000>;
 
-  hynitron-ts@1c {
-    compatible = "hynitron_i2c_touchpanel";
-    reg = <0x1c>;
-    interrupt-parent = <&tlmm>;
-		interrupts = <125 0x2002>;
-    interrupt-gpios = <&tlmm 125 0x2002>;
-    reset-gpios = <&tlmm 104 0>;
-  };
+  // hynitron-ts@1c {
+  //   compatible = "hynitron_i2c_touchpanel";
+  //   reg = <0x1c>;
+  //   interrupt-parent = <&tlmm>;
+	// 	interrupts = <125 0x2002>;
+  //   interrupt-gpios = <&tlmm 125 0x2002>;
+  //   reset-gpios = <&tlmm 104 0>;
+  // };
 
   samsung-ts@17 {
     compatible = "samsung_i2c_touchpanel";
