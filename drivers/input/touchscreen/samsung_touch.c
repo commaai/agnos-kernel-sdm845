@@ -478,9 +478,12 @@ static int ss_power_init(struct ss_ts_data *ts)
         goto err;
     }
 
-    // Enabling crashes the kernel.
-    // Not sure why, but it's a fixed regulator which is always enabled anyway
-    //ret = regulator_enable(ts->vdd);
+    if (of_property_read_bool(&ts->client->dev.of_node, "invert-vdd")) {
+        ret = regulator_disable(ts->vdd);
+    } else {
+        ret = regulator_enable(ts->vdd);
+    }
+
     if(ret){
         dev_err(&ts->client->dev, "%s: enabling regulator vdd: %d\n", __func__, ret);
     }

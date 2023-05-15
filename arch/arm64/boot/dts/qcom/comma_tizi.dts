@@ -37,6 +37,18 @@
     interrupt-gpios = <&tlmm 125 0x2002>;
     reset-gpios = <&tlmm 104 0>;
   };
+
+  samsung-ts@17 {
+    compatible = "samsung_i2c_touchpanel";
+    reg = <0x17>;
+    interrupt-parent = <&tlmm>;
+		interrupts = <125 0x2002>;
+    interrupt-gpios = <&tlmm 125 0x2002>;
+    reset-gpios = <&tlmm 104 0>;
+    ta-gpios = <&tlmm 128 0>;
+    vdd-supply = <&gpio10_regulator>;
+    invert-vdd;
+  };
 };
 
 &vendor {
@@ -53,13 +65,14 @@
     regulator-always-on;
   };
 
-	lcd_bias: lcd_bias {
+	gpio10_regulator: gpio10_regulator {
 		status = "ok";
 
 		compatible = "regulator-gpio";
-		regulator-name = "lcd_bias";
+		regulator-name = "gpio10_regulator";
 
 		gpio = <&pm8998_gpios 10 0>;
+    states = <3300000 1>;
 		enable-active-high;
     enable-at-boot;
 		regulator-boot-on;
@@ -109,7 +122,7 @@
     qcom,dsi-panel = <&dsi_mate10_lite_video>;
     vddio-supply = <&pm8998_l14>;
     vddcore-supply = <&lcd3v3>;
-    vci-supply = <&lcd_bias>;
+    vci-supply = <&gpio10_regulator>;
   };
 };
 
