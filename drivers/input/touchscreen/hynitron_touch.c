@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/firmware.h>
 #include <asm/unaligned.h>
+#include <linux/init.h>
 
 #define HYN_I2C_NAME "hynitron_i2c_touchpanel"
 
@@ -200,6 +201,12 @@ static int hyn_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	int error, boot_status;
 
     dev_info(&client->dev, "HYNITRON PANEL probe\n");
+
+    // Check that we are running with a Mate10 Lite panel, otherwise abort
+    if(strstr(saved_command_line, "mate10_lite") == NULL){
+        dev_err(&client->dev, "Not running on a Mate10 Lite panel, aborting\n");
+        return -ENODEV;
+    }
 
     ts = devm_kzalloc(&client->dev, sizeof(*ts), GFP_KERNEL);
 	if (!ts)

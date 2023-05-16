@@ -26,6 +26,8 @@
 #include <linux/slab.h>
 #include <linux/firmware.h>
 #include <asm/unaligned.h>
+#include <linux/regulator/consumer.h>
+#include <linux/init.h>
 
 #define SS_I2C_NAME "samsung_i2c_touchpanel"
 
@@ -478,9 +480,12 @@ static int ss_power_init(struct ss_ts_data *ts)
         goto err;
     }
 
-    // Enabling crashes the kernel.
-    // Not sure why, but it's a fixed regulator which is always enabled anyway
-    //ret = regulator_enable(ts->vdd);
+    if (of_property_read_bool(&ts->client->dev.of_node, "invert-vdd")) {
+        ret = regulator_disable(ts->vdd);
+    } else {
+        ret = regulator_enable(ts->vdd);
+    }
+
     if(ret){
         dev_err(&ts->client->dev, "%s: enabling regulator vdd: %d\n", __func__, ret);
     }
@@ -704,7 +709,13 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
     dev_info(&client->dev, "SAMSUNG PANEL probe\n");
 
-    ts = devm_kzalloc(&client->dev, sizeof(*ts), GFP_KERNEL);
+    // Check that we are running with a Samsung panel, otherwise abort
+    if(strstr(saved_command_line, "ea8074") == NULL){
+        dev_err(&client->dev, "Not running on a Samsung EA8074 panel, aborting\n");
+        return -ENODEV;
+    }
+
+    ts = devm_kzalloc(&client->dev, sizeof(struct ss_ts_data), GFP_KERNEL);
 	if (!ts)
 		return -ENOMEM;
 
