@@ -706,6 +706,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
     struct ss_ts_data *ts;
     struct firmware *fw;
 	int error, boot_status;
+    char test;
 
     dev_info(&client->dev, "SAMSUNG PANEL probe\n");
 
@@ -754,6 +755,15 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
     // Reset panel
 	ss_ts_reset(ts);
+
+    // Log if OEM
+    if(ss_read(ts, 0, &test, 1) == 0) {
+        if (test == 0xFF) {
+            dev_err(&client->dev, "OEM touch detected\n");
+        } else {
+            dev_err(&client->dev, "clone touch detected\n");
+        }
+    }
 
     // Check that the panel is running in app mode, otherwise flash
     boot_status = ss_get_boot_status(ts);
