@@ -80,12 +80,14 @@
   tp3v3: tp3v3 {
    status = "ok";
 
-   compatible = "regulator-gpio";
+   compatible = "regulator-fixed";
    regulator-name = "tp3v3";
+   regulator-min-microvolt = <3300000>;
+   regulator-max-microvolt = <3300000>;
 
    gpio = <&pm8998_gpios 10 0>;
-   enable-at-boot;
    regulator-boot-on;
+   regulator-always-on;
   };
 
   ssd3v3: ssd3v3 {
