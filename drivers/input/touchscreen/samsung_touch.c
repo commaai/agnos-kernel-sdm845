@@ -27,6 +27,7 @@
 #include <linux/firmware.h>
 #include <asm/unaligned.h>
 #include <linux/regulator/consumer.h>
+#include <linux/init.h>
 
 #define SS_I2C_NAME "samsung_i2c_touchpanel"
 
@@ -707,6 +708,12 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 	int error, boot_status;
 
     dev_info(&client->dev, "SAMSUNG PANEL probe\n");
+
+    // Check that we are running with a Samsung panel, otherwise abort
+    if(strstr(saved_command_line, "ea8074") == NULL){
+        dev_err(&client->dev, "Not running on a Samsung EA8074 panel, aborting\n");
+        return -ENODEV;
+    }
 
     ts = devm_kzalloc(&client->dev, sizeof(struct ss_ts_data), GFP_KERNEL);
 	if (!ts)
