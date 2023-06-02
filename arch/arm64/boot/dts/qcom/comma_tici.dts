@@ -46,9 +46,9 @@
 };
 
 /* GPS UART */
-&qupv3_gps_uart {
-  status = "ok";
-};
+// &qupv3_gps_uart {
+//   status = "ok";
+// };
 
 &vendor {
   main5v: main5v {
