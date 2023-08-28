@@ -141,6 +141,6 @@
 / {
 	model = "comma tici";
 	compatible = "qcom,sda845-mtp", "qcom,sda845", "qcom,mtp";
-	qcom,msm-id = <341 0x20001>;
+	qcom,msm-id = <341 0x20001>, <321 0x20001>;
 	qcom,board-id = <0x8 0>, <0x20 0>; // Support both old and new XBL
 };
