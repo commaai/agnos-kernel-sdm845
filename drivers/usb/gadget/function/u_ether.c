@@ -1414,10 +1414,14 @@ struct net_device *gether_setup_name_default(const char *netname)
 	dev->qmult = QMULT_DEFAULT;
 	snprintf(net->name, sizeof(net->name), "%s%%d", netname);
 
-	eth_random_addr(dev->dev_mac);
-	pr_warn("using random %s ethernet address\n", "self");
-	eth_random_addr(dev->host_mac);
-	pr_warn("using random %s ethernet address\n", "host");
+	// Hardcoded device MAC address. Not sure how to set this at runtime.
+	u8 hardcoded_dev_mac[ETH_ALEN] = {0x02, 0x01, 0x02, 0x03, 0x04, 0x05};
+	memcpy(dev->dev_mac, hardcoded_dev_mac, ETH_ALEN);
+	pr_warn("using hardcoded %s ethernet address for device\n", "self");
+	// Hardcoded host MAC address
+	u8 hardcoded_host_mac[ETH_ALEN] = {0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
+	memcpy(dev->host_mac, hardcoded_host_mac, ETH_ALEN);
+	pr_warn("using hardcoded %s ethernet address for host\n", "host");
 
 	net->netdev_ops = &eth_netdev_ops;
 
