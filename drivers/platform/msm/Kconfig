@@ -234,4 +234,12 @@ config MSM_RMNET_BAM
           for routing IP packets within the MSM using
           BAM as a physical transport.
 
+config GPIO_SOM_ID
+	bool "Simple GPIO-based ID driver"
+	help
+		This driver uses the internal pull-ups of the provided GPIOs to
+		detect the SOM ID. The SOM ID is a 4-bit value that is set by
+		tying the GPIOs to either ground or VDD. The SOM ID can then
+		be read in userspace by sysfs.
+
 endmenu
