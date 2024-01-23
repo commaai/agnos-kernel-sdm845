@@ -111,6 +111,14 @@
 };
 
 &vendor {
+  gpio-som-id {
+    status="okay";
+    compatible = "comma,gpio-som-id";
+    gpios = <&tlmm 105 0>, <&tlmm 106 0>, <&tlmm 107 0>, <&tlmm 108 0>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&som_id_default>;
+  };
+
   bluetooth: bt_wcn3990 {
     compatible = "qca,wcn3990";
     qca,bt-vdd-io-supply = <&pm8998_s3>;
