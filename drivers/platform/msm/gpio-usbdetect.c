@@ -23,7 +23,7 @@
 #include <linux/extcon.h>
 #include <linux/regulator/consumer.h>
 
-struct gpio_som_id {
+struct gpio_usbdetect {
 	struct platform_device	*pdev;
 	struct regulator	*vin;
 	int			vbus_det_irq;
@@ -42,7 +42,7 @@ static const unsigned int gpio_usb_extcon_table[] = {
 
 static irqreturn_t gpio_usbdetect_vbus_irq(int irq, void *data)
 {
-	struct gpio_som_id *usb = data;
+	struct gpio_usbdetect *usb = data;
 	union extcon_property_value val;
 
 	usb->vbus_state = gpio_get_value(usb->gpio);
@@ -62,7 +62,7 @@ static irqreturn_t gpio_usbdetect_vbus_irq(int irq, void *data)
 
 static irqreturn_t gpio_usbdetect_id_irq(int irq, void *data)
 {
-	struct gpio_som_id *usb = data;
+	struct gpio_usbdetect *usb = data;
 	int ret;
 
 	ret = irq_get_irqchip_state(irq, IRQCHIP_STATE_LINE_LEVEL,
@@ -77,7 +77,7 @@ static irqreturn_t gpio_usbdetect_id_irq(int irq, void *data)
 
 static irqreturn_t gpio_usbdetect_id_irq_thread(int irq, void *data)
 {
-	struct gpio_som_id *usb = data;
+	struct gpio_usbdetect *usb = data;
 	bool curr_id_state;
 	static int prev_id_state = -EINVAL;
 	union extcon_property_value val;
@@ -107,9 +107,9 @@ static irqreturn_t gpio_usbdetect_id_irq_thread(int irq, void *data)
 
 static const u32 gpio_usb_extcon_exclusive[] = {0x3, 0};
 
-static int gpio_som_id_probe(struct platform_device *pdev)
+static int gpio_usbdetect_probe(struct platform_device *pdev)
 {
-	struct gpio_som_id *usb;
+	struct gpio_usbdetect *usb;
 	int rc;
 
 	usb = devm_kzalloc(&pdev->dev, sizeof(*usb), GFP_KERNEL);
@@ -231,9 +231,9 @@ error:
 	return rc;
 }
 
-static int gpio_som_id_remove(struct platform_device *pdev)
+static int gpio_usbdetect_remove(struct platform_device *pdev)
 {
-	struct gpio_som_id *usb = dev_get_drvdata(&pdev->dev);
+	struct gpio_usbdetect *usb = dev_get_drvdata(&pdev->dev);
 
 	disable_irq_wake(usb->vbus_det_irq);
 	disable_irq(usb->vbus_det_irq);
@@ -255,8 +255,8 @@ static struct platform_driver gpio_usbdetect_driver = {
 		.name	= "qcom,gpio-usbdetect",
 		.of_match_table = of_match_table,
 	},
-	.probe		= gpio_som_id_probe,
-	.remove		= gpio_som_id_remove,
+	.probe		= gpio_usbdetect_probe,
+	.remove		= gpio_usbdetect_remove,
 };
 
 module_driver(gpio_usbdetect_driver, platform_driver_register,
