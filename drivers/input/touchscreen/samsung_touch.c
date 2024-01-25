@@ -93,6 +93,8 @@ struct ss_ts_data {
 	struct gpio_desc *reset_gpio;
     struct gpio_desc *ta_gpio;
 
+    uint64_t touch_count;
+
     uint8_t chip_id[3];
 };
 
@@ -200,6 +202,7 @@ static int ss_report_touch(struct ss_ts_data *ts, int touch_id, int action, int 
             break;
         case SS_EVENT_COORDINATE_ACTION_UP:
             input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, false);
+            ts->touch_count++;
             break;
     }
     input_mt_report_pointer_emulation(ts->input, true);
@@ -692,8 +695,17 @@ static ssize_t ss_color_cal_store(struct device *dev, struct device_attribute *a
 
 static DEVICE_ATTR(color_cal, 0664, ss_color_cal_read, ss_color_cal_store);
 
+static ssize_t ss_touch_count_read(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct ss_ts_data *ts = dev_get_drvdata(dev);
+    return sprintf(buf, "%llu\n", ts->touch_count);
+}
+
+static DEVICE_ATTR(touch_count, 0444, ss_touch_count_read, NULL);
+
 static struct attribute *ss_attributes[] = {
     &dev_attr_color_cal.attr,
+    &dev_attr_touch_count.attr,
     NULL
 };
 
@@ -820,6 +832,7 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 
 	ts->input->name = "Samsung Touchscreen";
 	ts->input->id.bustype = BUS_I2C;
+    ts->touch_count = 0;
 
     input_set_abs_params(ts->input, ABS_MT_TRACKING_ID, 0, SS_MAX_FINGERS + SS_MAX_HOVER, 0, 0);
 	input_set_abs_params(ts->input, ABS_MT_POSITION_X, 0, SS_MAX_X, 0, 0);
