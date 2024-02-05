@@ -1722,8 +1722,9 @@ void hdd_update_tgt_cfg(void *context, void *param)
 		hdd_ctx->reg.eeprom_rd_ext = cfg->eeprom_rd_ext;
 	}
 
+	// COMMA: always generate a unique MAC
 	/* This can be extended to other configurations like ht, vht cap... */
-	if (!qdf_is_macaddr_zero(&cfg->hw_macaddr))
+	if (!qdf_is_macaddr_zero(&cfg->hw_macaddr) && false)
 		qdf_mem_copy(&hdd_ctx->hw_macaddr, &cfg->hw_macaddr,
 			     QDF_MAC_ADDR_SIZE);
 	else
