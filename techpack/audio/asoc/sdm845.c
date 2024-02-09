@@ -3926,7 +3926,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		if (IS_ERR(mclk)) {
 		return -1;
 	}
-		
+
 	ret = clk_prepare_enable(mclk);
 	if (ret) {
 		return -1;
@@ -5945,7 +5945,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",*/
-    .codec_name = "max98088.0-0010",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_playback = 1,
@@ -5963,7 +5963,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",*/
-    .codec_name = "max98088.0-0010",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_capture = 1,
@@ -5972,7 +5972,6 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 	},
-  	// max98088 is connected here!
 	{
 		.name = LPASS_BE_TERT_MI2S_RX,
 		.stream_name = "Tertiary MI2S Playback",
@@ -5980,7 +5979,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",*/
-    .codec_name = "max98088.0-0010",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_playback = 1,
@@ -5997,7 +5996,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",*/
-    .codec_name = "max98088.0-0010",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_capture = 1,
