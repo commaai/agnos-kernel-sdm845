@@ -29,26 +29,17 @@
   status = "ok";
   qcom,clk-freq-out = <100000>;
 
-  // hynitron-ts@1c {
-  //   compatible = "hynitron_i2c_touchpanel";
-  //   reg = <0x1c>;
-  //   interrupt-parent = <&tlmm>;
-	// 	interrupts = <125 0x2002>;
-  //   interrupt-gpios = <&tlmm 125 0x2002>;
-  //   reset-gpios = <&tlmm 104 0>;
-  // };
-
-  // samsung-ts@17 {
-  //   compatible = "samsung_i2c_touchpanel";
-  //   reg = <0x17>;
-  //   interrupt-parent = <&tlmm>;
-	// 	interrupts = <125 0x2002>;
-  //   interrupt-gpios = <&tlmm 125 0x2002>;
-  //   reset-gpios = <&tlmm 104 0>;
-  //   ta-gpios = <&tlmm 128 0>;
-  //   vdd-supply = <&gpio10_regulator>;
-  //   invert-vdd;
-  // };
+  focaltech@38{
+    compatible = "focaltech,fts";
+    reg = <0x38>;
+    interrupt-parent = <&tlmm>;
+    interrupts = <125 0x2002>;
+    vdd-supply = <&lcd3v3>;
+    vcc_i2c-supply = <&pm8998_s4>;
+    focaltech,reset-gpio = <&tlmm 104 0>;
+    focaltech,irq-gpio = <&tlmm 125 0x2002>;
+    focaltech,display-coords = <0 0 240 536>;
+  };
 };
 
 &vendor {
