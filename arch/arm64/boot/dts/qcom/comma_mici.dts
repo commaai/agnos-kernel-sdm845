@@ -1,0 +1,78 @@
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+/dts-v1/;
+
+#include <dt-bindings/clock/qcom,gcc-sdm845.h>
+#include <dt-bindings/clock/qcom,camcc-sdm845.h>
+#include <dt-bindings/clock/qcom,dispcc-sdm845.h>
+#include <dt-bindings/clock/qcom,rpmh.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+
+#include "sda845-v2.1.dtsi"
+
+#include "comma_common.dtsi"
+
+/* touch panel I2C, /dev/i2c-2 */
+&qupv3_se5_i2c {
+  status = "ok";
+  qcom,clk-freq-out = <100000>;
+
+  focaltech@38{
+    compatible = "focaltech,fts";
+    reg = <0x38>;
+    interrupt-parent = <&tlmm>;
+    interrupts = <125 0x2002>;
+    vdd-supply = <&lcd3v3>;
+    vcc_i2c-supply = <&pm8998_s4>;
+    focaltech,reset-gpio = <&tlmm 104 0>;
+    focaltech,irq-gpio = <&tlmm 125 0x2002>;
+    focaltech,display-coords = <0 0 240 536>;
+  };
+};
+
+&vendor {
+	lcd3v3: lcd3v3 {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "lcd3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&pm8998_gpios 13 0>;
+    regulator-boot-on;
+    regulator-always-on;
+  };
+
+	gpio10_regulator: gpio10_regulator {
+		status = "ok";
+
+		compatible = "regulator-gpio";
+		regulator-name = "gpio10_regulator";
+
+		gpio = <&pm8998_gpios 10 0>;
+    states = <3300000 1>;
+		enable-active-high;
+    enable-at-boot;
+		regulator-boot-on;
+  };
+};
+
+/* Board definition */
+/ {
+	model = "comma mici";
+	compatible = "qcom,sda845-mtp", "qcom,sda845", "qcom,mtp";
+	qcom,msm-id = <341 0x20001>, <321 0x20001>, <321 0x20000>;
+	qcom,board-id = <0x22 0>;
+};
