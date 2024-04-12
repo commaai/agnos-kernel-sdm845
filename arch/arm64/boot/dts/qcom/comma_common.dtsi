@@ -532,6 +532,7 @@
 	qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrRight", "SpkrLeft", "SpkrRight";*/
 };
 
+/* SD card + WLAN */
 &sdhc_2 {
 	vdd-supply = <&pm8998_l21>;
 	qcom,vdd-voltage-level = <2950000 2960000>;
@@ -545,7 +546,9 @@
 	pinctrl-0 = <&sdc2_clk_on  &sdc2_cmd_on &sdc2_data_on &storage_cd>;
 	pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off &storage_cd>;
 
-	cd-gpios = <&tlmm 126 GPIO_ACTIVE_LOW>;
+	//cd-gpios = <&tlmm 126 GPIO_ACTIVE_LOW>;
+	qcom,non-removable;
+	//non-removable;
 
 	status = "ok";
 };
