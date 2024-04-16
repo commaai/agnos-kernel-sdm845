@@ -238,7 +238,7 @@ PREPACK struct bmi_target_info {
     A_UINT32 target_info_byte_count; /* size of this structure */
     A_UINT32 target_ver;             /* Target Version ID */
     A_UINT32 target_type;            /* Target type */
-} POSTPACK;
+} __attribute__((packed));
 #define TARGET_VERSION_SENTINAL 0xffffffff
 #define TARGET_TYPE_UNKNOWN   0
 #define TARGET_TYPE_AR6001    1
