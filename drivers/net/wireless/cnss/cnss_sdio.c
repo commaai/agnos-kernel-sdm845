@@ -992,10 +992,8 @@ int cnss_sdio_wlan_register_driver(struct cnss_sdio_wlan_driver *driver)
 	struct device *dev;
 	int error = -EINVAL;
 
-	if (!cnss_pdata) {
-		pr_err("no device!!!\n");
+	if (!cnss_pdata)
 		return -ENODEV;
-	}
 
 	cnss_info = &cnss_pdata->cnss_sdio_info;
 	dev = cnss_info->dev;
@@ -1401,8 +1399,6 @@ static int cnss_sdio_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct cnss_sdio_info *info;
 
-	pr_err("probing!!!\n");
-
 	if (pdev->dev.of_node) {
 		cnss_pdata = devm_kzalloc(
 			&pdev->dev, sizeof(*cnss_pdata), GFP_KERNEL);
@@ -1412,10 +1408,8 @@ static int cnss_sdio_probe(struct platform_device *pdev)
 		cnss_pdata = pdev->dev.platform_data;
 	}
 
-	if (!cnss_pdata) {
-		pr_err("not pdata :(\n");
+	if (!cnss_pdata)
 		return -EINVAL;
-	}
 
 	cnss_pdata->pdev = pdev;
 	info = &cnss_pdata->cnss_sdio_info;

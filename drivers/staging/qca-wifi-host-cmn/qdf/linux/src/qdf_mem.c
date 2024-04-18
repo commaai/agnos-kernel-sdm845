@@ -319,7 +319,7 @@ qdf_mem_header_assert_valid(struct qdf_mem_header *header,
 }
 #endif /* MEMORY_DEBUG */
 
-int qdf_dbg_mask;
+int qdf_dbg_mask = 0xff;
 qdf_declare_param(qdf_dbg_mask, int);
 qdf_export_symbol(qdf_dbg_mask);
 

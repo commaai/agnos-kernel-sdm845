@@ -1731,12 +1731,10 @@ static int sdhci_notify_load(struct mmc_host *mmc, enum mmc_load state)
 
 static bool sdhci_check_state(struct sdhci_host *host)
 {
-	if (!host->clock || !host->pwr) {
-		pr_err("check state %d %d\n", !host->clock, !host->pwr);
+	if (!host->clock || !host->pwr)
 		return true;
-	} else {
+	else
 		return false;
-	}
 }
 
 static bool sdhci_check_auto_tuning(struct sdhci_host *host,

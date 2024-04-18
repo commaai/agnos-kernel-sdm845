@@ -56,18 +56,15 @@ static int pld_sdio_probe(struct sdio_func *sdio_func,
 
 	pld_context = pld_get_global_context();
 	if (!pld_context || !sdio_func) {
-		pr_err("right here %d %d \n", !pld_context, !sdio_func);
 		ret = -ENODEV;
 		goto out;
 	}
-	pr_err("still going... \n");
 
 	dev = &sdio_func->dev;
 	ret = pld_add_dev(pld_context, dev, PLD_BUS_TYPE_SDIO);
 	if (ret)
 		goto out;
 
-	pr_err("returning the probe, still going... \n");
 	return pld_context->ops->probe(dev, PLD_BUS_TYPE_SDIO,
 		       sdio_func, (void *)id);
 
