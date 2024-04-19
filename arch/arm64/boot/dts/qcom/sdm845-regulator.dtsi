@@ -576,7 +576,7 @@
 			regulator-name = "pm8998_l21";
 			qcom,set = <RPMH_REGULATOR_SET_ALL>;
 			regulator-min-microvolt = <2704000>;
-			regulator-max-microvolt = <2960000>;
+			regulator-max-microvolt = <3300000>;
 			qcom,init-voltage = <2704000>;
 			qcom,init-mode = <RPMH_REGULATOR_MODE_LPM>;
 		};

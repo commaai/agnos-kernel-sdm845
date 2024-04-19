@@ -532,22 +532,61 @@
 	qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrRight", "SpkrLeft", "SpkrRight";*/
 };
 
+/ {
+	pwrseq_simple: pwrseq_simple {
+    compatible = "mmc-pwrseq-simple";
+		pinctrl-names = "default";
+		pinctrl-0 = <&sdio_wlan_en_default>;
+    reset-gpios = <&tlmm 42 GPIO_ACTIVE_HIGH>;
+	};
+
+	qcom,cnss_sdio {
+		compatible = "qcom,cnss_sdio";
+		subsys-name = "QCA9377_SDIO";
+		vdd-wlan-supply = <&pm8998_l21>;
+		vdd-wlan-io-supply = <&pm8998_l13>;
+		vdd-wlan-dsrc-supply = <&pm8998_l13>;
+		vdd-wlan-xtal-supply = <&pm8998_l13>;
+		qcom,skip-wlan-en-toggle;
+		status = "ok";
+	};
+};
+
+/* SD card + WLAN */
 &sdhc_2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
 	vdd-supply = <&pm8998_l21>;
-	qcom,vdd-voltage-level = <2950000 2960000>;
+	qcom,vdd-voltage-level = <2950000 3300000>;
 	qcom,vdd-current-level = <200 800000>;
 
 	vdd-io-supply = <&pm8998_l13>;
-	qcom,vdd-io-voltage-level = <1808000 2960000>;
+	qcom,vdd-io-voltage-level = <1800000 1800000>;
 	qcom,vdd-io-current-level = <200 22000>;
+
+  status = "ok";
 
 	pinctrl-names = "active", "sleep";
 	pinctrl-0 = <&sdc2_clk_on  &sdc2_cmd_on &sdc2_data_on &storage_cd>;
 	pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off &storage_cd>;
 
+	/* SD card */
+	/*
 	cd-gpios = <&tlmm 126 GPIO_ACTIVE_LOW>;
+	*/
 
-	status = "ok";
+	/* WLAN config */
+	bus-width = <4>;
+	qcom,nonremovable;
+	non-removable;
+	keep-power-in-suspend;
+	mmc-pwrseq = <&pwrseq_simple>;
+
+  wifi: wifi@1 {
+    reg = <1>;
+		compatible = "qcom,cnss_sdio";
+  };
 };
 
 &soc {
