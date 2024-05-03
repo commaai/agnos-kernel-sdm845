@@ -145,6 +145,7 @@ u16 ieee80211_select_queue_80211(struct ieee80211_sub_if_data *sdata,
 u16 ieee80211_select_queue(struct ieee80211_sub_if_data *sdata,
 			   struct sk_buff *skb)
 {
+  printk("ieee80211_select_queue\n");
 	struct ieee80211_local *local = sdata->local;
 	struct sta_info *sta = NULL;
 	const u8 *ra = NULL;

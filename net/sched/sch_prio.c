@@ -35,6 +35,7 @@ struct prio_sched_data {
 static struct Qdisc *
 prio_classify(struct sk_buff *skb, struct Qdisc *sch, int *qerr)
 {
+  printk(KERN_ALERT "\n");
 	struct prio_sched_data *q = qdisc_priv(sch);
 	u32 band = skb->priority;
 	struct tcf_result res;
@@ -42,9 +43,11 @@ prio_classify(struct sk_buff *skb, struct Qdisc *sch, int *qerr)
 	int err;
 
 	*qerr = NET_XMIT_SUCCESS | __NET_XMIT_BYPASS;
+	printk(KERN_ALERT "prio_classify: band=%d, TC_H_MAJ=%d, sch->handle=%d\n", band, TC_H_MAJ(band), sch->handle);
 	if (TC_H_MAJ(skb->priority) != sch->handle) {
 		fl = rcu_dereference_bh(q->filter_list);
 		err = tc_classify(skb, fl, &res, false);
+		printk(KERN_ALERT "prio_classify: err=%d, res.classid=%d\n", err, res.classid);
 #ifdef CONFIG_NET_CLS_ACT
 		switch (err) {
 		case TC_ACT_STOLEN:
@@ -57,13 +60,19 @@ prio_classify(struct sk_buff *skb, struct Qdisc *sch, int *qerr)
 		if (!fl || err < 0) {
 			if (TC_H_MAJ(band))
 				band = 0;
+      printk(KERN_ALERT "prio_classify: queue idx: %d\n", q->prio2band[band & TC_PRIO_MAX]);
 			return q->queues[q->prio2band[band & TC_PRIO_MAX]];
 		}
 		band = res.classid;
+		printk(KERN_ALERT "set band to %d\n", band);
 	}
+	printk(KERN_ALERT "final band: %d\n", band);
 	band = TC_H_MIN(band) - 1;
-	if (band >= q->bands)
+	if (band >= q->bands) {
+    printk(KERN_ALERT "band >= q->bands, returning: %d\n", q->prio2band[0]);
 		return q->queues[q->prio2band[0]];
+	}
+
 
 	return q->queues[band];
 }

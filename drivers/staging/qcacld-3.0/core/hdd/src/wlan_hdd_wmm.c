@@ -92,14 +92,14 @@ void wlan_hdd_process_peer_unauthorised_pause(hdd_adapter_t *adapter)
 
 /* Linux based UP -> AC Mapping */
 const uint8_t hdd_linux_up_to_ac_map[HDD_WMM_UP_TO_AC_MAP_SIZE] = {
-	HDD_LINUX_AC_BE,
-	HDD_LINUX_AC_BK,
-	HDD_LINUX_AC_BK,
-	HDD_LINUX_AC_BE,
-	HDD_LINUX_AC_VI,
-	HDD_LINUX_AC_VI,
-	HDD_LINUX_AC_VO,
-	HDD_LINUX_AC_VO
+	HDD_LINUX_AC_BE,  // 2
+	HDD_LINUX_AC_BK,  // 3
+	HDD_LINUX_AC_BK,  // 3
+	HDD_LINUX_AC_BE,  // 2
+	HDD_LINUX_AC_VI,  // 1
+	HDD_LINUX_AC_VI,  // 1
+	HDD_LINUX_AC_VO,  // 0
+	HDD_LINUX_AC_VO  // 0
 };
 
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
@@ -1281,8 +1281,10 @@ QDF_STATUS hdd_wmm_init(hdd_adapter_t *pAdapter)
 	/* DSCP to User Priority Lookup Table
 	 * By default use the 3 Precedence bits of DSCP as the User Priority
 	 */
-	for (dscp = 0; dscp <= WLAN_HDD_MAX_DSCP; dscp++)
+	for (dscp = 0; dscp <= WLAN_HDD_MAX_DSCP; dscp++) {
+
 		hddWmmDscpToUpMap[dscp] = dscp >> 3;
+	}
 
 	/* Special case for Expedited Forwarding (DSCP 46) */
 	hddWmmDscpToUpMap[46] = SME_QOS_WMM_UP_VO;
@@ -1433,6 +1435,7 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 		/* case 1: Ethernet II IP packet */
 		ip_hdr = (struct iphdr *)&pkt[sizeof(eth_hdr->eth_II)];
 		tos = ip_hdr->tos;
+	  printk(KERN_ALERT "hdd_wmm_classify_pkt: Ethernet II IP packet, tos: %d\n", tos);
 #ifdef HDD_WMM_DEBUG
 		hdd_info("Ethernet II IP Packet, tos is %d", tos);
 #endif /* HDD_WMM_DEBUG */
@@ -1440,6 +1443,7 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 	} else if (eth_hdr->eth_II.h_proto == htons(ETH_P_IPV6)) {
 		ipv6hdr = ipv6_hdr(skb);
 		tos = ntohs(*(const __be16 *)ipv6hdr) >> 4;
+    printk(KERN_ALERT "hdd_wmm_classify_pkt: Ethernet II IPv6 Packet, tos: %d\n", tos);
 #ifdef HDD_WMM_DEBUG
 		hdd_info("Ethernet II IPv6 Packet, tos is %d", tos);
 #endif /* HDD_WMM_DEBUG */
@@ -1451,11 +1455,13 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 		/* case 2: 802.3 LLC/SNAP IP packet */
 		ip_hdr = (struct iphdr *)&pkt[sizeof(eth_hdr->eth_8023)];
 		tos = ip_hdr->tos;
+    printk(KERN_ALERT "hdd_wmm_classify_pkt: 802.3 LLC/SNAP IP packet, tos: %d\n", tos);
 #ifdef HDD_WMM_DEBUG
 		hdd_info("802.3 LLC/SNAP IP Packet, tos is %d", tos);
 #endif /* HDD_WMM_DEBUG */
 	} else if (eth_hdr->eth_II.h_proto == htons(ETH_P_8021Q)) {
 		/* VLAN tagged */
+		printk(KERN_ALERT "hdd_wmm_classify_pkt: VLAN tagged\n");
 
 		if (eth_hdr->eth_IIv.h_vlan_encapsulated_proto ==
 			htons(ETH_P_IP)) {
@@ -1484,6 +1490,7 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 				(struct iphdr *)
 				&pkt[sizeof(eth_hdr->eth_8023v)];
 			tos = ip_hdr->tos;
+			printk(KERN_ALERT "hdd_wmm_classify_pkt: 802.3 LLC/SNAP vlan-tagged IP packet, tos: %d\n", tos);
 #ifdef HDD_WMM_DEBUG
 			hdd_info("802.3 LLC/SNAP VLAN tagged IP Packet, tos is %d",
 				 tos);
@@ -1494,6 +1501,7 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 			hdd_warn("VLAN tagged Unhandled Protocol, using default tos");
 #endif /* HDD_WMM_DEBUG */
 			tos = 0;
+			printk(KERN_ALERT "hdd_wmm_classify_pkt: VLAN tagged Unhandled Protocol, using default tos\n");
 		}
 	} else {
 		/* default */
@@ -1504,13 +1512,16 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 		if (eth_hdr->eth_II.h_proto ==
 			htons(HDD_ETHERTYPE_802_1_X)) {
 			tos = 0xC0;
+			printk(KERN_ALERT "hdd_wmm_classify_pkt: 802.1x packet, tos: %d\n", tos);
 			*is_eapol = true;
 		} else
 			tos = 0;
+			printk(KERN_ALERT "hdd_wmm_classify_pkt: Unhandled Protocol, using default tos\n");
 	}
 
 	dscp = (tos >> 2) & 0x3f;
 	*user_pri = adapter->hddWmmDscpToUpMap[dscp];
+	printk(KERN_ALERT "hdd_wmm_classify_pkt: dscp: %d, user_pri: %d\n", dscp, *user_pri);
 
 #ifdef HDD_WMM_DEBUG
 	hdd_debug("tos is %d, dscp is %d, up is %d", tos, dscp, *user_pri);
@@ -1592,6 +1603,7 @@ uint16_t hdd_hostapd_select_queue(struct net_device *dev, struct sk_buff *skb
 	skb->priority = up;
 	queueIndex = hdd_get_queue_index(skb->priority, is_eapol);
 
+
 	return queueIndex;
 }
 
@@ -1607,6 +1619,7 @@ uint16_t hdd_hostapd_select_queue(struct net_device *dev, struct sk_buff *skb
 uint16_t hdd_wmm_select_queue(struct net_device *dev, struct sk_buff *skb)
 {
 	sme_QosWmmUpType up = SME_QOS_WMM_UP_BE;
+	printk(KERN_ALERT "wlan_hdd_wmm: up: %d\n", up);
 	uint16_t queueIndex;
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	bool is_crtical = false;
@@ -1616,6 +1629,7 @@ uint16_t hdd_wmm_select_queue(struct net_device *dev, struct sk_buff *skb)
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status != 0) {
 		skb->priority = SME_QOS_WMM_UP_BE;
+    printk(KERN_ALERT "wlan_hdd_wmm: status: %d\n", status);
 		return HDD_LINUX_AC_BE;
 	}
 
@@ -1629,6 +1643,7 @@ uint16_t hdd_wmm_select_queue(struct net_device *dev, struct sk_buff *skb)
 	}
 	spin_unlock_bh(&adapter->pause_map_lock);
 	skb->priority = up;
+	printk(KERN_ALERT "wlan_hdd_wmm: up2: %d\n", up);
 	queueIndex = hdd_get_queue_index(skb->priority, is_crtical);
 
 	return queueIndex;
@@ -1898,6 +1913,7 @@ QDF_STATUS hdd_wmm_assoc(hdd_adapter_t *pAdapter,
 	status = sme_update_dsc_pto_up_mapping(pHddCtx->hHal,
 					       pAdapter->hddWmmDscpToUpMap,
 					       pAdapter->sessionId);
+  printk(KERN_ALERT "dscp to up mapping updated, status: %d\n", status);
 
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_wmm_init(pAdapter);

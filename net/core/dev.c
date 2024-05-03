@@ -3196,6 +3196,7 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 		rc = NET_XMIT_DROP;
 	} else if ((q->flags & TCQ_F_CAN_BYPASS) && !qdisc_qlen(q) &&
 		   qdisc_run_begin(q)) {
+    printk(KERN_ALERT "TCQ_F_CAN_BYPASS, skb->queue_mapping: %d\n", skb->queue_mapping);
 		/*
 		 * This is a work-conserving queue; there are no old skbs
 		 * waiting to be sent out; and the qdisc is not running -
@@ -3215,7 +3216,10 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 
 		rc = NET_XMIT_SUCCESS;
 	} else {
+    printk(KERN_ALERT "sk_buff prio4: %d\n", skb->priority, __LINE__, __func__);
 		rc = q->enqueue(skb, q, &to_free) & NET_XMIT_MASK;
+    printk(KERN_ALERT "enqueue done!\n", __LINE__, __func__);
+
 		if (qdisc_run_begin(q)) {
 			if (unlikely(contended)) {
 				spin_unlock(&q->busylock);
@@ -3354,23 +3358,35 @@ static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 
 static u16 __netdev_pick_tx(struct net_device *dev, struct sk_buff *skb)
 {
+  printk(KERN_ALERT "__netdev 1 prio: %d", skb->priority);
 	struct sock *sk = skb->sk;
+  printk(KERN_ALERT "__netdev 2 prio: %d", skb->priority);
 	int queue_index = sk_tx_queue_get(sk);
+  printk(KERN_ALERT "__netdev 3 prio: %d", skb->priority);
 
 	if (queue_index < 0 || skb->ooo_okay ||
 	    queue_index >= dev->real_num_tx_queues) {
+    printk(KERN_ALERT "__netdev 4 prio: %d", skb->priority);
 		int new_index = get_xps_queue(dev, skb);
-		if (new_index < 0)
+    printk(KERN_ALERT "__netdev 5 prio: %d", skb->priority);
+		if (new_index < 0) {
 			new_index = skb_tx_hash(dev, skb);
+      printk(KERN_ALERT "__netdev 6 prio: %d", skb->priority);
+		}
 
 		if (queue_index != new_index && sk &&
 		    sk_fullsock(sk) &&
-		    rcu_access_pointer(sk->sk_dst_cache))
+		    rcu_access_pointer(sk->sk_dst_cache)) {
+      printk(KERN_ALERT "__netdev 7 prio: %d", skb->priority);
+
 			sk_tx_queue_set(sk, new_index);
+      printk(KERN_ALERT "__netdev 8 prio: %d", skb->priority);
+    }
 
 		queue_index = new_index;
 	}
 
+  printk(KERN_ALERT "__netdev 9 prio: %d", skb->priority);
 	return queue_index;
 }
 
@@ -3379,6 +3395,7 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
 				    void *accel_priv)
 {
 	int queue_index = 0;
+  printk(KERN_ALERT "netdev 1 prio: %d", skb->priority);
 
 #ifdef CONFIG_XPS
 	u32 sender_cpu = skb->sender_cpu - 1;
@@ -3386,20 +3403,30 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
 	if (sender_cpu >= (u32)NR_CPUS)
 		skb->sender_cpu = raw_smp_processor_id() + 1;
 #endif
+  printk(KERN_ALERT "netdev 2 prio: %d", skb->priority);
 
 	if (dev->real_num_tx_queues != 1) {
 		const struct net_device_ops *ops = dev->netdev_ops;
-		if (ops->ndo_select_queue)
+		if (ops->ndo_select_queue) {
 			queue_index = ops->ndo_select_queue(dev, skb, accel_priv,
 							    __netdev_pick_tx);
-		else
+      printk(KERN_ALERT "netdev 3 prio: %d", skb->priority);
+		}
+		else {
 			queue_index = __netdev_pick_tx(dev, skb);
+      printk(KERN_ALERT "netdev 4 prio: %d", skb->priority);
 
-		if (!accel_priv)
+		}
+
+		if (!accel_priv) {
 			queue_index = netdev_cap_txqueue(dev, queue_index);
+      printk(KERN_ALERT "netdev 5 prio: %d", skb->priority);
+		}
 	}
 
+  printk(KERN_ALERT "netdev 6 prio: %d", skb->priority);
 	skb_set_queue_mapping(skb, queue_index);
+  printk(KERN_ALERT "netdev 7 prio: %d", skb->priority);
 	return netdev_get_tx_queue(dev, queue_index);
 }
 
@@ -3434,6 +3461,7 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv,
 			    bool skb_list)
 {
 	struct net_device *dev = skb->dev;
+	printk(KERN_ALERT "net device name: %s\n", dev->name);
 	struct netdev_queue *txq;
 	struct Qdisc *q;
 	int rc = -ENOMEM;
@@ -3448,14 +3476,20 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv,
 	 */
 	rcu_read_lock_bh();
 
+  printk(KERN_ALERT "sk_buff prio1: %d\n", skb->priority, __LINE__, __func__);
+
 	skb_update_prio(skb);
 
+  printk(KERN_ALERT "sk_buff prio2: %d\n", skb->priority, __LINE__, __func__);
+
 	qdisc_pkt_len_init(skb);
+  printk(KERN_ALERT "sk_buff prio2.1: %d\n", skb->priority, __LINE__, __func__);
 #ifdef CONFIG_NET_CLS_ACT
 	skb->tc_verd = SET_TC_AT(skb->tc_verd, AT_EGRESS);
 # ifdef CONFIG_NET_EGRESS
 	if (static_key_false(&egress_needed)) {
 		skb = sch_handle_egress(skb, &rc, dev);
+    printk(KERN_ALERT "sk_buff prio2.1: %d\n", skb->priority, __LINE__, __func__);
 		if (!skb)
 			goto out;
 	}
@@ -3464,19 +3498,31 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv,
 	/* If device/qdisc don't need skb->dst, release it right now while
 	 * its hot in this cpu cache.
 	 */
-	if (dev->priv_flags & IFF_XMIT_DST_RELEASE)
+  printk(KERN_ALERT "sk_buff prio2.1: %d\n", skb->priority, __LINE__, __func__);
+	if (dev->priv_flags & IFF_XMIT_DST_RELEASE) {
+	  printk(KERN_ALERT "here1\n");
 		skb_dst_drop(skb);
-	else
+	}
+	else {
+	  printk(KERN_ALERT "here2\n");
 		skb_dst_force(skb);
+	}
+  printk(KERN_ALERT "sk_buff prio2.11: %d\n", skb->priority, __LINE__, __func__);
 
 	txq = netdev_pick_tx(dev, skb, accel_priv);
+  printk(KERN_ALERT "sk_buff prio2.12: %d\n", skb->priority, __LINE__, __func__);
 	q = rcu_dereference_bh(txq->qdisc);
+  printk(KERN_ALERT "sk_buff prio2.1: %d\n", skb->priority, __LINE__, __func__);
 
 	trace_net_dev_queue(skb);
+  printk(KERN_ALERT "sk_buff prio2.1: %d\n", skb->priority, __LINE__, __func__);
 	if (q->enqueue) {
+	  printk(KERN_ALERT "has enqueue\n");
+    printk(KERN_ALERT "sk_buff prio3: %d\n", skb->priority, __LINE__, __func__);
 		rc = __dev_xmit_skb(skb, q, dev, txq);
 		goto out;
 	}
+  printk(KERN_ALERT "sk_buff prio3.5: %d\n", skb->priority, __LINE__, __func__);
 
 	/* The device has no queue. Common case for software devices:
 	   loopback, all the sorts of tunnels...

@@ -13947,6 +13947,7 @@ QDF_STATUS sme_update_dsc_pto_up_mapping(tHalHandle hHal,
 					FL("User Priority %d isn't used"), i);
 				break;
 			}
+			printk(KERN_ALERT "DSCP %d is mapped to UP %d\n", j, i);
 			dscpmapping[j] = i;
 		}
 	}
