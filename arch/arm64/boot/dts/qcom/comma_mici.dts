@@ -41,6 +41,10 @@
   };
 };
 
+&pm8998_l8 {
+  regulator-always-on;
+};
+
 &vendor {
 	lcd3v3: lcd3v3 {
     status = "ok";
