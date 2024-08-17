@@ -131,11 +131,9 @@
 };
 
 &mdss_dsi0 {
-	status = "ok";
+  status = "ok";
   qcom,dsi-pref-prim-pan = <&dsi_ss_fhd_ea8074_cmd>;
 };
-
-
 
 /* Board definition */
 / {
@@ -143,4 +141,39 @@
 	compatible = "qcom,sda845-mtp", "qcom,sda845", "qcom,mtp";
 	qcom,msm-id = <341 0x20001>, <321 0x20001>, <321 0x20000>;
 	qcom,board-id = <0x8 0>, <0x20 0>; // Support both old and new XBL
+
+    chosen {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+        
+		framebuffer@0x9d400000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0x9d400000 0x0 (1080 * 2340 * 4)>;
+			width = <1080>;
+			height = <2340>;
+			stride = <(1080 * 4)>;
+			format = "a8r8g8b8";
+		};
+    };
+    
+    reserved-memory {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+        
+		linux,cma {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0 0x00000000 0 0xffffffff>;
+			reusable;
+			alignment = <0 0x400000>;
+			size = <0 0x2c00000>;
+			linux,cma-default;
+		};
+
+		framebuffer_region@9d400000 {
+			reg = <0x0 0x9d400000 0x0 0x02400000>;
+			no-map;
+		};
+    };
 };
