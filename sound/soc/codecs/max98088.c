@@ -1658,32 +1658,32 @@ static int max98088_probe(struct snd_soc_codec *codec)
        max98088->mic1pre = 0;
        max98088->mic2pre = 0;
 
-       ret = snd_soc_read(codec, M98088_REG_FF_REV_ID);
-       if (ret < 0) {
-               dev_err(codec->dev, "Failed to read device revision: %d\n",
-                       ret);
-               goto err_access;
-       }
-       dev_info(codec->dev, "revision %c\n", ret - 0x40 + 'A');
+//        ret = snd_soc_read(codec, M98088_REG_FF_REV_ID);
+//        if (ret < 0) {
+//                dev_err(codec->dev, "Failed to read device revision: %d\n",
+//                        ret);
+//                goto err_access;
+//        }
+//        dev_info(codec->dev, "revision %c\n", ret - 0x40 + 'A');
 
-       snd_soc_write(codec, M98088_REG_51_PWR_SYS, M98088_PWRSV);
+//        snd_soc_write(codec, M98088_REG_51_PWR_SYS, M98088_PWRSV);
 
-       snd_soc_write(codec, M98088_REG_0F_IRQ_ENABLE, 0x00);
+//        snd_soc_write(codec, M98088_REG_0F_IRQ_ENABLE, 0x00);
 
-       snd_soc_write(codec, M98088_REG_22_MIX_DAC,
-               M98088_DAI1L_TO_DACL|M98088_DAI2L_TO_DACL|
-               M98088_DAI1R_TO_DACR|M98088_DAI2R_TO_DACR);
+//        snd_soc_write(codec, M98088_REG_22_MIX_DAC,
+//                M98088_DAI1L_TO_DACL|M98088_DAI2L_TO_DACL|
+//                M98088_DAI1R_TO_DACR|M98088_DAI2R_TO_DACR);
 
-       snd_soc_write(codec, M98088_REG_4E_BIAS_CNTL, 0xF0);
-       snd_soc_write(codec, M98088_REG_50_DAC_BIAS2, 0x0F);
+//        snd_soc_write(codec, M98088_REG_4E_BIAS_CNTL, 0xF0);
+//        snd_soc_write(codec, M98088_REG_50_DAC_BIAS2, 0x0F);
 
-       snd_soc_write(codec, M98088_REG_16_DAI1_IOCFG,
-               M98088_S1NORMAL|M98088_SDATA);
+//        snd_soc_write(codec, M98088_REG_16_DAI1_IOCFG,
+//                M98088_S1NORMAL|M98088_SDATA);
 
-       snd_soc_write(codec, M98088_REG_1E_DAI2_IOCFG,
-               M98088_S2NORMAL|M98088_SDATA);
+//        snd_soc_write(codec, M98088_REG_1E_DAI2_IOCFG,
+//                M98088_S2NORMAL|M98088_SDATA);
 
-       max98088_handle_pdata(codec);
+//        max98088_handle_pdata(codec);
 
 err_access:
        return ret;
