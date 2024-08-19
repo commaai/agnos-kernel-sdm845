@@ -104,35 +104,14 @@
   };
 };
 
-&soc {
-	dsi_ss_ea8074_fhd_cmd_display: qcom,dsi-display@0 {
-    compatible = "qcom,dsi-display";
-    label = "dsi_ss_ea8074_fhd_cmd_display";
-    qcom,display-type = "primary";
-    qcom,dsi-display-active;
-
-    qcom,dsi-ctrl = <&mdss_dsi0>;
-    qcom,dsi-phy = <&mdss_dsi_phy0>;
-    clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>, <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
-		clock-names = "src_byte_clk", "src_pixel_clk";
-
-    pinctrl-names = "panel_active", "panel_suspend";
-    //pinctrl-0 = <&sde_dsi_active &sde_te_active &lcd_3v3_en_n_active &tp_3v3_en_n_active>;
-    //pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend &lcd_3v3_en_n_suspend &tp_3v3_en_n_suspend>;
-    pinctrl-0 = <&sde_dsi_active &sde_te_active>;
-    pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
-
-    qcom,dsi-panel = <&dsi_ss_fhd_ea8074_cmd>;
-    vddio-supply = <&pm8998_l14>;
-    vddcore-supply = <&lcd3v3>;
-
-    /*vci-supply = <&disp_vci_vreg>;*/
-  };
-};
 
 &mdss_dsi0 {
-  status = "ok";
+  status = "disabled";
   qcom,dsi-pref-prim-pan = <&dsi_ss_fhd_ea8074_cmd>;
+};
+
+&mdss_dsi0_ll {
+  status = "disabled";
 };
 
 /* Board definition */
