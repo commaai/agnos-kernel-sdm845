@@ -968,19 +968,28 @@ struct snd_soc_dai *snd_soc_find_dai(
 
 	lockdep_assert_held(&client_mutex);
 
+	printk("COMMA dlc->dai_name = %s\n", dlc->dai_name);
+
 	/* Find CPU DAI from registered DAIs*/
 	list_for_each_entry(component, &component_list, list) {
 		component_of_node = component->dev->of_node;
 		if (!component_of_node && component->dev->parent)
 			component_of_node = component->dev->parent->of_node;
 
-		if (dlc->of_node && component_of_node != dlc->of_node)
+		if (dlc->of_node && component_of_node != dlc->of_node) {
+			printk("SKIP 1\n");
 			continue;
-		if (dlc->name && strcmp(component->name, dlc->name))
+		}
+		if (dlc->name && strcmp(component->name, dlc->name)) {
+			printk("SKIP 2 %s | %s\n", component->name, dlc->name);
 			continue;
+		}
 		list_for_each_entry(dai, &component->dai_list, list) {
-			if (dlc->dai_name && strcmp(dai->name, dlc->dai_name))
+			printk("      dai->name = %s \t dlc->dai_name = %s\n", dai->name, dlc->dai_name);
+			if (dlc->dai_name && strcmp(dai->name, dlc->dai_name)){
+				printk("SKIP 3\n");
 				continue;
+			}
 
 			return dai;
 		}
