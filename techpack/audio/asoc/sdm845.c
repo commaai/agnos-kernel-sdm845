@@ -3922,8 +3922,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	//tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
 
 	// enable mclk
-		mclk = clk_get(codec->dev, "mclk");
-		if (IS_ERR(mclk)) {
+	mclk = clk_get(codec->dev, "mclk");
+	if (IS_ERR(mclk)) {
 		return -1;
 	}
 
@@ -5945,7 +5945,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",*/
-    .codec_name = "generic-codec",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_playback = 1,
@@ -5963,7 +5963,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",*/
-    .codec_name = "generic-codec",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_capture = 1,
@@ -5979,7 +5979,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",*/
-    .codec_name = "generic-codec",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_playback = 1,
@@ -5996,7 +5996,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.platform_name = "msm-pcm-routing",
 		/*.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",*/
-    .codec_name = "generic-codec",
+    .codec_name = "vendor:generic-codec",
     .codec_dai_name = "HiFi",
 		.no_pcm = 1,
 		.dpcm_capture = 1,

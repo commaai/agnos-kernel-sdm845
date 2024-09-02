@@ -151,6 +151,8 @@
   generic_codec: generic-codec {
     status = "ok";
     compatible = "generic-codec";
+    clock-names = "mclk";
+    clocks = <&clock_audio_lnbb AUDIO_PMIC_LNBB_CLK>;
   };
 };
 
