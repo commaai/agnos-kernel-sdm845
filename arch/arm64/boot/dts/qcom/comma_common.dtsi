@@ -65,15 +65,6 @@
     /* value is 30mOhm, measured in uohms */
     shunt-resistor = <30000>;
   };
-
-  // max98089@10 {
-  //   compatible = "maxim,max98089";
-  //   reg = <0x10>;  /* slave address 0x20 for write, 0x21 for read */
-  //   mic-left-digital;
-  //   mic-right-digital;
-	// 	clock-names = "mclk";
-	// 	clocks = <&clock_audio_lnbb AUDIO_PMIC_LNBB_CLK>;
-  // };
 };
 
 /* IMU bus */
