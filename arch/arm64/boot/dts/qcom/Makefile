@@ -4,6 +4,7 @@
 
 dtb-$(CONFIG_ARCH_SDM845) += comma_tici.dtb
 dtb-$(CONFIG_ARCH_SDM845) += comma_tizi.dtb
+dtb-$(CONFIG_ARCH_SDM845) += comma_tiki.dtb
 dtb-$(CONFIG_ARCH_SDM845) += comma_mici.dtb
 
 always		:= $(dtb-y)
