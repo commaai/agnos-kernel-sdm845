@@ -77,6 +77,20 @@
     enable-at-boot;
 		regulator-boot-on;
   };
+
+  gps_power: gps_power {
+    compatible = "regulator-gpio";
+		regulator-name = "gpio11_regulator";
+    vdd-supply = <&pm8998_l21>;
+    qcom,vdd-voltage-level = <2950000 2960000>;
+    qcom,vdd-current-level = <200 800000>;
+    status = "ok";
+  };
+};
+
+/* ublox UART */
+&qupv3_gps_uart {
+  status = "ok";
 };
 
 &soc {
