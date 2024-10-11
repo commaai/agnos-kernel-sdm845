@@ -2615,7 +2615,7 @@
 
 				config {
 					pins = "gpio43";
-					drive-strength = <2>;
+					drive-strength = <4>;
 					bias-pull-up;
 				};
 			};
