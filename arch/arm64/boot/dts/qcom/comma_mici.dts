@@ -45,6 +45,10 @@
   regulator-always-on;
 };
 
+&qupv3_gps_uart {
+  status = "ok";
+};
+
 &vendor {
 	lcd3v3: lcd3v3 {
     status = "ok";
