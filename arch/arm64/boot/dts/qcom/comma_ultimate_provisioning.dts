@@ -15,6 +15,53 @@
 
 #include "sda845-v2.1.dtsi"
 #include "comma_common.dtsi"
+#include "dsi-panel-bantian.dtsi"
+
+/* touch panel I2C, /dev/i2c-2 */
+&qupv3_se5_i2c {
+  status = "ok";
+  qcom,clk-freq-out = <100000>;
+
+  focaltech@38{
+    compatible = "focaltech,fts";
+    reg = <0x38>;
+    interrupt-parent = <&tlmm>;
+    interrupts = <125 0x2002>;
+    vdd-supply = <&lcd3v3>;
+    vcc_i2c-supply = <&pm8998_s4>;
+    focaltech,reset-gpio = <&tlmm 104 0>;
+    focaltech,irq-gpio = <&tlmm 125 0x2002>;
+    focaltech,display-coords = <0 0 240 536>;
+  };
+};
+
+&vendor {
+  lcd3v3: lcd3v3 {
+    status = "ok";
+
+    compatible = "regulator-fixed";
+    regulator-name = "lcd3v3";
+    regulator-min-microvolt = <3300000>;
+    regulator-max-microvolt = <3300000>;
+
+    gpio = <&pm8998_gpios 13 0>;
+    regulator-boot-on;
+    regulator-always-on;
+  };
+
+  gpio10_regulator: gpio10_regulator {
+    status = "ok";
+
+    compatible = "regulator-gpio";
+    regulator-name = "gpio10_regulator";
+
+    gpio = <&pm8998_gpios 10 0>;
+    states = <3300000 1>;
+    enable-active-high;
+    enable-at-boot;
+    regulator-boot-on;
+  };
+};
 
 &pm8998_vadc {
     chan@12 {
@@ -38,6 +85,55 @@
         qcom,fast-avg-setup = <0>;
     };
 };
+
+&soc {
+  dsi_bantian_video_display: qcom,dsi-display@0 {
+    compatible = "qcom,dsi-display";
+    label = "dsi_dwo_video_display";
+    qcom,display-type = "primary";
+
+    qcom,dsi-ctrl = <&mdss_dsi0>;
+    qcom,dsi-phy = <&mdss_dsi_phy0>;
+    clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>, <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+  clock-names = "src_byte_clk", "src_pixel_clk";
+
+    pinctrl-names = "panel_active", "panel_suspend";
+    //pinctrl-0 = <&sde_dsi_active &sde_te_active &lcd_3v3_en_n_active &tp_3v3_en_n_active>;
+    //pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend &lcd_3v3_en_n_suspend &tp_3v3_en_n_suspend>;
+    pinctrl-0 = <&sde_dsi_active &sde_te_active>;
+    pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
+
+    qcom,dsi-panel = <&dsi_bantian_amoled>;
+    vddio-supply = <&pm8998_l14>;
+    vddcore-supply = <&lcd3v3>;
+
+    /*vci-supply = <&disp_vci_vreg>;*/
+  };
+};
+
+&mdss_dsi0 {
+  status = "ok";
+    qcom,dsi-pref-prim-pan = <&dsi_bantian_amoled>;
+  };
+
+  &dsi_bantian_amoled {
+    qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+
+    /* gpios are correct and connected */
+    qcom,platform-te-gpio = <&tlmm 10 0>;
+    qcom,platform-reset-gpio = <&tlmm 6 0>;
+    //qcom,panel-errfg-gpio = <&tlmm 135 0>
+
+    qcom,mdss-dsi-t-clk-post = <0x0e>;
+    qcom,mdss-dsi-t-clk-pre = <0x31>;
+    qcom,mdss-dsi-display-timings {
+      timing@0{
+        qcom,mdss-dsi-panel-phy-timings = [00 20 08 08 24 23 08 08 05 03 04 00];
+        qcom,display-topology = <1 0 1>;
+        qcom,default-topology-index = <0>;
+      };
+    };
+  };
 
 &qupv3_se0_spi {
   status = "ok";
