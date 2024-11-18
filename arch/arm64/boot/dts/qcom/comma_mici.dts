@@ -68,7 +68,7 @@
 };
 
 &mdss_dsi0 {
-status = "ok";
+  status = "ok";
   qcom,dsi-pref-prim-pan = <&dsi_bantian_amoled>;
 };
 
@@ -93,6 +93,10 @@ status = "ok";
 
 &pm8998_l8 {
   regulator-always-on;
+};
+
+&pm8998_lvs1 {
+  /delete-property/ regulator-always-on;
 };
 
 &qupv3_gps_uart {
@@ -124,6 +128,14 @@ status = "ok";
 		enable-active-high;
     enable-at-boot;
 		regulator-boot-on;
+  };
+
+  lvs1_switch {
+    status = "ok";
+
+    compatible = "reg-userspace-consumer";
+    regulator-name = "lvs1_switch";
+    regulator-supplies = "pm8998_lvs1";
   };
 };
 
