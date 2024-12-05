@@ -66,13 +66,12 @@
     qcom,thermal-node;
   };
 };
-
 &thermal_zones {
 
   /delete-node/ msm-therm-adc;
   /delete-node/ quiet-therm-adc;
 
-  ambient-therm-adc {
+  ambient {
     polling-delay-passive = <0>;
     polling-delay = <0>;
     thermal-sensors = <&pm8998_adc_tm 0x4d>;
