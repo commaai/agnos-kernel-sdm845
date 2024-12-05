@@ -44,7 +44,7 @@
 
 &pm8998_vadc {
   chan@4e {
-    label = "amux2_therm";
+    label = "exhaust_therm";
     reg = <0x4e>;
     qcom,decimation = <2>;
     qcom,pre-div-channel-scaling = <0>;
@@ -56,7 +56,7 @@
 };
 &pm8998_adc_tm {
   chan@4e {
-    label = "amux2_therm";
+    label = "exhaust_therm";
     reg = <0x4e>;
     qcom,pre-div-channel-scaling = <0>;
     qcom,calibration-type = "ratiometric";
@@ -67,7 +67,7 @@
   };
 };
 &thermal_zones {
-  amux2-therm-adc {
+  exhaust-therm-adc {
     polling-delay-passive = <0>;
     polling-delay = <0>;
     thermal-sensors = <&pm8998_adc_tm 0x4e>;
