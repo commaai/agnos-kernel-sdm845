@@ -42,6 +42,19 @@
   };
 };
 
+&pm8998_vadc {
+  chan@4e {
+    label = "amux2_therm";
+    reg = <0x4e>;
+    qcom,decimation = <2>;
+    qcom,pre-div-channel-scaling = <0>;
+    qcom,calibration-type = "ratiometric";
+    qcom,scale-function = <2>;
+    qcom,hw-settle-time = <2>;
+    qcom,fast-avg-setup = <0>;
+  };
+};
+
 &soc {
   dsi_bantian_video_display: qcom,dsi-display@0 {
     compatible = "qcom,dsi-display";
