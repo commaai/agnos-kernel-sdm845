@@ -3921,15 +3921,13 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	pdata->codec_root = entry;
 	//tavil_codec_info_create_codec_entry(pdata->codec_root, codec);
 
-	// enable mclk
+	// enable mclk if it exists
 	mclk = clk_get(codec->dev, "mclk");
-	if (IS_ERR(mclk)) {
-		return -1;
-	}
-
-	ret = clk_prepare_enable(mclk);
-	if (ret) {
-		return -1;
+	if (!IS_ERR(mclk)) {
+		ret = clk_prepare_enable(mclk);
+		if (ret) {
+			return -1;
+		}
 	}
 
 done:
