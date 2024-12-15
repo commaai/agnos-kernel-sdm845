@@ -164,6 +164,10 @@ status = "ok";
   };
 };
 
+&clock_audio_lnbb {
+  status = "disabled";
+};
+
 &pm8998_l8 {
   regulator-always-on;
 };
