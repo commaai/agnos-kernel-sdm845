@@ -216,3 +216,22 @@ status = "ok";
 	qcom,msm-id = <341 0x20001>, <321 0x20001>, <321 0x20000>;
 	qcom,board-id = <0x22 0>;
 };
+
+/* Reduce CAM MCLK drive strengths */
+&cam_sensor_mclk0_active {
+  config {
+    drive-strength = <2>;
+  };
+};
+
+&cam_sensor_mclk1_active {
+  config {
+    drive-strength = <2>;
+  };
+};
+
+&cam_sensor_mclk2_active {
+  config {
+    drive-strength = <2>;
+  };
+};
