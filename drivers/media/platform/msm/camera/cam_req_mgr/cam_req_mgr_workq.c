@@ -197,6 +197,7 @@ int cam_req_mgr_workq_create(char *name, int32_t num_tasks,
 		//if (flags & CAM_WORKQ_FLAG_HIGH_PRIORITY)
 		//	wq_flags |= WQ_HIGHPRI;
 		wq_flags |= WQ_HIGHPRI;
+		wq_flags |= WQ_SYSFS;
 
 		if (flags & CAM_WORKQ_FLAG_SERIAL)
 			max_active_tasks = 1;
