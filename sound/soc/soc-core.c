@@ -974,14 +974,16 @@ struct snd_soc_dai *snd_soc_find_dai(
 		if (!component_of_node && component->dev->parent)
 			component_of_node = component->dev->parent->of_node;
 
-		if (dlc->of_node && component_of_node != dlc->of_node)
+		if (dlc->of_node && component_of_node != dlc->of_node) {
 			continue;
-		if (dlc->name && strcmp(component->name, dlc->name))
+		}
+		if (dlc->name && strcmp(component->name, dlc->name)) {
 			continue;
+		}
 		list_for_each_entry(dai, &component->dai_list, list) {
-			if (dlc->dai_name && strcmp(dai->name, dlc->dai_name))
+			if (dlc->dai_name && strcmp(dai->name, dlc->dai_name)){
 				continue;
-
+			}
 			return dai;
 		}
 	}
