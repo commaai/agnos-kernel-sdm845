@@ -110,9 +110,11 @@
   qcom,dsi-pref-prim-pan = <&dsi_ss_fhd_ea8074_cmd>;
 };
 
+/*
 &mdss_dsi0_ll {
   status = "disabled";
 };
+*/
 
 /* Board definition */
 / {
