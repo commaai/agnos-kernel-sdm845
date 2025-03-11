@@ -2231,8 +2231,13 @@ u32 addrconf_rt_table(const struct net_device *dev, u32 default_table) {
 	 * - If < 0, put routes into table dev->ifindex + (-rt_table).
 	 */
 	struct inet6_dev *idev = in6_dev_get(dev);
+	int sysctl;
 	u32 table;
-	int sysctl = idev->cnf.accept_ra_rt_table;
+
+	if (!idev)
+		return default_table;
+
+	sysctl = idev->cnf.accept_ra_rt_table;
 	if (sysctl == 0) {
 		table = default_table;
 	} else if (sysctl > 0) {
