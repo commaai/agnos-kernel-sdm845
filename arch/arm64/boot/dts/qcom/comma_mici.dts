@@ -235,3 +235,8 @@ status = "ok";
     drive-strength = <2>;
   };
 };
+
+/* Limit max IR LED current */
+&pmi8998_torch2 {
+  qcom,max-current = <300>;
+};
