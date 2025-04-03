@@ -794,7 +794,7 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	}
 
 	/* apply outgoing CDC or RNDIS filters */
-	if (!test_bit(RMNET_MODE_LLP_IP, &dev->flags) &&
+	if (skb && !test_bit(RMNET_MODE_LLP_IP, &dev->flags) &&
 			!is_promisc(cdc_filter)) {
 		u8		*dest = skb->data;
 
