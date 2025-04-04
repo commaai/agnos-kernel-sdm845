@@ -54,8 +54,8 @@
 		qcom,panel-allow-phy-poweroff;
 		qcom,mdss-dsi-display-timings {
 			timing@0{
-				qcom,mdss-dsi-panel-width = <2400>;
-				qcom,mdss-dsi-panel-height = <5360>;
+				qcom,mdss-dsi-panel-width = <240>;
+				qcom,mdss-dsi-panel-height = <536>;
 				qcom,mdss-dsi-h-front-porch = <20>;
 				qcom,mdss-dsi-h-back-porch = <40>;
 				qcom,mdss-dsi-h-pulse-width = <20>;

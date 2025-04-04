@@ -15,24 +15,24 @@
  *
  */
 /*****************************************************************************
- *
- * File Name: focaltech_core.h
- *
- * Author: Focaltech Driver Team
- *
- * Created: 2016-08-08
- *
- * Abstract:
- *
- * Reference:
- *
- *****************************************************************************/
+*
+* File Name: focaltech_core.h
+
+* Author: Focaltech Driver Team
+*
+* Created: 2016-08-08
+*
+* Abstract:
+*
+* Reference:
+*
+*****************************************************************************/
 
 #ifndef __LINUX_FOCALTECH_CORE_H__
 #define __LINUX_FOCALTECH_CORE_H__
 /*****************************************************************************
- * Included header files
- *****************************************************************************/
+* Included header files
+*****************************************************************************/
 #include <linux/i2c.h>
 #include <linux/input.h>
 #include <linux/input/mt.h>
@@ -52,7 +52,7 @@
 #include <linux/workqueue.h>
 #include <linux/fs.h>
 #include <linux/proc_fs.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <linux/version.h>
 #include <linux/types.h>
 #include <linux/sched.h>
@@ -70,13 +70,13 @@
 #include <linux/sensors.h>
 #endif
 /*****************************************************************************
- * Private constant and macro definitions using #define
- *****************************************************************************/
+* Private constant and macro definitions using #define
+*****************************************************************************/
 #define LEN_FLASH_ECC_MAX                   0xFFFE
 
 #define FTS_WORKQUEUE_NAME                  "fts_wq"
 
-#define FTS_MAX_POINTS                      10
+#define FTS_MAX_POINTS                      3
 #define FTS_KEY_WIDTH                       50
 #define FTS_ONE_TCH_LEN                     6
 #define POINT_READ_BUF  (3 + FTS_ONE_TCH_LEN * FTS_MAX_POINTS)
@@ -97,21 +97,23 @@
 #define FTS_TOUCH_UP        1
 #define FTS_TOUCH_CONTACT   2
 
-#define FTS_SYSFS_ECHO_ON(buf)      ((strncasecmp(buf, "1", 1)  == 0) || \
-					(strncasecmp(buf, "on", 2) == 0))
-#define FTS_SYSFS_ECHO_OFF(buf)     ((strncasecmp(buf, "0", 1)  == 0) || \
-					(strncasecmp(buf, "off", 3) == 0))
+#define FTS_SYSFS_ECHO_ON(buf)      ((strncmp(buf, "1", 1)  == 0) || \
+                                        (strncmp(buf, "on", 2) == 0))
+#define FTS_SYSFS_ECHO_OFF(buf)     ((strncmp(buf, "0", 1)  == 0) || \
+                                        (strncmp(buf, "off", 3) == 0))
 
 /*****************************************************************************
- * Private enumerations, structures and unions using typedef
- *****************************************************************************/
+* Private enumerations, structures and unions using typedef
+*****************************************************************************/
 
 
 struct fts_ts_platform_data {
-	int irq_gpio;
+	u32 irq_gpio;
 	u32 irq_gpio_flags;
-	int reset_gpio;
+	u32 reset_gpio;
 	u32 reset_gpio_flags;
+	u32 switch_gpio;
+	u32 switch_gpio_flags;
 	bool have_key;
 	u32 key_number;
 	u32 keys[4];
@@ -122,19 +124,14 @@ struct fts_ts_platform_data {
 	u32 x_min;
 	u32 y_min;
 	u32 max_touch_number;
-	bool wakeup_gestures_en;
 };
 
 struct ts_event {
 	u16 au16_x[FTS_MAX_POINTS]; /*x coordinate */
 	u16 au16_y[FTS_MAX_POINTS]; /*y coordinate */
 	u16 pressure[FTS_MAX_POINTS];
-	u8 au8_touch_event[FTS_MAX_POINTS]; /* touch event:
-					     * 0 -- down;
-					     * 1 -- up;
-					     * 2 -- contact
-					     */
-	u8 au8_finger_id[FTS_MAX_POINTS];   /* touch ID */
+	u8 au8_touch_event[FTS_MAX_POINTS]; /* touch event: 0 -- down; 1-- up; 2 -- contact */
+	u8 au8_finger_id[FTS_MAX_POINTS];   /*touch ID */
 	u8 area[FTS_MAX_POINTS];
 	u8 touch_point;
 	u8 point_num;
@@ -154,12 +151,16 @@ struct fts_ts_data {
 	struct regulator *vcc_i2c;
 	spinlock_t irq_lock;
 	struct mutex report_mutex;
+	struct mutex reset_mutex;
 	u16 addr;
 	bool suspended;
 	u8 fw_ver[3];
 	u8 fw_vendor_id;
 	int touchs;
 	int irq_disable;
+	int panel_power_state;
+	ktime_t last_plam_time;
+	bool inputdev_opened;
 
 #if defined(CONFIG_FB)
 	struct notifier_block fb_notif;
@@ -186,8 +187,8 @@ int fts_sensor_remove(struct fts_ts_data *data);
 #endif
 
 /*****************************************************************************
- * Static variables
- *****************************************************************************/
+* Static variables
+*****************************************************************************/
 extern struct i2c_client *fts_i2c_client;
 extern struct fts_ts_data *fts_wq_data;
 extern struct input_dev *fts_input_dev;
