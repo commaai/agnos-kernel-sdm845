@@ -82,7 +82,7 @@
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
 				qcom,mdss-dsi-panel-framerate = <60>;
-				qcom,mdss-dsi-panel-jitter = <0xa 0x1>;
+				qcom,mdss-dsi-panel-jitter = <0x4 0x1>;
 				qcom,mdss-dsi-on-command = [
 					05 01 00 00 0A 00 02 11 00
 					39 01 00 00 0A 00 05 2A 00 00 04 37
