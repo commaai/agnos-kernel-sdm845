@@ -426,6 +426,14 @@ static ssize_t fts_tpfwver_show(struct device *dev,
 
 	return num_read_chars;
 }
+
+static ssize_t fts_touch_count_show(struct device *dev,
+    struct device_attribute *attr, char *buf)
+{
+  struct fts_ts_data *data = dev_get_drvdata(dev);
+  return sprintf(buf, "%llu\n", data->touch_count);
+}
+
 /************************************************************************
  * Name: fts_tpfwver_store
  * Brief:  no
@@ -1048,6 +1056,9 @@ static ssize_t fts_dumpreg_show(struct device *dev,
 static DEVICE_ATTR(fts_fw_version, 0644,
 		fts_tpfwver_show, fts_tpfwver_store);
 
+static DEVICE_ATTR(touch_count, 0444,
+    fts_touch_count_show, NULL);
+
 /* upgrade from *.i
  *   example: echo 1 > fw_update
  */
@@ -1099,6 +1110,7 @@ static struct attribute *fts_attributes[] = {
 	&dev_attr_fts_module_config.attr,
 	&dev_attr_fts_hw_reset.attr,
 	&dev_attr_fts_irq.attr,
+  &dev_attr_touch_count.attr,
 #if FTS_ESDCHECK_EN
 	&dev_attr_fts_esd_check.attr,
 #endif
