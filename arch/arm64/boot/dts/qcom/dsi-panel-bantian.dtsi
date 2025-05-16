@@ -21,14 +21,13 @@
 		qcom,mdss-dsi-panel-name = "bantian_amoled";
 		qcom,mdss-dsi-panel-id = <0>;
 		qcom,mdss-dsi-panel-model = "bantian_amoled";
-		qcom,mdss-dsi-panel-sleepwrmod = <0>;
 		qcom,mdss-dsi-panel-type = "dsi_video_mode";
 		qcom,mdss-dsi-virtual-channel-id = <0>;
 		qcom,mdss-dsi-stream = <0>;
 		qcom,mdss-dsi-bpp = <24>;
 		qcom,mdss-dsi-underflow-color = <0xff>;
 		qcom,mdss-dsi-border-color = <0>;
-		qcom,mdss-dsi-traffic-mode = "burst_mode";
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_pulse";
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
  		qcom,mdss-dsi-lp11-init;
@@ -75,9 +74,10 @@
 					39 01 00 00 0A 00 02 FE 00
 					39 01 00 00 0A 00 02 3A 77
 					39 01 00 00 0A 00 02 51 00
+					39 01 00 00 0A 00 02 36 C0
 					05 01 00 00 64 00 02 11 00
 					05 01 00 00 78 00 02 29 00
-					39 01 00 00 0A 00 03 51 D0 D0
+					39 01 00 00 78 00 03 51 D0 D0
 				];
 				qcom,mdss-dsi-off-command = [
 					05 01 00 00 00 00 02 28 00

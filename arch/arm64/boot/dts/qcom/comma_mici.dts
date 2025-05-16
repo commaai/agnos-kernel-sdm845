@@ -120,11 +120,12 @@
     compatible = "qcom,dsi-display";
     label = "dsi_dwo_video_display";
     qcom,display-type = "primary";
+    qcom,dsi-display-active;
 
     qcom,dsi-ctrl = <&mdss_dsi0>;
     qcom,dsi-phy = <&mdss_dsi_phy0>;
     clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>, <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
-  clock-names = "src_byte_clk", "src_pixel_clk";
+    clock-names = "src_byte_clk", "src_pixel_clk";
 
     pinctrl-names = "panel_active", "panel_suspend";
     //pinctrl-0 = <&sde_dsi_active &sde_te_active &lcd_3v3_en_n_active &tp_3v3_en_n_active>;
@@ -135,13 +136,43 @@
     qcom,dsi-panel = <&dsi_bantian_amoled>;
     vddio-supply = <&pm8998_l14>;
     vddcore-supply = <&lcd3v3>;
+    lab-supply = <&lab_regulator>;
+    ibb-supply = <&ibb_regulator>;
 
     /*vci-supply = <&disp_vci_vreg>;*/
   };
 };
 
+&labibb {
+  status = "ok";
+  qcom,qpnp-labibb-mode = "amoled";
+};
+
+&dsi_panel_pwr_supply {
+  /delete-node/ qcom,panel-supply-entry@1;
+
+  qcom,panel-supply-entry@1 {
+    reg = <1>;
+    qcom,supply-name = "lab";
+    qcom,supply-min-voltage = <4600000>;
+    qcom,supply-max-voltage = <6000000>;
+    qcom,supply-enable-load = <10000>;
+    qcom,supply-disable-load = <100>;
+  };
+
+  qcom,panel-supply-entry@2 {
+    reg = <2>;
+    qcom,supply-name = "ibb";
+    qcom,supply-min-voltage = <4600000>;
+    qcom,supply-max-voltage = <6000000>;
+    qcom,supply-enable-load = <10000>;
+    qcom,supply-disable-load = <100>;
+    qcom,supply-post-on-sleep = <20>;
+  };
+};
+
 &mdss_dsi0 {
-status = "ok";
+  status = "ok";
   qcom,dsi-pref-prim-pan = <&dsi_bantian_amoled>;
 };
 
