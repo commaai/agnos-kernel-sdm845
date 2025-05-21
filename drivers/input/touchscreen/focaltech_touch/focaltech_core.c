@@ -516,7 +516,7 @@ static int fts_input_dev_report_b(struct ts_event *event,
 			uppoint++;
 			input_mt_report_slot_state(data->input_dev,
 						MT_TOOL_FINGER, false);
-      data->touch_count++;
+			data->touch_count++;
 #if FTS_REPORT_PRESSURE_EN
 			input_report_abs(data->input_dev, ABS_MT_PRESSURE, 0);
 #endif
@@ -1113,7 +1113,7 @@ static int fts_ts_probe(struct i2c_client *client,
 		return -ENOMEM;
 	}
 
-  data->touch_count = 0;
+	data->touch_count = 0;
 
 	input_dev = input_allocate_device();
 	if (!input_dev) {
