@@ -160,6 +160,7 @@ struct fts_ts_data {
 	u8 fw_vendor_id;
 	int touchs;
 	int irq_disable;
+	u64 touch_count;
 
 #if defined(CONFIG_FB)
 	struct notifier_block fb_notif;
