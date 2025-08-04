@@ -1,0 +1,1 @@
+obj-$(CONFIG_PANDA_SPI) += panda-spi.o
