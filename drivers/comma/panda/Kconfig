@@ -1,0 +1,6 @@
+config PANDA_SPI
+    tristate "Panda SPI driver"
+    depends on SPI
+    default n
+    help
+      Custom SPI driver for communicating with Panda board.
