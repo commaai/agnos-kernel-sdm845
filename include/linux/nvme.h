@@ -558,12 +558,6 @@ struct nvme_dsm_range {
 	__le64			slba;
 };
 
-/* Features */
-
-struct nvme_feat_auto_pst {
-	__le64 entries[32];
-};
-
 /* Admin commands */
 
 enum nvme_admin_opcode {
