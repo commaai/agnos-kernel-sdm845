@@ -12,6 +12,7 @@
  *
  */
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
@@ -1123,7 +1124,18 @@ static int spi_geni_transfer_one(struct spi_master *spi,
 			}
 		}
 	}
+
+  if (xfer->delay_usecs) {
+    // copied from msm_spi_udelay
+    if (xfer->delay_usecs > 20) {
+      usleep_range(xfer->delay_usecs, xfer->delay_usecs + 1);
+    } else {
+      udelay(xfer->delay_usecs);
+    }
+  }
+
 	return ret;
+
 err_gsi_geni_transfer_one:
 	geni_se_dump_dbg_regs(&mas->spi_rsc, mas->base, mas->ipc);
 	dmaengine_terminate_all(mas->tx);
