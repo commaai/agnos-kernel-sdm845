@@ -1135,7 +1135,6 @@ static int spi_geni_transfer_one(struct spi_master *spi,
   }
 
 	return ret;
-
 err_gsi_geni_transfer_one:
 	geni_se_dump_dbg_regs(&mas->spi_rsc, mas->base, mas->ipc);
 	dmaengine_terminate_all(mas->tx);
