@@ -242,6 +242,8 @@ ssize_t mipi_dsi_generic_write(struct mipi_dsi_device *dsi, const void *payload,
 			       size_t size);
 ssize_t mipi_dsi_generic_read(struct mipi_dsi_device *dsi, const void *params,
 			      size_t num_params, void *data, size_t size);
+ssize_t mipi_dsi_device_transfer(struct mipi_dsi_device *dsi,
+					struct mipi_dsi_msg *msg);
 
 /**
  * enum mipi_dsi_dcs_tear_mode - Tearing Effect Output Line mode

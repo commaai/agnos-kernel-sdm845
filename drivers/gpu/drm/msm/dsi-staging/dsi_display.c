@@ -19,6 +19,7 @@
 #include <linux/of_graph.h>
 #include <linux/of_gpio.h>
 #include <linux/err.h>
+#include <video/mipi_display.h>
 
 #include "msm_drv.h"
 #include "sde_connector.h"
@@ -1309,6 +1310,276 @@ error:
 	return len;
 }
 
+static ssize_t debugfs_mipi_command_write(struct file *file,
+				  const char __user *user_buf,
+				  size_t user_len,
+				  loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	char *buf;
+	int rc = 0;
+	struct dsi_display_debugfs_mipi_command *command;
+	struct mipi_dsi_msg *dsi_msg;
+	struct mipi_dsi_device *dsi;
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (user_len < 12){
+		pr_info("got buffer of %d bytes, expected at least 12\n", user_len);
+		return -EINVAL;
+	}
+
+	buf = kzalloc(user_len, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(buf))
+		return -ENOMEM;
+
+	if (copy_from_user(buf, user_buf, user_len)) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	if (!display->panel) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	// Data is in buf, let's cast it to our struct
+	command = (struct dsi_display_debugfs_mipi_command *) buf;
+	if(command->command_length < 8) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	// Parse and transfer the message
+	dsi = &display->panel->mipi_device;
+	dsi_msg = kzalloc(sizeof(struct mipi_dsi_msg), GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(dsi_msg)) {
+		rc = -ENOMEM;
+		goto error;
+	}
+
+	dsi_msg->tx_buf = kzalloc((command->command_length - 7), GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(dsi_msg)) {
+		rc = -ENOMEM;
+		goto error_two;
+	}
+
+	dsi_msg->channel = dsi->channel;
+	dsi_msg->type = command->command_buf[0];
+	pr_info("msg type: %d\n", dsi_msg->type);
+
+	memcpy(dsi_msg->tx_buf, command->command_buf + 7, (command->command_length - 7));
+	dsi_msg->tx_len = (command->command_length - 7);
+
+	rc = mipi_dsi_device_transfer(dsi, dsi_msg);
+	if(!IS_ERR_VALUE(rc)){
+		pr_info("wrote %d bytes\n", rc);
+		rc = user_len;
+	}
+
+error_two:
+	kfree(dsi_msg);
+error:
+	kfree(buf);
+	return rc;
+}
+
+static ssize_t debugfs_tp_color_read(struct file *file,
+				 char __user *user_buf,
+				 size_t user_len,
+				 loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	struct mipi_dsi_msg *msg;
+	char *buf;
+	char param[1];
+	int rc = 0;
+	size_t len = min_t(size_t, user_len, 1);
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (!display->panel) {
+		pr_err("invalid panel data\n");
+		return -EINVAL;
+	}
+
+	buf = kzalloc(len, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(buf))
+		return -ENOMEM;
+
+	msg = kzalloc(sizeof(struct mipi_dsi_msg), GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(msg))
+		goto error_msg;
+	msg->channel = display->panel->mipi_device.channel;
+
+	// Perform command
+	param[0] = 0xDC;
+	msg->tx_buf = param;
+	msg->tx_len = 1;
+	msg->rx_buf = buf;
+	msg->rx_len = 1;
+	msg->type = MIPI_DSI_DCS_READ;
+	msg->flags = MIPI_DSI_MSG_LASTCOMMAND;
+	msg->wait_ms = 10;
+	rc = mipi_dsi_device_transfer(&display->panel->mipi_device, msg);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	pr_info("got color 0x%x\n", buf[0]);
+	if (copy_to_user(user_buf, buf, len)) {
+		rc = -EFAULT;
+		goto error;
+	}
+
+	*ppos += len;
+
+error:
+	kfree(msg);
+error_msg:
+	kfree(buf);
+	return len;
+}
+
+static ssize_t debugfs_oem_read(struct file *file,
+				 char __user *user_buf,
+				 size_t user_len,
+				 loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	struct mipi_dsi_msg *msg;
+	char *buf;
+	char param[2];
+	int rc = 0, i;
+	size_t len = min_t(size_t, user_len, 32);
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (!display->panel) {
+		pr_err("invalid panel data\n");
+		return -EINVAL;
+	}
+
+	buf = kzalloc(len, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(buf))
+		return -ENOMEM;
+
+	msg = kzalloc(sizeof(struct mipi_dsi_msg), GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(msg))
+		goto error_msg;
+	msg->channel = display->panel->mipi_device.channel;
+
+	// Unlock read A
+	param[0] = 0xFF; param[1] = 0x29;
+	msg->tx_buf = param;
+	msg->tx_len = 2;
+	msg->rx_len = 0;
+	msg->type = MIPI_DSI_GENERIC_LONG_WRITE;
+	msg->flags = MIPI_DSI_MSG_LASTCOMMAND;
+	msg->wait_ms = 10;
+
+	rc = mipi_dsi_device_transfer(&display->panel->mipi_device, msg);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	// Perform read A
+	for(i = 0; i<26; i++){
+		param[0] = (0xc8 + i);
+
+		msg->tx_buf = param;
+		msg->tx_len = 1;
+		msg->type = MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM;
+		msg->rx_buf = &buf[i];
+		msg->rx_len = 1;
+
+		rc = mipi_dsi_device_transfer(&display->panel->mipi_device, msg);
+		if (IS_ERR_VALUE(rc)) {
+			goto error;
+		}
+		pr_info("read 0x%x, got 0x%x\n", param[0], buf[i]);
+	}
+
+	// Unlock read B
+	param[0] = 0xFF; param[1] = 0x23;
+	msg->tx_buf = param;
+	msg->tx_len = 2;
+	msg->rx_len = 0;
+	msg->type = MIPI_DSI_GENERIC_LONG_WRITE;
+
+	rc = mipi_dsi_device_transfer(&display->panel->mipi_device, msg);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	// Perform read B
+	for(i = 0; i<5; i++){
+		param[0] = (0xf0 + i);
+
+		msg->tx_buf = param;
+		msg->tx_len = 1;
+		msg->type = MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM;
+		msg->rx_buf = &buf[i + 26];
+		msg->rx_len = 1;
+
+		rc = mipi_dsi_device_transfer(&display->panel->mipi_device, msg);
+		if (IS_ERR_VALUE(rc)) {
+			goto error;
+		}
+		pr_info("read 0x%x, got 0x%x\n", param[0], buf[i + 26]);
+	}
+	param[0] = 0xd5;
+
+	msg->tx_buf = param;
+	msg->tx_len = 1;
+	msg->type = MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM;
+	msg->rx_buf = &buf[31];
+	msg->rx_len = 1;
+
+	rc = mipi_dsi_device_transfer(&display->panel->mipi_device, msg);
+	pr_info("read 0x%x, got 0x%x\n", param[0], buf[31]);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	// Back to User
+	param[0] = 0xFF; param[1] = 0x10;
+	msg->tx_buf = param;
+	msg->tx_len = 2;
+	msg->rx_len = 0;
+	msg->type = MIPI_DSI_GENERIC_LONG_WRITE;
+
+	rc = mipi_dsi_device_transfer(&display->panel->mipi_device, msg);
+	if (IS_ERR_VALUE(rc)) {
+		goto error;
+	}
+
+	if (copy_to_user(user_buf, buf, len)) {
+		rc = -EFAULT;
+		goto error;
+	}
+
+	*ppos += len;
+
+error:
+	kfree(msg);
+error_msg:
+	kfree(buf);
+	return len;
+}
+
 static const struct file_operations dump_info_fops = {
 	.open = simple_open,
 	.read = debugfs_dump_info_read,
@@ -1331,10 +1602,26 @@ static const struct file_operations esd_check_mode_fops = {
 	.read = debugfs_read_esd_check_mode,
 };
 
+static const struct file_operations mipi_command_fops = {
+	.open = simple_open,
+	//TODO: .read = debugfs_mipi_command_read,
+	.write = debugfs_mipi_command_write,
+};
+
+static const struct file_operations tp_color_fops = {
+	.open = simple_open,
+	.read = debugfs_tp_color_read,
+};
+
+static const struct file_operations oem_fops = {
+	.open = simple_open,
+	.read = debugfs_oem_read,
+};
+
 static int dsi_display_debugfs_init(struct dsi_display *display)
 {
 	int rc = 0;
-	struct dentry *dir, *dump_file, *misr_data;
+	struct dentry *dir, *dump_file, *misr_data, *mipi_command, *tp_color, *oem;
 	char name[MAX_NAME_SIZE];
 	int i;
 
@@ -1390,6 +1677,42 @@ static int dsi_display_debugfs_init(struct dsi_display *display)
 	if (IS_ERR_OR_NULL(misr_data)) {
 		rc = PTR_ERR(misr_data);
 		pr_err("[%s] debugfs create misr datafile failed, rc=%d\n",
+		       display->name, rc);
+		goto error_remove_dir;
+	}
+
+	mipi_command = debugfs_create_file("mipi_command",
+					0600,
+					dir,
+					display,
+					&mipi_command_fops);
+	if (IS_ERR_OR_NULL(mipi_command)) {
+		rc = PTR_ERR(mipi_command);
+		pr_err("[%s] debugfs create mipi command failed, rc=%d\n",
+		       display->name, rc);
+		goto error_remove_dir;
+	}
+
+	tp_color = debugfs_create_file("tp_color",
+					0600,
+					dir,
+					display,
+					&tp_color_fops);
+	if (IS_ERR_OR_NULL(tp_color)) {
+		rc = PTR_ERR(tp_color);
+		pr_err("[%s] debugfs create tp_color failed, rc=%d\n",
+		       display->name, rc);
+		goto error_remove_dir;
+	}
+
+	oem = debugfs_create_file("oem",
+					0600,
+					dir,
+					display,
+					&oem_fops);
+	if (IS_ERR_OR_NULL(oem)) {
+		rc = PTR_ERR(oem);
+		pr_err("[%s] debugfs create oem failed, rc=%d\n",
 		       display->name, rc);
 		goto error_remove_dir;
 	}
@@ -2788,9 +3111,12 @@ static ssize_t dsi_host_transfer(struct mipi_dsi_host *host,
 		int ctrl_idx = (msg->flags & MIPI_DSI_MSG_UNICAST) ?
 				msg->ctrl : 0;
 
-		rc = dsi_ctrl_cmd_transfer(display->ctrl[ctrl_idx].ctrl, msg,
-					  DSI_CTRL_CMD_FETCH_MEMORY);
-		if (rc) {
+		int flags_local = DSI_CTRL_CMD_FETCH_MEMORY;
+		if(msg->rx_len > 0)
+			flags_local |= DSI_CTRL_CMD_READ;
+
+		rc = dsi_ctrl_cmd_transfer(display->ctrl[ctrl_idx].ctrl, msg, flags_local);
+		if (rc < 0) {
 			pr_err("[%s] cmd transfer failed, rc=%d\n",
 			       display->name, rc);
 			goto error_disable_cmd_engine;
