@@ -1063,8 +1063,6 @@ static int dsi_message_tx(struct dsi_ctrl *dsi_ctrl,
 	u8 *cmdbuf;
 	struct dsi_mode_info *timing;
 
-	printk("dsi_message_tx: tx_len: %02x, rx_len: %02x, flags: %02x, type: %02x", msg->tx_len, msg->rx_len, msg->flags, msg->type);
-
 	/* Select the tx mode to transfer the command */
 	dsi_message_setup_tx_mode(dsi_ctrl, msg->tx_len, &flags);
 
@@ -1127,12 +1125,8 @@ static int dsi_message_tx(struct dsi_ctrl *dsi_ctrl,
 		cmdbuf = (u8 *)(dsi_ctrl->vaddr);
 
 		msm_gem_sync(dsi_ctrl->tx_cmd_buf);
-		printk("DSI: Sending: ");
-		for (cnt = 0; cnt < length; cnt++){
+		for (cnt = 0; cnt < length; cnt++)
 			cmdbuf[dsi_ctrl->cmd_len + cnt] = buffer[cnt];
-			printk(KERN_CONT "%02x ", buffer[cnt]);
-		}
-		printk(KERN_CONT "\n");
 
 		dsi_ctrl->cmd_len += length;
 
@@ -1415,7 +1409,6 @@ static int dsi_message_rx(struct dsi_ctrl *dsi_ctrl,
 					buff, total_bytes_read,
 					total_read_len, rd_pkt_size,
 					&hw_read_cnt);
-		printk("Read back %d bytes\n", dlen);
 		if (!dlen)
 			goto error;
 
