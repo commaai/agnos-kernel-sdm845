@@ -32,7 +32,7 @@
 #define to_sde_encoder_phys_cmd(x) \
 	container_of(x, struct sde_encoder_phys_cmd, base)
 
-#define PP_TIMEOUT_MAX_TRIALS	2
+#define PP_TIMEOUT_MAX_TRIALS	10
 
 /*
  * Tearcheck sync start and continue thresholds are empirically found
@@ -42,7 +42,7 @@
 #define DEFAULT_TEARCHECK_SYNC_THRESH_START	4
 #define DEFAULT_TEARCHECK_SYNC_THRESH_CONTINUE	4
 
-#define SDE_ENC_WR_PTR_START_TIMEOUT_US 20000
+#define SDE_ENC_WR_PTR_START_TIMEOUT_US 200000
 
 /*
  * Threshold for signalling retire fences in cases where
