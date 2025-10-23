@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -460,6 +460,11 @@ void lim_handle_heart_beat_failure_timeout(tpAniSirGlobal pMac);
 	cfg_get_vendor_ie_ptr_from_oui(pMac, SIR_MAC_P2P_OUI, \
 			SIR_MAC_P2P_OUI_SIZE, ie, ie_len)
 
+#define LE_READ_2(p) \
+	((uint16_t)\
+	((((const uint8_t *)(p))[0]) |\
+	(((const uint8_t *)(p))[1] <<  8)))
+
 uint8_t lim_get_noa_attr_stream_in_mult_p2p_ies(tpAniSirGlobal pMac,
 		uint8_t *noaStream, uint8_t noaLen,
 		uint8_t overFlowLen);
@@ -609,14 +614,13 @@ bool lim_check_disassoc_deauth_ack_pending(tpAniSirGlobal pMac,
 
 #ifdef WLAN_FEATURE_11W
 void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param);
-#endif
-
 void lim_set_protected_bit(tpAniSirGlobal pMac,
 		tpPESession psessionEntry,
 		tSirMacAddr peer, tpSirMacMgmtHdr pMacHdr);
-
-#ifdef WLAN_FEATURE_11W
-void lim_pmf_comeback_timer_callback(void *context);
+#else
+static inline void lim_set_protected_bit(tpAniSirGlobal pMac,
+	tpPESession psessionEntry,
+	tSirMacAddr peer, tpSirMacMgmtHdr pMacHdr) {}
 #endif /* WLAN_FEATURE_11W */
 
 void lim_set_ht_caps(tpAniSirGlobal p_mac,
@@ -766,6 +770,26 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 					uint8_t *subtype);
 
 /**
+ * lim_send_dfs_chan_sw_ie_update() -updates the channel switch IE in beacon
+ * template
+ * @mac_ctx - pointer to global mac context
+ * @session - A pointer to pesession
+ *
+ * Return None
+ */
+void lim_send_dfs_chan_sw_ie_update(tpAniSirGlobal mac_ctx,
+				    tpPESession session);
+
+/**
+ * lim_process_ap_ecsa_timeout() -process ECSA timeout which decrement csa count
+ * in beacon and update beacon template in firmware
+ * @data - A pointer to pesession
+ *
+ * Return None
+ */
+void lim_process_ap_ecsa_timeout(void *session);
+
+/**
  * lim_send_chan_switch_action_frame()- function to send ECSA/CSA
  * action frame for each sta connected to SAP/GO and AP in case of
  * STA .
@@ -786,9 +810,7 @@ void lim_send_chan_switch_action_frame(tpAniSirGlobal mac_ctx,
  * lim_assoc_rej_add_to_rssi_based_reject_list() - Add BSSID to the rssi based
  * rejection list
  * @mac_ctx: mac ctx
- * @rssi_assoc_rej: rssi assoc reject attribute
- * @bssid : BSSID of the AP
- * @rssi : RSSI of the assoc resp
+ * @ap_info: bssid info to be added to reject list.
  *
  * Add BSSID to the rssi based rejection list. Also if number
  * of entries is greater than MAX_RSSI_AVOID_BSSID_LIST
@@ -797,8 +819,7 @@ void lim_send_chan_switch_action_frame(tpAniSirGlobal mac_ctx,
  * Return: void
  */
 void lim_assoc_rej_add_to_rssi_based_reject_list(tpAniSirGlobal mac_ctx,
-	tDot11fTLVrssi_assoc_rej  *rssi_assoc_rej,
-	tSirMacAddr bssid, int8_t rssi);
+				struct sir_rssi_disallow_lst *ap_info);
 
 /**
  * lim_check_if_vendor_oui_match() - Check if the given OUI match in IE buffer

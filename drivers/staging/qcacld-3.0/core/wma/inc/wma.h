@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -266,7 +266,7 @@ enum ds_mode {
 #define WMA_CHAN_START_RESP             0
 #define WMA_CHAN_END_RESP               1
 
-#define WMA_BCN_BUF_MAX_SIZE 2500
+#define WMA_BCN_BUF_MAX_SIZE 512
 #define WMA_NOA_IE_SIZE(num_desc) (2 + (13 * (num_desc)))
 #define WMA_MAX_NOA_DESCRIPTORS 4
 
@@ -348,8 +348,8 @@ enum ds_mode {
 #define WMA_RSSI_THOLD_DEFAULT   -300
 
 #ifdef FEATURE_WLAN_SCAN_PNO
-#define WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT         WAKELOCK_DURATION_RECOMMENDED
-#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT WAKELOCK_DURATION_RECOMMENDED
+#define WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT         2000
+#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT 2000
 #endif /* FEATURE_WLAN_SCAN_PNO */
 
 #define WMA_AUTH_REQ_RECV_WAKE_LOCK_TIMEOUT     WAKELOCK_DURATION_RECOMMENDED
@@ -1538,12 +1538,14 @@ struct peer_debug_info {
  * @bandcapability: band capability configured through ini
  * @ito_repeat_count: Indicates ito repeated count
  * @critical_events_in_flight: number of suspend preventing events in flight
+ * @thermal_sampling_time: Thermal throttling sampling time in ms
+ * @thermal_throt_dc: Thermal throttling duty cycle that is to be enforced
  */
 typedef struct {
 	void *wmi_handle;
 	void *htc_handle;
 	void *cds_context;
-	void *mac_context;
+	tAniSirGlobal *mac_context;
 	qdf_event_t wma_ready_event;
 	qdf_event_t wma_resume_event;
 	qdf_event_t target_suspend;
@@ -1726,6 +1728,8 @@ typedef struct {
 		roam_offload_synch_ind *roam_synch_data,
 		tpSirBssDescription  bss_desc_ptr,
 		enum sir_roam_op_code reason);
+	QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
+		struct roam_pmkid_req_event *bss_list);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
 	qdf_runtime_lock_t wma_runtime_resume_lock;
@@ -1761,6 +1765,12 @@ typedef struct {
 	qdf_atomic_t critical_events_in_flight;
 #ifdef FEATURE_WLAN_D0WOW
 	atomic_t in_d0wow;
+#endif
+	bool is_pktcapture_enabled;
+
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	uint32_t thermal_sampling_time;
+	uint32_t thermal_throt_dc;
 #endif
 } t_wma_handle, *tp_wma_handle;
 
@@ -2383,7 +2393,7 @@ QDF_STATUS wma_set_rssi_monitoring(tp_wma_handle wma,
 					struct rssi_monitor_req *req);
 
 QDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
-		struct wmi_pcl_chan_weights *msg);
+		struct set_pcl_req *msg);
 
 QDF_STATUS wma_send_pdev_set_hw_mode_cmd(tp_wma_handle wma_handle,
 		struct sir_hw_mode *msg);
@@ -2413,6 +2423,9 @@ int wmi_desc_pool_init(tp_wma_handle wma_handle, uint32_t pool_size);
 void wmi_desc_pool_deinit(tp_wma_handle wma_handle);
 struct wmi_desc_t *wmi_desc_get(tp_wma_handle wma_handle);
 void wmi_desc_put(tp_wma_handle wma_handle, struct wmi_desc_t *wmi_desc);
+int wma_process_mon_mgmt_tx(qdf_nbuf_t nbuf, uint32_t nbuf_len,
+			    struct wmi_mgmt_params *mgmt_param,
+			    uint16_t chanfreq);
 int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 				   uint32_t len);
 int wma_mgmt_tx_bundle_completion_handler(void *handle,
@@ -2640,6 +2653,18 @@ bool wma_is_wow_bitmask_zero(uint32_t *bitmask,
  */
 QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 				     tSirRoamOffloadScanReq *roam_req);
+
+/**
+ * wma_handle_roam_sync_timeout() - Update roaming status at wma layer
+ * @wma_handle: wma handle
+ * @info: Info for roaming start timer
+ *
+ * This function gets called in case of roaming offload timer get expired
+ *
+ * Return: None
+ */
+void wma_handle_roam_sync_timeout(tp_wma_handle wma_handle,
+				  struct roam_sync_timeout_timer_info *info);
 
 /**
  * wma_register_phy_err_event_handler() - register phy error event handler

@@ -313,5 +313,7 @@ int wlan_hdd_get_rcpi(hdd_adapter_t *adapter, uint8_t *mac,
  */
 void wlan_hdd_cfg80211_link_layer_stats_ext_callback(tHddHandle ctx,
 						     tSirLLStatsResults *rsp);
+int wlan_hdd_get_sap_stats(hdd_adapter_t *adapter, struct station_info *info);   // LGE_PATCH
+
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */
 

@@ -1336,7 +1336,7 @@ IE TPCReport (EID_TPC_REPORT)             // 7.3.2.18
 
 IE SuppChannels (EID_SUPPORTED_CHANNELS)  // 7.2.3.19
 {
-    bands[2][1..48];
+    bands[2][0..48];
 }
 
 IE SuppOperatingClasses (EID_SUPPORTED_OPER_CLASSES)
@@ -1399,7 +1399,7 @@ IE RSN (EID_RSN)                          // 7.3.2.25
 
 IE RSNOpaque (EID_RSN)                    // 7.3.2.25
 {
-    data[ 6..253 ];
+    data[ 0..253 ];
 }
 
 IE WAPI (EID_WAPI)                          // 7.3.2.25
@@ -3399,7 +3399,6 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  WFDIEOpaque;
     OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
-    OPTIE  MBO_IE;
     OPTIE  QCN_IE;
     OPTIE  osen_ie;
 } // End frame AssocRequest.

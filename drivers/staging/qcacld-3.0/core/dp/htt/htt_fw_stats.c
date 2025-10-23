@@ -49,13 +49,14 @@ static char *bw_str_arr[] = {"20MHz", "40MHz", "80MHz", "160MHz"};
  * to bypass the strong type-checking of a function seems a simple
  * trick to use to avoid the code duplication.
  */
+//(18.04.05), protocol-wifi, JUDY HOTSPOT KPI: Use qdf_print [START]
 #define tx_rate_stats_print_cmn(_tx_rate_info, _concise) \
 	do {							 \
 		qdf_debug("TX Rate Info:");			 \
 		\
 		/* MCS */					 \
-		qdf_debug("%s: %d, %d, %d, %d, %d, %d, %d, %d, %d, %d",\
-				"MCS counts (0..9)",		 \
+		qdf_print("%s: %d, %d, %d, %d, %d, %d, %d, %d, %d, %d",\
+				"[TX] MCS counts (0..9)",		 \
 				_tx_rate_info->mcs[0],		 \
 				_tx_rate_info->mcs[1],		 \
 				_tx_rate_info->mcs[2],		 \
@@ -82,18 +83,18 @@ static char *bw_str_arr[] = {"20MHz", "40MHz", "80MHz", "160MHz"};
 				_tx_rate_info->sgi[9]);		 \
 		\
 		/* NSS */					 \
-		qdf_debug("NSS  counts: 1x1 %d, 2x2 %d, 3x3 %d", \
+		qdf_print("[TX] NSS counts: 1x1 %d, 2x2 %d", \
 				_tx_rate_info->nss[0],		 \
-				_tx_rate_info->nss[1], _tx_rate_info->nss[2]);\
+				_tx_rate_info->nss[1]);\
 		\
 		/* BW */					 \
 		if (ARRAY_SIZE(_tx_rate_info->bw) == 3) \
-			qdf_debug("BW counts: %s %d, %s %d, %s %d", \
+			qdf_print("[TX] BW counts: %s %d, %s %d, %s %d", \
 				bw_str_arr[0], _tx_rate_info->bw[0],	 \
 				bw_str_arr[1], _tx_rate_info->bw[1],	 \
 				bw_str_arr[2], _tx_rate_info->bw[2]);	 \
 		else if (ARRAY_SIZE(_tx_rate_info->bw) == 4) \
-			qdf_debug("BW counts: %s %d, %s %d, %s %d, %s %d", \
+			qdf_print("[TX] BW counts: %s %d, %s %d, %s %d, %s %d", \
 				bw_str_arr[0], _tx_rate_info->bw[0],	 \
 				bw_str_arr[1], _tx_rate_info->bw[1],	 \
 				bw_str_arr[2], _tx_rate_info->bw[2],     \
@@ -127,7 +128,7 @@ static char *bw_str_arr[] = {"20MHz", "40MHz", "80MHz", "160MHz"};
 		/* RSSI Values for last ack frames */		\
 		qdf_debug("Ack RSSI: %d", _tx_rate_info->ack_rssi);\
 	} while (0)
-
+//(18.04.05), protocol-wifi, JUDY HOTSPOT KPI: Use qdf_print [END]
 static void htt_t2h_stats_tx_rate_stats_print(wlan_dbg_tx_rate_info_t *
 					      tx_rate_info, int concise)
 {
@@ -150,13 +151,14 @@ static void htt_t2h_stats_tx_rate_stats_print_v2(wlan_dbg_tx_rate_info_v2_t *
  * to bypass the strong type-checking of a function seems a simple
  * trick to use to avoid the code duplication.
  */
+//(18.04.05), protocol-wifi, JUDY HOTSPOT KPI: Use qdf_print [START]
 #define rx_rate_stats_print_cmn(_rx_phy_info, _concise) \
 	do {							\
 		qdf_debug("RX Rate Info:");			\
 		\
 		/* MCS */					\
-		qdf_debug("%s: %d, %d, %d, %d, %d, %d, %d, %d, %d, %d",\
-				"MCS counts (0..9)",		 \
+		qdf_print("%s: %d, %d, %d, %d, %d, %d, %d, %d, %d, %d",\
+				"[RX] MCS counts (0..9)",		 \
 				_rx_phy_info->mcs[0],			\
 				_rx_phy_info->mcs[1],			\
 				_rx_phy_info->mcs[2],			\
@@ -193,7 +195,7 @@ static void htt_t2h_stats_tx_rate_stats_print_v2(wlan_dbg_tx_rate_info_v2_t *
 		 * if needed in the future. Hence the addition in the host code\
 		 * at this line.
 		 */							       \
-		qdf_debug("NSS  counts: 1x1 %d, 2x2 %d, 3x3 %d, 4x4 %d",\
+		qdf_print("[RX] NSS counts: 1x1 %d, 2x2 %d, 3x3 %d, 4x4 %d",\
 				_rx_phy_info->nss[0] + _rx_phy_info->nsts,\
 				_rx_phy_info->nss[1],			\
 				_rx_phy_info->nss[2],			\
@@ -204,12 +206,12 @@ static void htt_t2h_stats_tx_rate_stats_print_v2(wlan_dbg_tx_rate_info_v2_t *
 		\
 		/* BW */					\
 		if (ARRAY_SIZE(_rx_phy_info->bw) == 3) \
-			qdf_debug("BW counts: %s %d, %s %d, %s %d",	\
+			qdf_print("[RX] BW counts: %s %d, %s %d, %s %d",	\
 				bw_str_arr[0], _rx_phy_info->bw[0],	\
 				bw_str_arr[1], _rx_phy_info->bw[1],	\
 				bw_str_arr[2], _rx_phy_info->bw[2]);	\
 		else if (ARRAY_SIZE(_rx_phy_info->bw) == 4) \
-			qdf_debug("BW counts: %s %d, %s %d, %s %d, %s %d", \
+			qdf_print("[RX] BW counts: %s %d, %s %d, %s %d, %s %d", \
 				bw_str_arr[0], _rx_phy_info->bw[0],	\
 				bw_str_arr[1], _rx_phy_info->bw[1],	\
 				bw_str_arr[2], _rx_phy_info->bw[2],    \
@@ -263,7 +265,7 @@ static void htt_t2h_stats_tx_rate_stats_print_v2(wlan_dbg_tx_rate_info_v2_t *
 				((_rx_phy_info->rssi_chain2 >> 8) & 0xff),\
 				((_rx_phy_info->rssi_chain2 >> 0) & 0xff));\
 	} while (0)
-
+//(18.04.05), protocol-wifi, JUDY HOTSPOT KPI: Use qdf_print [END]
 static void htt_t2h_stats_rx_rate_stats_print(wlan_dbg_rx_rate_info_t *
 					      rx_phy_info, int concise)
 {
