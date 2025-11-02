@@ -1372,13 +1372,39 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 	dsi_msg->type = command->command_buf[0];
 	pr_info("msg type: %d\n", dsi_msg->type);
 
-	memcpy(dsi_msg->tx_buf, command->command_buf + 7, (command->command_length - 7));
-	dsi_msg->tx_len = (command->command_length - 7);
+	dsi_msg->tx_len = command->command_buf[5] << 8 | command->command_buf[6];
+	if (dsi_msg->tx_len + 7 > command->command_length) {
+		rc = -EINVAL;
+		goto error_two;
+	}
+	pr_info("msg tx_len: %d\n", dsi_msg->tx_len);
+	memcpy(dsi_msg->tx_buf, command->command_buf + 7, dsi_msg->tx_len);
+
+	if (dsi_msg->tx_len + 8 < command->command_length) {
+		dsi_msg->rx_len = command->command_buf[7 + dsi_msg->tx_len] << 8 |
+				  command->command_buf[8 + dsi_msg->tx_len];
+	} else {
+		dsi_msg->rx_len = 0;
+	}
+	pr_info("msg rx_len: %d\n", dsi_msg->rx_len);
+	if (dsi_msg->rx_len) {
+		dsi_msg->rx_buf = kzalloc(dsi_msg->rx_len, GFP_KERNEL);
+		if (ZERO_OR_NULL_PTR(dsi_msg->rx_buf)) {
+			rc = -ENOMEM;
+			goto error_two;
+		}
+	}
 
 	rc = mipi_dsi_device_transfer(dsi, dsi_msg);
 	if(!IS_ERR_VALUE(rc)){
 		pr_info("wrote %d bytes\n", rc);
 		rc = user_len;
+	}
+
+	if (dsi_msg->rx_len) {
+		memcpy(dsi_msg->rx_buf, display->readback_buf, dsi_msg->rx_len);
+		display->readback_length = dsi_msg->rx_len;
+		pr_info("read back %d bytes\n", dsi_msg->rx_len);
 	}
 
 error_two:
@@ -1387,6 +1413,42 @@ error:
 	kfree(buf);
 	return rc;
 }
+
+static ssize_t debugfs_mipi_command_read(struct file *file,
+				 char __user *user_buf,
+				 size_t user_len,
+				 loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	struct drm_panel_esd_config *esd_config;
+	char *buf;
+	int rc = 0;
+	size_t len = min_t(size_t, user_len, display->readback_length);
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (!display->panel) {
+		pr_err("invalid panel data\n");
+		return -EINVAL;
+	}
+
+	if (copy_to_user(user_buf, display->readback_buf, len)) {
+		rc = -EFAULT;
+		goto error;
+	}
+
+	*ppos += len;
+
+error:
+	kfree(buf);
+	return len;
+}
+
+
 static const struct file_operations dump_info_fops = {
 	.open = simple_open,
 	.read = debugfs_dump_info_read,
@@ -1411,7 +1473,7 @@ static const struct file_operations esd_check_mode_fops = {
 
 static const struct file_operations mipi_command_fops = {
 	.open = simple_open,
-	//TODO: .read = debugfs_mipi_command_read,
+	.read = debugfs_mipi_command_read,
 	.write = debugfs_mipi_command_write,
 };
 

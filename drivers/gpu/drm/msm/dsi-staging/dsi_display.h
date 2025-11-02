@@ -232,6 +232,10 @@ struct dsi_display {
 	bool misr_enable;
 	u32 misr_frame_count;
 	u32 esd_trigger;
+
+	u32 readback_length;
+	char readback_buf[MAX_CMD_PAYLOAD_SIZE];
+
 	/* multiple dsi error handlers */
 	struct workqueue_struct *err_workq;
 	struct work_struct fifo_underflow_work;
@@ -246,10 +250,9 @@ struct dsi_display {
  * @command_length:Length of DSI command
  * @command_buf:DSI command buffer
  */
-#define DSI_DISPLAY_MAX_MIPI_COMMAND_LEN
 struct dsi_display_debugfs_mipi_command {
 	int command_length;
-	char command_buf[DSI_DISPLAY_MAX_MIPI_COMMAND_LEN];
+	char command_buf[MAX_CMD_PAYLOAD_SIZE];
 };
 
 /**
