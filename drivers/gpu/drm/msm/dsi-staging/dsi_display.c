@@ -1541,7 +1541,7 @@ static int dsi_display_debugfs_init(struct dsi_display *display)
 	}
 
 	mipi_command = debugfs_create_file("mipi_command",
-					0600,
+					0666,
 					dir,
 					display,
 					&mipi_command_fops);
