@@ -1370,14 +1370,14 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 
 	dsi_msg->channel = dsi->channel;
 	dsi_msg->type = command->command_buf[0];
-	pr_info("msg type: %d\n", dsi_msg->type);
+	pr_debug("msg type: %d\n", dsi_msg->type);
 
 	dsi_msg->tx_len = command->command_buf[5] << 8 | command->command_buf[6];
 	if (dsi_msg->tx_len + 7 > command->command_length) {
 		rc = -EINVAL;
 		goto error_two;
 	}
-	pr_info("msg tx_len: %d\n", dsi_msg->tx_len);
+	pr_debug("msg tx_len: %d\n", dsi_msg->tx_len);
 	memcpy(dsi_msg->tx_buf, command->command_buf + 7, dsi_msg->tx_len);
 
 	if (dsi_msg->tx_len + 8 < command->command_length) {
@@ -1386,7 +1386,7 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 	} else {
 		dsi_msg->rx_len = 0;
 	}
-	pr_info("msg rx_len: %d\n", dsi_msg->rx_len);
+	pr_debug("msg rx_len: %d\n", dsi_msg->rx_len);
 	if (dsi_msg->rx_len) {
 		dsi_msg->flags |= MIPI_DSI_MSG_USE_LPM;
 		dsi_msg->rx_buf = kzalloc(dsi_msg->rx_len, GFP_KERNEL);
@@ -1398,14 +1398,14 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 
 	rc = mipi_dsi_device_transfer(dsi, dsi_msg);
 	if(!IS_ERR_VALUE(rc)){
-		pr_info("wrote %d bytes\n", rc);
 		rc = user_len;
+		pr_debug("wrote %d bytes\n", rc);
 	}
 
 	if (dsi_msg->rx_len) {
 		memcpy(display->readback_buf, dsi_msg->rx_buf, dsi_msg->rx_len);
 		display->readback_length = dsi_msg->rx_len;
-		pr_info("read back %d bytes\n", dsi_msg->rx_len);
+		pr_debug("read back %d bytes\n", dsi_msg->rx_len);
 	}
 
 error_two:
