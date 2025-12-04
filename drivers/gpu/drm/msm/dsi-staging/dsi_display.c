@@ -1388,6 +1388,7 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 	}
 	pr_info("msg rx_len: %d\n", dsi_msg->rx_len);
 	if (dsi_msg->rx_len) {
+		dsi_msg->flags |= MIPI_DSI_MSG_USE_LPM;
 		dsi_msg->rx_buf = kzalloc(dsi_msg->rx_len, GFP_KERNEL);
 		if (ZERO_OR_NULL_PTR(dsi_msg->rx_buf)) {
 			rc = -ENOMEM;
@@ -1402,7 +1403,7 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 	}
 
 	if (dsi_msg->rx_len) {
-		memcpy(dsi_msg->rx_buf, display->readback_buf, dsi_msg->rx_len);
+		memcpy(display->readback_buf, dsi_msg->rx_buf, dsi_msg->rx_len);
 		display->readback_length = dsi_msg->rx_len;
 		pr_info("read back %d bytes\n", dsi_msg->rx_len);
 	}
