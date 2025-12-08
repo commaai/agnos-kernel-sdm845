@@ -433,7 +433,7 @@
 			<&clock_gcc GCC_QUPV3_WRAP_1_M_AHB_CLK>,
 			<&clock_gcc GCC_QUPV3_WRAP_1_S_AHB_CLK>;
 		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&qupv3_se9_2uart_active>;
+		pinctrl-0 = <&qupv3_se9_2uart_rx_active>, <&qupv3_se9_2uart_tx_active>;
 		pinctrl-1 = <&qupv3_se9_2uart_sleep>;
 		interrupts = <GIC_SPI 354 0>;
 		qcom,wrapper-core = <&qupv3_1>;
