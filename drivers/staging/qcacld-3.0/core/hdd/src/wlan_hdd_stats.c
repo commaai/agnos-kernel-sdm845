@@ -4945,7 +4945,7 @@ static bool hdd_is_rcpi_applicable(hdd_adapter_t *adapter,
 
 		if (qdf_mem_cmp(mac_addr, &hdd_sta_ctx->conn_info.bssId,
 		    sizeof(*mac_addr))) {
-			hdd_err("mac addr is different from bssid connected");
+			hdd_debug("mac addr is different from bssid connected");
 			return false;
 		}
 	} else if (adapter->device_mode == QDF_SAP_MODE ||
