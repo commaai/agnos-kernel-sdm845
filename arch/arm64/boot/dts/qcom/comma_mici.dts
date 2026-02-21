@@ -86,7 +86,7 @@
     };
   };
 
-  ublox {
+  gnss {
     polling-delay-passive = <0>;
     polling-delay = <0>;
     thermal-sensors = <&pm8998_adc_tm 0x51>;
