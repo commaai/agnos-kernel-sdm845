@@ -53,6 +53,17 @@
     qcom,hw-settle-time = <2>;
     qcom,fast-avg-setup = <0>;
   };
+
+  chan@50 {
+    label = "bottom_soc_therm";
+    reg = <0x50>;
+    qcom,decimation = <2>;
+    qcom,pre-div-channel-scaling = <0>;
+    qcom,calibration-type = "ratiometric";
+    qcom,scale-function = <2>;
+    qcom,hw-settle-time = <2>;
+    qcom,fast-avg-setup = <0>;
+  };
 };
 &pm8998_adc_tm {
   chan@4e {
@@ -63,6 +74,17 @@
     qcom,scale-function = <2>;
     qcom,hw-settle-time = <2>;
     qcom,btm-channel-number = <0x74>;
+    qcom,thermal-node;
+  };
+
+  chan@50 {
+    label = "bottom_soc_therm";
+    reg = <0x50>;
+    qcom,pre-div-channel-scaling = <0>;
+    qcom,calibration-type = "ratiometric";
+    qcom,scale-function = <2>;
+    qcom,hw-settle-time = <2>;
+    qcom,btm-channel-number = <0x7c>;
     qcom,thermal-node;
   };
 };
