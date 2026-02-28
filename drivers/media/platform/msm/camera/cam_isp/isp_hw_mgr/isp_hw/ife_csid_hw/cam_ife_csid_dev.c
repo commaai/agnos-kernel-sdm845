@@ -17,11 +17,51 @@
 #include "cam_ife_csid_dev.h"
 #include "cam_ife_csid_hw_intf.h"
 #include "cam_debug_util.h"
+#include "cam_io_util.h"
 
 static struct cam_hw_intf *cam_ife_csid_hw_list[CAM_IFE_CSID_HW_RES_MAX] = {
 	0, 0, 0, 0};
 
 static char csid_dev_name[8];
+
+/* sysfs attribute for runtime PHY_NUM_SEL switching (IFE sharing) */
+static ssize_t phy_sel_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct cam_ife_csid_hw *csid_hw = dev_get_drvdata(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%u\n",
+		csid_hw->csi2_rx_cfg.phy_sel);
+}
+
+static ssize_t phy_sel_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct cam_ife_csid_hw *csid_hw = dev_get_drvdata(dev);
+	struct cam_hw_soc_info *soc_info = &csid_hw->hw_info->soc_info;
+	struct cam_ife_csid_reg_offset *csid_reg =
+		csid_hw->csid_info->csid_reg;
+	uint32_t phy_sel, val;
+
+	if (kstrtou32(buf, 0, &phy_sel) || phy_sel > 3)
+		return -EINVAL;
+
+	/* Read-modify-write: update only PHY_NUM_SEL bits [21:20] */
+	val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
+		csid_reg->csi2_reg->csid_csi2_rx_cfg0_addr);
+	val = (val & ~(0x3 << 20)) | ((phy_sel & 0x3) << 20);
+	cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
+		csid_reg->csi2_reg->csid_csi2_rx_cfg0_addr);
+
+	csid_hw->csi2_rx_cfg.phy_sel = phy_sel;
+	return count;
+}
+
+static struct device_attribute dev_attr_phy_sel = {
+	.attr = { .name = "phy_sel", .mode = 0666 },
+	.show = phy_sel_show,
+	.store = phy_sel_store,
+};
 
 int cam_ife_csid_probe(struct platform_device *pdev)
 {
@@ -88,6 +128,12 @@ int cam_ife_csid_probe(struct platform_device *pdev)
 		goto free_dev;
 
 	platform_set_drvdata(pdev, csid_dev);
+
+	rc = device_create_file(&pdev->dev, &dev_attr_phy_sel);
+	if (rc)
+		CAM_WARN(CAM_ISP, "CSID:%d failed to create phy_sel sysfs",
+			csid_dev_idx);
+
 	CAM_DBG(CAM_ISP, "CSID:%d probe successful",
 		csid_hw_intf->hw_idx);
 
@@ -121,6 +167,8 @@ int cam_ife_csid_remove(struct platform_device *pdev)
 
 	CAM_DBG(CAM_ISP, "CSID:%d remove",
 		csid_dev->hw_intf->hw_idx);
+
+	device_remove_file(&pdev->dev, &dev_attr_phy_sel);
 
 	cam_ife_csid_hw_deinit(csid_dev);
 
