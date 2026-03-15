@@ -466,6 +466,9 @@
 };
 
 &snd_934x {
+	compatible = "qcom,sdm845-asoc-snd-comma-simple";
+	qcom,model = "sdm845-comma-simple-snd-card";
+
 	qcom,audio-routing =
 		"AIF4 VI", "MCLK",
 		"RX_BIAS", "MCLK",
@@ -503,8 +506,8 @@
 	qcom,hph-en1-gpio = <&tavil_hph_en1>;*/
 	qcom,tavil-mclk-clk-freq = <9600000>;
 
-	asoc-codec = <&stub_codec>, <&ext_disp_audio_codec>;
-	asoc-codec-names = "msm-stub-codec.1", "msm-ext-disp-audio-codec-rx";
+	asoc-codec = <&generic_codec>;
+	asoc-codec-names = "vendor:generic-codec";
 
 	/*qcom,usbc-analog-en1-gpio = <&wcd_usbc_analog_en1_gpio>;
 	qcom,usbc-analog-en2-gpio = <&tlmm 51 0>;*/
