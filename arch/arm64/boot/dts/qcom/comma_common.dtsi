@@ -183,8 +183,73 @@
   extcon = <&extcon_usb1>;
 };
 
+&tlmm {
+  usb1_hs_pulldown {
+    usb1_hs_pulldown_active: usb1_hs_pulldown_active {
+      mux {
+        pins = "gpio122";
+        function = "gpio";
+      };
+      config {
+        pins = "gpio122";
+        drive-strength = <2>;
+        bias-disable;
+        output-high;
+      };
+    };
+    usb1_hs_pulldown_suspend: usb1_hs_pulldown_suspend {
+      mux {
+        pins = "gpio122";
+        function = "gpio";
+      };
+      config {
+        pins = "gpio122";
+        drive-strength = <2>;
+        bias-disable;
+        output-low;
+      };
+    };
+  };
+
+  usb2_hs_pulldown {
+    usb2_hs_pulldown_active: usb2_hs_pulldown_active {
+      mux {
+        pins = "gpio135";
+        function = "gpio";
+      };
+      config {
+        pins = "gpio135";
+        drive-strength = <2>;
+        bias-disable;
+        output-high;
+      };
+    };
+    usb2_hs_pulldown_suspend: usb2_hs_pulldown_suspend {
+      mux {
+        pins = "gpio135";
+        function = "gpio";
+      };
+      config {
+        pins = "gpio135";
+        drive-strength = <2>;
+        bias-disable;
+        output-low;
+      };
+    };
+  };
+};
+
+&qusb_phy0 {
+  pinctrl-names = "atest_usb13_suspend", "atest_usb13_active";
+  pinctrl-0 = <&usb1_hs_pulldown_suspend>;
+  pinctrl-1 = <&usb1_hs_pulldown_active>;
+};
+
 &qusb_phy1 {
   status = "okay";
+  pinctrl-names = "atest_usb13_suspend", "atest_usb13_active";
+  pinctrl-0 = <&usb2_hs_pulldown_suspend>;
+  pinctrl-1 = <&usb2_hs_pulldown_active>;
 };
 
 &pmi8998_pdphy {
