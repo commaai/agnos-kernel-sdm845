@@ -1310,17 +1310,90 @@ error:
 	return len;
 }
 
+static int debugfs_mipi_command_transfer_one(struct dsi_display *display,
+		struct mipi_dsi_device *dsi,
+		struct dsi_display_debugfs_mipi_command *command)
+{
+	struct mipi_dsi_msg *dsi_msg;
+	int rc;
+
+	if (command->command_length < 8)
+		return -EINVAL;
+
+	dsi_msg = kzalloc(sizeof(*dsi_msg), GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(dsi_msg))
+		return -ENOMEM;
+
+	dsi_msg->tx_buf = kzalloc(command->command_length - 7, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(dsi_msg->tx_buf)) {
+		rc = -ENOMEM;
+		goto out_free_msg;
+	}
+
+	dsi_msg->channel = dsi->channel;
+	dsi_msg->type = command->command_buf[0];
+	dsi_msg->tx_len = command->command_buf[5] << 8 | command->command_buf[6];
+	if (dsi_msg->tx_len + 7 > command->command_length) {
+		rc = -EINVAL;
+		goto out_free_tx;
+	}
+	memcpy((void *)dsi_msg->tx_buf, command->command_buf + 7, dsi_msg->tx_len);
+
+	if (dsi_msg->tx_len + 8 < command->command_length) {
+		dsi_msg->rx_len = command->command_buf[7 + dsi_msg->tx_len] << 8 |
+				  command->command_buf[8 + dsi_msg->tx_len];
+	} else {
+		dsi_msg->rx_len = 0;
+	}
+
+	if (dsi_msg->rx_len) {
+		dsi_msg->flags |= MIPI_DSI_MSG_USE_LPM;
+		dsi_msg->rx_buf = kzalloc(dsi_msg->rx_len, GFP_KERNEL);
+		if (ZERO_OR_NULL_PTR(dsi_msg->rx_buf)) {
+			rc = -ENOMEM;
+			goto out_free_tx;
+		}
+	}
+
+	if (!dsi->host->ops || !dsi->host->ops->transfer) {
+		rc = -ENOSYS;
+		goto out_free_rx;
+	}
+
+	if (dsi->mode_flags & MIPI_DSI_MODE_LPM)
+		dsi_msg->flags |= MIPI_DSI_MSG_USE_LPM;
+
+	if ((command->command_buf[1] != 0x0F) || (dsi_msg->rx_len > 0)) {
+		// normal "slow" mode
+		dsi_msg->flags |= MIPI_DSI_MSG_LASTCOMMAND;
+	}
+
+	rc = dsi_host_transfer(dsi->host, dsi_msg);
+
+	if (dsi_msg->rx_len && !IS_ERR_VALUE(rc)) {
+		memcpy(display->readback_buf, dsi_msg->rx_buf, dsi_msg->rx_len);
+		display->readback_length = dsi_msg->rx_len;
+	}
+
+out_free_rx:
+	kfree(dsi_msg->rx_buf);
+out_free_tx:
+	kfree(dsi_msg->tx_buf);
+out_free_msg:
+	kfree(dsi_msg);
+	return IS_ERR_VALUE(rc) ? rc : 0;
+}
+
 static ssize_t debugfs_mipi_command_write(struct file *file,
 				  const char __user *user_buf,
 				  size_t user_len,
 				  loff_t *ppos)
 {
 	struct dsi_display *display = file->private_data;
-	char *buf;
-	int rc = 0;
-	struct dsi_display_debugfs_mipi_command *command;
-	struct mipi_dsi_msg *dsi_msg;
 	struct mipi_dsi_device *dsi;
+	char *buf;
+	size_t offset = 0;
+	int rc = 0;
 
 	if (!display)
 		return -ENODEV;
@@ -1328,8 +1401,8 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 	if (*ppos)
 		return 0;
 
-	if (user_len < 12){
-		pr_info("got buffer of %d bytes, expected at least 12\n", user_len);
+	if (user_len < 12) {
+		pr_info("got buffer of %zu bytes, expected at least 12\n", user_len);
 		return -EINVAL;
 	}
 
@@ -1347,84 +1420,39 @@ static ssize_t debugfs_mipi_command_write(struct file *file,
 		goto error;
 	}
 
-	// Data is in buf, let's cast it to our struct
-	command = (struct dsi_display_debugfs_mipi_command *) buf;
-	if(command->command_length < 8) {
-		rc = -EINVAL;
-		goto error;
-	}
-
-	// Parse and transfer the message
 	dsi = &display->panel->mipi_device;
-	dsi_msg = kzalloc(sizeof(struct mipi_dsi_msg), GFP_KERNEL);
-	if (ZERO_OR_NULL_PTR(dsi_msg)) {
-		rc = -ENOMEM;
-		goto error;
-	}
 
-	dsi_msg->tx_buf = kzalloc((command->command_length - 7), GFP_KERNEL);
-	if (ZERO_OR_NULL_PTR(dsi_msg)) {
-		rc = -ENOMEM;
-		goto error_two;
-	}
+	mutex_lock(&display->panel->panel_lock);
 
-	dsi_msg->channel = dsi->channel;
-	dsi_msg->type = command->command_buf[0];
-	pr_debug("msg type: %d\n", dsi_msg->type);
+	while (offset + sizeof(int) <= user_len) {
+		struct dsi_display_debugfs_mipi_command *command =
+			(struct dsi_display_debugfs_mipi_command *)(buf + offset);
+		size_t cmd_total;
 
-	dsi_msg->tx_len = command->command_buf[5] << 8 | command->command_buf[6];
-	if (dsi_msg->tx_len + 7 > command->command_length) {
-		rc = -EINVAL;
-		goto error_two;
-	}
-	pr_debug("msg tx_len: %d\n", dsi_msg->tx_len);
-	memcpy(dsi_msg->tx_buf, command->command_buf + 7, dsi_msg->tx_len);
-
-	if (dsi_msg->tx_len + 8 < command->command_length) {
-		dsi_msg->rx_len = command->command_buf[7 + dsi_msg->tx_len] << 8 |
-				  command->command_buf[8 + dsi_msg->tx_len];
-	} else {
-		dsi_msg->rx_len = 0;
-	}
-	pr_debug("msg rx_len: %d\n", dsi_msg->rx_len);
-	if (dsi_msg->rx_len) {
-		dsi_msg->flags |= MIPI_DSI_MSG_USE_LPM;
-		dsi_msg->rx_buf = kzalloc(dsi_msg->rx_len, GFP_KERNEL);
-		if (ZERO_OR_NULL_PTR(dsi_msg->rx_buf)) {
-			rc = -ENOMEM;
-			goto error_two;
+		if (command->command_length < 0 ||
+		    command->command_length > MAX_CMD_PAYLOAD_SIZE) {
+			rc = -EINVAL;
+			break;
 		}
+
+		cmd_total = sizeof(int) + command->command_length;
+		if (offset + cmd_total > user_len) {
+			rc = -EINVAL;
+			break;
+		}
+
+		rc = debugfs_mipi_command_transfer_one(display, dsi, command);
+		if (rc)
+			break;
+
+		offset += cmd_total;
 	}
 
-	if (!dsi->host->ops || !dsi->host->ops->transfer) {
-		rc = -ENOSYS;
-		goto error_two;
-	}
+	mutex_unlock(&display->panel->panel_lock);
 
-	if (dsi->mode_flags & MIPI_DSI_MODE_LPM)
-		dsi_msg->flags |= MIPI_DSI_MSG_USE_LPM;
-
-	if ((command->command_buf[1] != 0x0F) || (dsi_msg->rx_len > 0)) {
-		// normal "slow" mode
-		dsi_msg->flags |= MIPI_DSI_MSG_LASTCOMMAND;
-	} else {
-		pr_debug("fast tx only command\n");
-	}
-
-	rc = dsi_host_transfer(dsi->host, dsi_msg);
-	if(!IS_ERR_VALUE(rc)){
+	if (!rc)
 		rc = user_len;
-		pr_debug("wrote %d bytes\n", rc);
-	}
 
-	if (dsi_msg->rx_len) {
-		memcpy(display->readback_buf, dsi_msg->rx_buf, dsi_msg->rx_len);
-		display->readback_length = dsi_msg->rx_len;
-		pr_debug("read back %d bytes\n", dsi_msg->rx_len);
-	}
-
-error_two:
-	kfree(dsi_msg);
 error:
 	kfree(buf);
 	return rc;
