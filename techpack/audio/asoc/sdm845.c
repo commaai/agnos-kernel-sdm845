@@ -6437,11 +6437,74 @@ struct snd_soc_card snd_soc_card_stub_msm = {
 	.name		= "sdm845-stub-snd-card",
 };
 
+static struct snd_soc_dai_link msm_comma_simple_fe_dai_links[] = {
+	{
+		.name = "COMMA Audio",
+		.stream_name = "Comma Audio",
+		.cpu_dai_name = "MultiMedia1",
+		.platform_name = "msm-pcm-dsp.0",
+		.dynamic = 1,
+		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
+		.dpcm_playback = 1,
+		.dpcm_capture = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		.id = MSM_FRONTEND_DAI_MULTIMEDIA1,
+	},
+};
+
+static struct snd_soc_dai_link msm_comma_simple_be_dai_links[] = {
+	{
+		.name = LPASS_BE_SEC_MI2S_RX,
+		.stream_name = "Secondary MI2S Playback",
+		.cpu_dai_name = "msm-dai-q6-mi2s.1",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "vendor:generic-codec",
+		.codec_dai_name = "HiFi",
+		.no_pcm = 1,
+		.dpcm_playback = 1,
+		.id = MSM_BACKEND_DAI_SECONDARY_MI2S_RX,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &msm_mi2s_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		.init = &msm_audrx_init,
+	},
+	{
+		.name = LPASS_BE_TERT_MI2S_TX,
+		.stream_name = "Tertiary MI2S Capture",
+		.cpu_dai_name = "msm-dai-q6-mi2s.2",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "vendor:generic-codec",
+		.codec_dai_name = "HiFi",
+		.no_pcm = 1,
+		.dpcm_capture = 1,
+		.id = MSM_BACKEND_DAI_TERTIARY_MI2S_TX,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &msm_mi2s_be_ops,
+		.ignore_suspend = 1,
+	},
+};
+
+static struct snd_soc_dai_link msm_comma_simple_dai_links[
+			 ARRAY_SIZE(msm_comma_simple_fe_dai_links) +
+			 ARRAY_SIZE(msm_comma_simple_be_dai_links)];
+
+struct snd_soc_card snd_soc_card_comma_simple_msm = {
+	.name		= "sdm845-comma-simple-snd-card",
+};
+
 static const struct of_device_id sdm845_asoc_machine_of_match[]  = {
 	{ .compatible = "qcom,sdm845-asoc-snd-tavil",
 	  .data = "tavil_codec"},
 	{ .compatible = "qcom,sdm845-asoc-snd-stub",
 	  .data = "stub_codec"},
+	{ .compatible = "qcom,sdm845-asoc-snd-comma-simple",
+	  .data = "comma_simple_codec"},
 	{},
 };
 
@@ -6529,6 +6592,20 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 		       sizeof(msm_stub_be_dai_links));
 
 		dailink = msm_stub_dai_links;
+		total_links = len_2;
+	} else if (!strcmp(match->data, "comma_simple_codec")) {
+		card = &snd_soc_card_comma_simple_msm;
+		len_1 = ARRAY_SIZE(msm_comma_simple_fe_dai_links);
+		len_2 = len_1 + ARRAY_SIZE(msm_comma_simple_be_dai_links);
+
+		memcpy(msm_comma_simple_dai_links,
+		       msm_comma_simple_fe_dai_links,
+		       sizeof(msm_comma_simple_fe_dai_links));
+		memcpy(msm_comma_simple_dai_links + len_1,
+		       msm_comma_simple_be_dai_links,
+		       sizeof(msm_comma_simple_be_dai_links));
+
+		dailink = msm_comma_simple_dai_links;
 		total_links = len_2;
 	}
 
