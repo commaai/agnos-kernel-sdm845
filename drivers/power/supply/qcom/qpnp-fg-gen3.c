@@ -689,6 +689,7 @@ static int fg_get_battery_resistance(struct fg_chip *chip, int *val)
 #define BATT_CURRENT_DENR	1000
 static int fg_get_battery_current(struct fg_chip *chip, int *val)
 {
+	static int last_iadc_ua = 1;
 	int rc = 0;
 	int64_t temp = 0;
 	u8 buf[2];
@@ -709,6 +710,7 @@ static int fg_get_battery_current(struct fg_chip *chip, int *val)
 	/* Sign bit is bit 15 */
 	temp = twos_compliment_extend(temp, 15);
 	*val = div_s64((s64)temp * BATT_CURRENT_NUMR, BATT_CURRENT_DENR);
+	*val = *val ? (last_iadc_ua = *val) : last_iadc_ua;
 
 	/* Arm the next IADC conversion via rising edge on BATT_IADC_CONV. */
 	u8 iadc_ctrl = ALG_DIRECT_MODE_EN_BIT | ADC_ENABLE_REG_CTRL_BIT;
