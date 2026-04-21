@@ -693,10 +693,10 @@ static int fg_get_battery_current(struct fg_chip *chip, int *val)
 	int64_t temp = 0;
 	u8 buf[2];
 
-	rc = fg_read(chip, BATT_INFO_IBATT_LSB(chip), buf, 2);
+	rc = fg_read(chip, BATT_INFO_IADC_LSB(chip), buf, 2);
 	if (rc < 0) {
 		pr_err("failed to read addr=0x%04x, rc=%d\n",
-			BATT_INFO_IBATT_LSB(chip), rc);
+			BATT_INFO_IADC_LSB(chip), rc);
 		return rc;
 	}
 
@@ -709,6 +709,12 @@ static int fg_get_battery_current(struct fg_chip *chip, int *val)
 	/* Sign bit is bit 15 */
 	temp = twos_compliment_extend(temp, 15);
 	*val = div_s64((s64)temp * BATT_CURRENT_NUMR, BATT_CURRENT_DENR);
+
+	/* Arm the next IADC conversion via rising edge on BATT_IADC_CONV. */
+	u8 iadc_ctrl = ALG_DIRECT_MODE_EN_BIT | ADC_ENABLE_REG_CTRL_BIT;
+	fg_write(chip, BATT_INFO_TM_MISC(chip), &iadc_ctrl, 1);
+	iadc_ctrl |= BATT_IADC_CONV_BIT;
+	fg_write(chip, BATT_INFO_TM_MISC(chip), &iadc_ctrl, 1);
 	return 0;
 }
 
