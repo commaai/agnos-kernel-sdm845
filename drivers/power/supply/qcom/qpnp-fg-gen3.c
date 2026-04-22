@@ -690,6 +690,7 @@ static int fg_get_battery_resistance(struct fg_chip *chip, int *val)
 static int fg_get_battery_current(struct fg_chip *chip, int *val)
 {
 	static int last_iadc_ua = 1;
+	static unsigned long last_trig;
 	int rc = 0;
 	int64_t temp = 0;
 	u8 buf[2];
@@ -712,11 +713,16 @@ static int fg_get_battery_current(struct fg_chip *chip, int *val)
 	*val = div_s64((s64)temp * BATT_CURRENT_NUMR, BATT_CURRENT_DENR);
 	*val = *val ? (last_iadc_ua = *val) : last_iadc_ua;
 
-	/* Arm the next IADC conversion via rising edge on BATT_IADC_CONV. */
+	/* skip adc trigger while previous conversion is still running */
+	if (time_before(jiffies, last_trig + msecs_to_jiffies(167)))
+		return 0;
+
+	/* arm the next IADC conversion with rising edge on BATT_IADC_CONV */
 	u8 iadc_ctrl = ALG_DIRECT_MODE_EN_BIT | ADC_ENABLE_REG_CTRL_BIT;
 	fg_write(chip, BATT_INFO_TM_MISC(chip), &iadc_ctrl, 1);
 	iadc_ctrl |= BATT_IADC_CONV_BIT;
 	fg_write(chip, BATT_INFO_TM_MISC(chip), &iadc_ctrl, 1);
+	last_trig = jiffies;
 	return 0;
 }
 
