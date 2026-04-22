@@ -714,7 +714,7 @@ static int fg_get_battery_current(struct fg_chip *chip, int *val)
 	*val = *val ? (last_iadc_ua = *val) : last_iadc_ua;
 
 	/* skip adc trigger while previous conversion is still running */
-	if (time_before(jiffies, last_trig + msecs_to_jiffies(167)))
+	if (time_before(jiffies, last_trig + msecs_to_jiffies(170)))
 		return 0;
 
 	/* arm the next IADC conversion with rising edge on BATT_IADC_CONV */
