@@ -566,14 +566,14 @@ static int limits_dcvs_probe(struct platform_device *pdev)
 		return -EINVAL;
 	};
 
-	/* Enable the thermal algorithm early */
+	/* Disabled to raise LMH throttling temperature */
 	ret = limits_dcvs_write(hw->affinity, LIMITS_SUB_FN_THERMAL,
-		 LIMITS_ALGO_MODE_ENABLE, 1, 0, 0);
+		 LIMITS_ALGO_MODE_ENABLE, 0, 0, 0);
 	if (ret)
 		return ret;
-	/* Enable the LMH outer loop algorithm */
+	/* Disabled to raise LMH throttling temperature */
 	ret = limits_dcvs_write(hw->affinity, LIMITS_SUB_FN_CRNT,
-		 LIMITS_ALGO_MODE_ENABLE, 1, 0, 0);
+		 LIMITS_ALGO_MODE_ENABLE, 0, 0, 0);
 	if (ret)
 		return ret;
 	/* Enable the Reliability algorithm */
