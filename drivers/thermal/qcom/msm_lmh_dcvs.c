@@ -566,12 +566,14 @@ static int limits_dcvs_probe(struct platform_device *pdev)
 		return -EINVAL;
 	};
 
-	/* Disabled to raise LMH throttling temperature */
+	/* COMMA: Disable LIMITS_SUB_FN_THERMAL and LIMITS_SUB_FN_CRNT LMH subfunctions to raise throttling temperature to ~105°C 
+	 * LIMITS_SUB_FN_REL and LIMITS_SUB_FN_BCL keep LMH functional */
+	/* Enable the thermal algorithm early */
 	ret = limits_dcvs_write(hw->affinity, LIMITS_SUB_FN_THERMAL,
 		 LIMITS_ALGO_MODE_ENABLE, 0, 0, 0);
 	if (ret)
 		return ret;
-	/* Disabled to raise LMH throttling temperature */
+	/* Enable the LMH outer loop algorithm */
 	ret = limits_dcvs_write(hw->affinity, LIMITS_SUB_FN_CRNT,
 		 LIMITS_ALGO_MODE_ENABLE, 0, 0, 0);
 	if (ret)
