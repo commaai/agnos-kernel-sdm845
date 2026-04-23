@@ -3537,7 +3537,7 @@
 			thermal-governor = "step_wise";
 			trips {
 				pop_trip: pop-trip {
-					temperature = <95000>;
+					temperature = <105000>;
 					hysteresis = <0>;
 					type = "passive";
 				};
