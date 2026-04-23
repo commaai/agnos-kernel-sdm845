@@ -2456,8 +2456,11 @@ static int icnss_driver_event_pd_service_down(struct icnss_priv *priv,
 		goto out;
 	}
 
-	if (priv->force_err_fatal)
-		ICNSS_ASSERT(0);
+	if (priv->force_err_fatal) {
+		// ICNSS_ASSERT(0);
+		icnss_pr_err("comma hax: skipping BUG_ON and proceeding with FW crash recovery");
+		priv->force_err_fatal = false;
+	}
 
 	if (priv->early_crash_ind) {
 		icnss_pr_dbg("PD Down ignored as early indication is processed: %d, state: 0x%lx\n",
