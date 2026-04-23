@@ -657,12 +657,19 @@
 
                 ramoops: ramoops@b0000000 {
                         compatible = "ramoops";
-                        reg = <0 0xb0000000 0 0x00400000>;
+                        reg = <0 0xb0000000 0 0x003ff000>;
                         record-size = <0x40000>; /*256x1024*/
                         console-size = <0x40000>;
                         ftrace-size = <0x40000>;
                         pmsg-size = <0x200000>;
                         ecc-size = <0x0>;
+                };
+
+                /* Untouched region for bootloader cookies
+                 * (e.g. the power blip cookie @ 0xb03ffffc). */
+                cookies: cookies@b03ff000 {
+                        no-map;
+                        reg = <0 0xb03ff000 0 0x1000>;
                 };
 
 
