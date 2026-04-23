@@ -689,14 +689,16 @@ static int fg_get_battery_resistance(struct fg_chip *chip, int *val)
 #define BATT_CURRENT_DENR	1000
 static int fg_get_battery_current(struct fg_chip *chip, int *val)
 {
+	static int last_iadc_ua = 1;
+	static unsigned long last_trig;
 	int rc = 0;
 	int64_t temp = 0;
 	u8 buf[2];
 
-	rc = fg_read(chip, BATT_INFO_IBATT_LSB(chip), buf, 2);
+	rc = fg_read(chip, BATT_INFO_IADC_LSB(chip), buf, 2);
 	if (rc < 0) {
 		pr_err("failed to read addr=0x%04x, rc=%d\n",
-			BATT_INFO_IBATT_LSB(chip), rc);
+			BATT_INFO_IADC_LSB(chip), rc);
 		return rc;
 	}
 
@@ -709,6 +711,18 @@ static int fg_get_battery_current(struct fg_chip *chip, int *val)
 	/* Sign bit is bit 15 */
 	temp = twos_compliment_extend(temp, 15);
 	*val = div_s64((s64)temp * BATT_CURRENT_NUMR, BATT_CURRENT_DENR);
+	*val = *val ? (last_iadc_ua = *val) : last_iadc_ua;
+
+	/* skip adc trigger while previous conversion is still running */
+	if (time_before(jiffies, last_trig + msecs_to_jiffies(170)))
+		return 0;
+
+	/* arm the next IADC conversion with rising edge on BATT_IADC_CONV */
+	u8 iadc_ctrl = ALG_DIRECT_MODE_EN_BIT | ADC_ENABLE_REG_CTRL_BIT;
+	fg_write(chip, BATT_INFO_TM_MISC(chip), &iadc_ctrl, 1);
+	iadc_ctrl |= BATT_IADC_CONV_BIT;
+	fg_write(chip, BATT_INFO_TM_MISC(chip), &iadc_ctrl, 1);
+	last_trig = jiffies;
 	return 0;
 }
 
