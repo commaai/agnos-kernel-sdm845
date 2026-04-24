@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1183,11 +1183,6 @@ bool sap_dfs_is_w53_invalid(tHalHandle hHal, uint8_t channelID)
 	tpAniSirGlobal pMac;
 
 	pMac = PMAC_STRUCT(hHal);
-	if (NULL == pMac) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("invalid pMac"));
-		return false;
-	}
 
 	/*
 	 * Check for JAPAN W53 Channel operation capability
@@ -1218,14 +1213,8 @@ bool sap_dfs_is_w53_invalid(tHalHandle hHal, uint8_t channelID)
  */
 bool sap_dfs_is_channel_in_preferred_location(tHalHandle hHal, uint8_t channelID)
 {
-	tpAniSirGlobal pMac;
+	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 
-	pMac = PMAC_STRUCT(hHal);
-	if (NULL == pMac) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("invalid pMac"));
-		return true;
-	}
 	if ((SAP_CHAN_PREFERRED_INDOOR ==
 	     pMac->sap.SapDfsInfo.sap_operating_chan_preferred_location) &&
 	    (true == IS_CHAN_JAPAN_OUTDOOR(channelID))) {
@@ -1338,11 +1327,6 @@ static uint8_t sap_apply_rules(ptSapContext sap_ctx)
 	}
 
 	mac_ctx = PMAC_STRUCT(hal);
-	if (NULL == mac_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("mac_ctx pointer NULL"));
-		return 0;
-	}
 
 	preferred_location =
 		mac_ctx->sap.SapDfsInfo.sap_operating_chan_preferred_location;
@@ -1691,11 +1675,6 @@ static uint8_t sap_random_channel_sel(ptSapContext sap_ctx)
 	}
 
 	mac_ctx = PMAC_STRUCT(hal);
-	if (NULL == mac_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("invalid mac_ctx"));
-		return 0;
-	}
 
 	/*
 	 * Retrieve the original one and store it.
@@ -1837,12 +1816,11 @@ static void sap_mark_dfs_channels(ptSapContext sapContext, uint8_t *channels,
 	int i, j;
 	tSapDfsNolInfo *psapDfsChannelNolList = NULL;
 	uint8_t nRegDomainDfsChannels;
-	tHalHandle hHal;
+	tHalHandle hHal = CDS_GET_HAL_CB(sapContext->p_cds_gctx);
 	tpAniSirGlobal pMac;
 	uint64_t time_elapsed_since_last_radar;
 	uint64_t time_when_radar_found;
 
-	hHal = CDS_GET_HAL_CB(sapContext->p_cds_gctx);
 	if (NULL == channels)
 		return;
 	if (NULL == hHal) {
@@ -1851,11 +1829,6 @@ static void sap_mark_dfs_channels(ptSapContext sapContext, uint8_t *channels,
 		return;
 	}
 	pMac = PMAC_STRUCT(hHal);
-	if (NULL == pMac) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("invalid pMac"));
-		return;
-	}
 
 	/*
 	 * Mark the current channel on which Radar is found
@@ -2312,15 +2285,11 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 	}
 
 	mac_ctx = PMAC_STRUCT(h_hal);
-	if (NULL == mac_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-				FL("Invalid MAC context"));
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	if (cds_concurrent_beaconing_sessions_running()) {
 		con_ch =
-			sme_get_concurrent_operation_channel(h_hal);
+			sme_get_beaconing_concurrent_operation_channel(h_hal,
+							sap_context->sessionId);
 #ifdef FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
 		if (con_ch && sap_context->channel == AUTO_CHANNEL_SELECT) {
 			sap_context->dfs_ch_disable = true;
@@ -2332,9 +2301,9 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 		}
 #endif
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-		if (sap_context->cc_switch_mode !=
+		if (con_ch && (sap_context->cc_switch_mode !=
 					QDF_MCC_TO_SCC_SWITCH_DISABLE &&
-					sap_context->channel) {
+					sap_context->channel)) {
 			/*
 			 * For ACS request ,the sapContext->channel is 0,
 			 * we skip below overlap checking. When the ACS
@@ -2938,11 +2907,6 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 	mac_ctx = PMAC_STRUCT(hal);
-	if (NULL == mac_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Invalid MAC context"));
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	if (sap_hddevent != eSAP_UPDATE_SCAN_RESULT)
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
@@ -3040,6 +3004,12 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 				  FL("Invalid CSR Roam Info"));
 			return QDF_STATUS_E_INVAL;
 		}
+		if (eSAP_DISCONNECTING == sap_ctx->sapsMachine) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+				  "SAP is disconnecting, not able to handle any incoming (re)assoc req");
+			return QDF_STATUS_E_ABORTED;
+		}
+
 		reassoc_complete =
 		    &sap_ap_event.sapevt.sapStationAssocReassocCompleteEvent;
 
@@ -3907,7 +3877,8 @@ static QDF_STATUS sap_fsm_state_ch_select(ptSapContext sap_ctx,
 		if (cds_concurrent_beaconing_sessions_running()) {
 			uint16_t con_ch;
 
-			con_ch = sme_get_concurrent_operation_channel(hal);
+			con_ch = sme_get_beaconing_concurrent_operation_channel(
+					hal, sap_ctx->sessionId);
 			if (con_ch && CDS_IS_DFS_CH(con_ch))
 				sap_ctx->channel = con_ch;
 		}
@@ -4028,6 +3999,7 @@ static QDF_STATUS sap_fsm_state_dfs_cac_wait(ptSapContext sap_ctx,
 					continue;
 				/* SAP to be moved to DISCONNECTING state */
 				t_sap_ctx->sapsMachine = eSAP_DISCONNECTING;
+				t_sap_ctx->is_chan_change_inprogress = true;
 				/*
 				 * eSAP_DFS_CHANNEL_CAC_RADAR_FOUND:
 				 * A Radar is found on current DFS Channel
@@ -4342,17 +4314,9 @@ static QDF_STATUS sap_fsm_state_disconnecting(ptSapContext sap_ctx,
 			  "eSAP_DISCONNECTING", "eSAP_DISCONNECTED");
 		sap_ctx->sapsMachine = eSAP_DISCONNECTED;
 
-		/* Close the SME session */
-		if (true == sap_ctx->isSapSessionOpen) {
-			sap_ctx->isSapSessionOpen = false;
-			qdf_status = sap_close_session(hal, sap_ctx,
-					sap_roam_session_close_callback, true);
-			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-				qdf_status = sap_signal_hdd_event(sap_ctx, NULL,
-						eSAP_STOP_BSS_EVENT,
-						(void *)eSAP_STATUS_SUCCESS);
-			}
-		}
+		qdf_status = sap_signal_hdd_event(sap_ctx, NULL,
+						  eSAP_STOP_BSS_EVENT,
+						  (void *)eSAP_STATUS_SUCCESS);
 	} else if (msg == eWNI_SME_CHANNEL_CHANGE_REQ) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
 			  FL("sapdfs: Send channel change request on sapctx[%pK]"),
@@ -4417,11 +4381,6 @@ QDF_STATUS sap_fsm(ptSapContext sap_ctx, ptWLAN_SAPEvent sap_event)
 	}
 
 	mac_ctx = PMAC_STRUCT(hal);
-	if (NULL == mac_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Invalid MAC context"));
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
 		  FL("sap_ctx=%pK, state_var=%d, msg=0x%x"),
@@ -4882,7 +4841,7 @@ static QDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
 #ifdef FEATURE_WLAN_CH_AVOID
 	uint8_t i;
 #endif
-	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	tpAniSirGlobal mac_ctx;
 	tSapChSelSpectInfo spect_info_obj = { NULL, 0 };
 	uint16_t ch_width;
 
@@ -4894,6 +4853,7 @@ static QDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
 		return QDF_STATUS_E_FAULT;
 	}
 
+	mac_ctx = PMAC_STRUCT(hal);
 	start_ch_num = sap_ctx->acs_cfg->start_ch;
 	end_ch_num = sap_ctx->acs_cfg->end_ch;
 	ch_width = sap_ctx->acs_cfg->ch_width;
@@ -4953,6 +4913,10 @@ static QDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
 		      CDS_CHANNEL_STATE(loop_count)))))
 			continue;
 
+		if (CDS_CHANNEL_NUM(loop_count) == 12 ||
+		    CDS_CHANNEL_NUM(loop_count) == 13)
+			continue;
+
 		/*
 		 * Skip the channels which are not in ACS config from user
 		 * space
@@ -4965,9 +4929,13 @@ static QDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
 		/* Dont scan DFS channels in case of MCC disallowed
 		 * As it can result in SAP starting on DFS channel
 		 * resulting  MCC on DFS channel
+		 * Also if the dfs master mode in not enabled, exclude the
+		 * dfs channels, as the user doesnt want the SAP bringup on
+		 * dfs channel.
 		 */
 		if (CDS_IS_DFS_CH(CDS_CHANNEL_NUM(loop_count)) &&
-				  cds_disallow_mcc(CDS_CHANNEL_NUM(loop_count)))
+		   (cds_disallow_mcc(CDS_CHANNEL_NUM(loop_count)) ||
+		    !sap_ctx->acs_cfg->dfs_master_enable))
 			continue;
 
 		/*

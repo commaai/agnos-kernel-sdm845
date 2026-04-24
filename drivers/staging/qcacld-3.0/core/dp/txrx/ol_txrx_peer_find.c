@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -100,6 +100,9 @@ void ol_txrx_peer_delete_roam_stale_peer(struct ol_txrx_pdev_t *pdev)
 		peer = stale_peer->peer;
 		for (i = 0; i < MAX_NUM_PEER_ID_PER_PEER; i++) {
 			peer_id = peer->peer_ids[i];
+
+			if (peer_id == HTT_INVALID_PEER)
+				continue;
 
 			if (pdev->peer_id_to_obj_map[peer_id].peer_ref != peer)
 				continue;
@@ -756,7 +759,6 @@ void ol_txrx_peer_remove_obj_map_entries(ol_txrx_pdev_handle pdev,
 				peer_id_ref_cnt);
 		num_deleted_maps += peer_id_ref_cnt;
 		pdev->peer_id_to_obj_map[peer_id].peer = NULL;
-		peer->peer_ids[i] = HTT_INVALID_PEER;
 
 		if (peer_id_ref_cnt)
 			pdev->peer_id_to_obj_map[peer_id].peer_ref = peer;
@@ -790,7 +792,9 @@ struct ol_txrx_peer_t *ol_txrx_assoc_peer_find(struct ol_txrx_vdev_t *vdev)
 	 */
 	if (vdev->last_real_peer
 	    && vdev->last_real_peer->peer_ids[0] != HTT_INVALID_PEER_ID) {
+		qdf_spin_lock_bh(&vdev->pdev->peer_ref_mutex);
 		OL_TXRX_PEER_INC_REF_CNT(vdev->last_real_peer);
+		qdf_spin_unlock_bh(&vdev->pdev->peer_ref_mutex);
 		peer = vdev->last_real_peer;
 	} else {
 		peer = NULL;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -828,8 +828,7 @@ static void wma_data_tx_ack_work_handler(void *ack_work)
 
 	/* Call the Ack Cb registered by UMAC */
 	if (ack_cb)
-		ack_cb((tpAniSirGlobal) (wma_handle->mac_context),
-			work->status ? 0 : 1);
+		ack_cb(wma_handle->mac_context, work->status ? 0 : 1);
 	else
 		WMA_LOGE("Data Tx Ack Cb is NULL");
 
@@ -1376,23 +1375,22 @@ static void wma_mgmt_tx_ack_work_handler(void *ack_work)
 	tp_wma_handle wma_handle;
 	pWMAAckFnTxComp ack_cb;
 
-	if (cds_is_load_or_unload_in_progress()) {
-		WMA_LOGE("%s: Driver load/unload in progress", __func__);
-		return;
-	}
-
 	work = (struct wma_tx_ack_work_ctx *)ack_work;
 
 	wma_handle = work->wma_handle;
 	ack_cb = wma_handle->umac_ota_ack_cb[work->sub_type];
 
+	if (cds_is_load_or_unload_in_progress()) {
+		WMA_LOGE("%s: Driver load/unload in progress", __func__);
+		goto end;
+	}
+
 	WMA_LOGD("Tx Ack Cb SubType %d Status %d",
 		 work->sub_type, work->status);
 
 	/* Call the Ack Cb registered by UMAC */
-	ack_cb((tpAniSirGlobal) (wma_handle->mac_context),
-	       work->status ? 0 : 1);
-
+	ack_cb(wma_handle->mac_context, work->status ? 0 : 1);
+end:
 	qdf_mem_free(work);
 	wma_handle->mgmt_ack_work_ctx = NULL;
 }
@@ -2171,9 +2169,9 @@ int wma_ibss_peer_info_event_handler(void *handle, uint8_t *data,
 	}
 
 	/*sanity check */
-	if (!(num_peers) || (num_peers > 32) ||
-	     (num_peers > param_tlvs->num_peer_info) ||
-	     (!peer_info)) {
+	if (!num_peers || (num_peers > 32) ||
+	    (num_peers > param_tlvs->num_peer_info) ||
+	    (!peer_info)) {
 		WMA_LOGE("%s: Invalid event data from target num_peers %d peer_info %pK",
 			__func__, num_peers, peer_info);
 		status = 1;
@@ -2572,6 +2570,37 @@ static void wma_update_tx_send_params(struct tx_send_params *tx_param,
 }
 
 /**
+ * wma_is_rmf_mgmt_action_frame() - check RMF action frame by category
+ * @action_category: action frame actegory
+ *
+ * This function check the frame is robust mgmt action frame or not
+ *
+ * Return: true - if category is robust mgmt type
+ */
+bool wma_is_rmf_mgmt_action_frame(uint8_t action_category)
+{
+	switch (action_category) {
+	case SIR_MAC_ACTION_SPECTRUM_MGMT:
+	case SIR_MAC_ACTION_QOS_MGMT:
+	case SIR_MAC_ACTION_DLP:
+	case SIR_MAC_ACTION_BLKACK:
+	case SIR_MAC_ACTION_RRM:
+	case SIR_MAC_ACTION_FAST_BSS_TRNST:
+	case SIR_MAC_ACTION_SA_QUERY:
+	case SIR_MAC_ACTION_PROT_DUAL_PUB:
+	case SIR_MAC_ACTION_WNM:
+	case SIR_MAC_ACITON_MESH:
+	case SIR_MAC_ACTION_MHF:
+	case SIR_MAC_ACTION_FST:
+		return true;
+	default:
+		break;
+	}
+	return false;
+
+}
+
+/**
  * wma_tx_packet() - Sends Tx Frame to TxRx
  * @wma_context: wma context
  * @tx_frame: frame buffer
@@ -2612,6 +2641,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	uint8_t *pFrame = NULL;
 	void *pPacket = NULL;
 	uint16_t newFrmLen = 0;
+	uint8_t action_category = 0;
+	bool deauth_disassoc = false;
 #endif /* WLAN_FEATURE_11W */
 	struct wma_txrx_node *iface;
 	tpAniSirGlobal pMac;
@@ -2620,6 +2651,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	struct wmi_desc_t *wmi_desc = NULL;
 	ol_pdev_handle ctrl_pdev;
 	bool is_5g = false;
+
+	ol_txrx_pdev_handle pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	if (NULL == wma_handle) {
 		WMA_LOGE("wma_handle is NULL");
@@ -2668,6 +2701,12 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	     pFc->subType == SIR_MAC_MGMT_ACTION)) {
 		struct ieee80211_frame *wh =
 			(struct ieee80211_frame *)qdf_nbuf_data(tx_frame);
+		if (pFc->subType == SIR_MAC_MGMT_ACTION)
+			action_category =
+					*((uint8_t *)(qdf_nbuf_data(tx_frame)) +
+					  sizeof(struct ieee80211_frame));
+		else
+			deauth_disassoc = true;
 		if (!IEEE80211_IS_BROADCAST(wh->i_addr1) &&
 		    !IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 			if (pFc->wep) {
@@ -2718,7 +2757,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 				pFc = (tpSirMacFrameCtl)
 						(qdf_nbuf_data(tx_frame));
 			}
-		} else {
+		} else if (deauth_disassoc ||
+			   wma_is_rmf_mgmt_action_frame(action_category)) {
 			/* Allocate extra bytes for MMIE */
 			newFrmLen = frmLen + IEEE80211_MMIE_LEN;
 			qdf_status = cds_packet_alloc((uint16_t) newFrmLen,
@@ -2759,6 +2799,13 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			frmLen = newFrmLen;
 			pFc = (tpSirMacFrameCtl) (qdf_nbuf_data(tx_frame));
 		}
+		/*
+		 * Some target which support sending mgmt frame based on htt
+		 * would DMA write this PMF tx frame buffer, it may cause smmu
+		 * check permission fault, set a flag to do bi-direction DMA
+		 * map, normal tx unmap is enough for this case.
+		 */
+		QDF_NBUF_CB_TX_DMA_BI_MAP((qdf_nbuf_t)tx_frame) = 1;
 	}
 #endif /* WLAN_FEATURE_11W */
 	mHdr = (tpSirMacMgmtHdr)qdf_nbuf_data(tx_frame);
@@ -2998,6 +3045,16 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			wmi_desc->nbuf = tx_frame;
 			wmi_desc->tx_cmpl_cb = tx_frm_download_comp_cb;
 			wmi_desc->ota_post_proc_cb = tx_frm_ota_comp_cb;
+
+			if (pdev && cds_get_pktcap_mode_enable() &&
+			    (ol_cfg_pktcapture_mode(pdev->ctrl_pdev) &
+			    PKT_CAPTURE_MODE_MGMT_ONLY) &&
+			    pdev->mon_cb) {
+				chanfreq = wma_handle->interfaces[vdev_id].mhz;
+				wma_process_mon_mgmt_tx(tx_frame,
+							qdf_nbuf_len(tx_frame),
+							&mgmt_param, chanfreq);
+			}
 			status = wmi_mgmt_unified_cmd_send(
 					wma_handle->wmi_handle,
 					&mgmt_param);

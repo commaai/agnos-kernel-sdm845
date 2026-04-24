@@ -700,6 +700,7 @@ void hdd_tdls_context_init(hdd_context_t *hdd_ctx, bool ssr)
 	hdd_ctx->set_state_info.vdev_id = 0;
 	hdd_ctx->tdls_nss_teardown_complete = false;
 	hdd_ctx->tdls_nss_transition_mode = TDLS_NSS_TRANSITION_UNKNOWN;
+	hdd_ctx->enable_tdls_in_fw = true;
 
 	if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger) {
 		hdd_ctx->tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
@@ -1959,7 +1960,7 @@ void wlan_hdd_update_tdls_info(hdd_adapter_t *adapter, bool tdls_prohibited,
 
 	/* If TDLS support is disabled then no need to update target */
 	if (false == hdd_ctx->config->fEnableTDLSSupport) {
-		hdd_err("TDLS not enabled");
+		hdd_err("TDLS not supported");
 		goto done;
 	}
 
@@ -1995,6 +1996,11 @@ void wlan_hdd_update_tdls_info(hdd_adapter_t *adapter, bool tdls_prohibited,
 		 */
 		hdd_ctx->tdls_source_bitmap = 0;
 	} else {
+		if (!hdd_ctx->enable_tdls_in_fw) {
+			hdd_debug("Current HW mode is dbs, don't enable tdls in FW, wait for HW mode change");
+			mutex_unlock(&hdd_ctx->tdls_lock);
+			goto done;
+		}
 		if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger) {
 			hdd_ctx->tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
 		} else if (true == hdd_ctx->config->fTDLSExternalControl) {
@@ -3872,6 +3878,7 @@ int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
 	unsigned long rc;
 	int ret;
 	int rate_idx;
+	hdd_station_ctx_t *hdd_sta_ctx;
 
 	ENTER();
 
@@ -3888,6 +3895,26 @@ int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
 		hdd_debug("TDLS mode is disabled OR not enabled in FW " MAC_ADDRESS_STR "Request declined.",
 			   MAC_ADDR_ARRAY(mac));
 		return -ENOTSUPP;
+	}
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+
+	/*
+	 * STA or P2P client should be connected and authenticated before
+	 *  adding TDLS STA.
+	 */
+	if ((eConnectionState_Associated !=
+	     hdd_sta_ctx->conn_info.connState) ||
+	     (false == hdd_sta_ctx->conn_info.uIsAuthenticated)) {
+		hdd_debug("STA is not connected or not authenticated. connState %u, uIsAuthenticated %u",
+			hdd_sta_ctx->conn_info.connState,
+			hdd_sta_ctx->conn_info.uIsAuthenticated);
+		return -EAGAIN;
+	}
+
+	if (!cds_check_is_tdls_allowed(pAdapter->device_mode)) {
+		hdd_debug("TDLS not allowed, reject TDLS add station");
+		return -EPERM;
 	}
 
 	mutex_lock(&pHddCtx->tdls_lock);
@@ -4195,8 +4222,9 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 		}
 		/* if tdls_mode is disabled, then decline the peer's request */
 		if (eTDLS_SUPPORT_DISABLED == pHddCtx->tdls_mode) {
-			hdd_debug(MAC_ADDRESS_STR " TDLS mode is disabled. action %d declined.",
-				   MAC_ADDR_ARRAY(peer), action_code);
+			hdd_debug(MAC_ADDRESS_STR " TDLS mode is disabled. action %d declined. source bitmap:%lu",
+				  MAC_ADDR_ARRAY(peer), action_code,
+				  pHddCtx->tdls_source_bitmap);
 			return -ENOTSUPP;
 		}
 		if (pHddCtx->tdls_nss_switch_in_progress) {
@@ -6498,6 +6526,7 @@ void hdd_tdls_notify_hw_mode_change(bool is_dbs_hw_mode)
 	hdd_context_t *hdd_ctx;
 	v_CONTEXT_t g_context;
 	enum tdls_support_mode tdls_mode;
+	hdd_adapter_t *temp_adapter;
 
 	g_context = cds_get_global_context();
 
@@ -6509,7 +6538,14 @@ void hdd_tdls_notify_hw_mode_change(bool is_dbs_hw_mode)
 	if (!hdd_ctx)
 		return;
 
-	if (hdd_ctx->tdls_mode == eTDLS_SUPPORT_NOT_ENABLED) {
+	mutex_lock(&hdd_ctx->tdls_lock);
+	if (is_dbs_hw_mode)
+		hdd_ctx->enable_tdls_in_fw = false;
+	else
+		hdd_ctx->enable_tdls_in_fw = true;
+	mutex_unlock(&hdd_ctx->tdls_lock);
+
+	if (hdd_ctx->tdls_mode == eTDLS_SUPPORT_NOT_ENABLED && is_dbs_hw_mode) {
 		hdd_debug("TDLS mode is not enabled continue with hw mode change");
 		return;
 	}
@@ -6542,8 +6578,25 @@ void hdd_tdls_notify_hw_mode_change(bool is_dbs_hw_mode)
 revert_tdls_mode:
 	hdd_debug("hw mode is non DBS, so revert to last tdls mode %d",
 					tdls_mode);
-	wlan_hdd_tdls_set_mode(hdd_ctx,
-			       tdls_mode,
-			       false,
-			       HDD_SET_TDLS_MODE_SOURCE_POLICY_MGR);
+	temp_adapter = wlan_hdd_tdls_get_adapter(hdd_ctx);
+	if (temp_adapter) {
+		mutex_lock(&hdd_ctx->tdls_lock);
+		if (hdd_ctx->set_state_info.set_state_cnt == 0) {
+			mutex_unlock(&hdd_ctx->tdls_lock);
+			hdd_debug("HW mode is changed to Non DBS enable TDLS in FW");
+			wlan_hdd_update_tdls_info(temp_adapter, false, false);
+		} else {
+			mutex_unlock(&hdd_ctx->tdls_lock);
+		}
+		wlan_hdd_tdls_set_mode(hdd_ctx, tdls_mode, false,
+				       HDD_SET_TDLS_MODE_SOURCE_POLICY_MGR);
+	}
+}
+
+void hdd_tdls_init_completion(hdd_adapter_t *adapter)
+{
+	init_completion(&adapter->tdls_add_station_comp);
+	init_completion(&adapter->tdls_del_station_comp);
+	init_completion(&adapter->tdls_mgmt_comp);
+	init_completion(&adapter->tdls_link_establish_req_comp);
 }
