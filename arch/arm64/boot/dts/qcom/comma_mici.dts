@@ -24,6 +24,11 @@
 #include "comma_common.dtsi"
 #include "dsi-panel-bantian.dtsi"
 
+&qupv3_se10_i2c {
+  /* Not populated on mici; probing it costs ~500ms at boot. */
+  /delete-node/ ti_ina321@40;
+};
+
 /* touch panel I2C, /dev/i2c-2 */
 &qupv3_se5_i2c {
   status = "ok";
