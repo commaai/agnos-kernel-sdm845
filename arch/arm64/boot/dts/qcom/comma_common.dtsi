@@ -41,6 +41,14 @@
   status = "disabled";
 };
 
+&pcie0 {
+  status = "disabled";
+};
+
+&pcie1 {
+  status = "disabled";
+};
+
 &soc {
 	clock_audio_lnbb: audio_ext_clk_lnbb {
 		status = "ok";
