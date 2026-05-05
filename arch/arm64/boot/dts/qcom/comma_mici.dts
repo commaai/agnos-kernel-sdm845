@@ -250,6 +250,22 @@ status = "ok";
 	qcom,msm-mi2s-tx-lines = <1>;
 };
 
+&snd_934x {
+  qcom,comma-skip-tavil-init;
+  qcom,comma-minimal-audio;
+
+  qcom,audio-routing =
+    "HiFi Playback", "IN_L",
+    "HiFi Playback", "IN_R",
+    "OUT_L", "HiFi Capture",
+    "OUT_R", "HiFi Capture";
+
+  asoc-platform = <&pcm0>, <&routing>;
+  asoc-platform-names = "msm-pcm-dsp.0", "msm-pcm-routing";
+  asoc-cpu = <&dai_mi2s1>;
+  asoc-cpu-names = "msm-dai-q6-mi2s.1";
+};
+
 /* Board definition */
 / {
 	model = "comma mici";

@@ -3829,6 +3829,10 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 
 	rtd->pmdown_time = 0;
 
+	if (of_property_read_bool(rtd->card->dev->of_node,
+				  "qcom,comma-skip-tavil-init"))
+		return 0;
+
 	ret = snd_soc_add_codec_controls(codec, msm_snd_controls,
 					 ARRAY_SIZE(msm_snd_controls));
 	if (ret < 0) {
@@ -6164,6 +6168,12 @@ static struct snd_soc_dai_link msm_tavil_snd_card_dai_links[
 			 ARRAY_SIZE(msm_mi2s_be_dai_links) +
 			 ARRAY_SIZE(msm_auxpcm_be_dai_links)];
 
+#define MSM_COMMON_DAI_LINK_MEDIA1	0
+#define MSM_MI2S_DAI_LINK_SEC_RX	2
+#define MSM_MI2S_DAI_LINK_SEC_TX	3
+
+static struct snd_soc_dai_link msm_mici_snd_card_dai_links[3];
+
 #if 0
 static int msm_snd_card_tavil_late_probe(struct snd_soc_card *card)
 {
@@ -6462,60 +6472,78 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 
 	if (!strcmp(match->data, "tavil_codec")) {
 		card = &snd_soc_card_tavil_msm;
-		len_1 = ARRAY_SIZE(msm_common_dai_links);
-		len_2 = len_1 + ARRAY_SIZE(msm_tavil_fe_dai_links);
-		len_3 = len_2 + ARRAY_SIZE(msm_common_misc_fe_dai_links);
-		len_4 = len_3 + ARRAY_SIZE(msm_common_be_dai_links);
-		total_links = len_4 + ARRAY_SIZE(msm_tavil_be_dai_links);
-		memcpy(msm_tavil_snd_card_dai_links,
-		       msm_common_dai_links,
-		       sizeof(msm_common_dai_links));
-		memcpy(msm_tavil_snd_card_dai_links + len_1,
-		       msm_tavil_fe_dai_links,
-		       sizeof(msm_tavil_fe_dai_links));
-		memcpy(msm_tavil_snd_card_dai_links + len_2,
-		       msm_common_misc_fe_dai_links,
-		       sizeof(msm_common_misc_fe_dai_links));
-		memcpy(msm_tavil_snd_card_dai_links + len_3,
-		       msm_common_be_dai_links,
-		       sizeof(msm_common_be_dai_links));
-		memcpy(msm_tavil_snd_card_dai_links + len_4,
-		       msm_tavil_be_dai_links,
-		       sizeof(msm_tavil_be_dai_links));
-
-		if (of_property_read_bool(dev->of_node, "qcom,wcn-btfm")) {
-			dev_dbg(dev, "%s(): WCN BTFM support present\n",
-				__func__);
-			memcpy(msm_tavil_snd_card_dai_links + total_links,
-			       msm_wcn_be_dai_links,
-			       sizeof(msm_wcn_be_dai_links));
-			total_links += ARRAY_SIZE(msm_wcn_be_dai_links);
-		}
 
 		if (of_property_read_bool(dev->of_node,
-					  "qcom,ext-disp-audio-rx")) {
-			dev_dbg(dev, "%s(): ext disp audio support present\n",
-				__func__);
-			memcpy(msm_tavil_snd_card_dai_links + total_links,
-			       ext_disp_be_dai_link,
-			       sizeof(ext_disp_be_dai_link));
-			total_links += ARRAY_SIZE(ext_disp_be_dai_link);
+					  "qcom,comma-minimal-audio")) {
+			total_links = ARRAY_SIZE(msm_mici_snd_card_dai_links);
+			memcpy(&msm_mici_snd_card_dai_links[0],
+			       &msm_common_dai_links[MSM_COMMON_DAI_LINK_MEDIA1],
+			       sizeof(msm_mici_snd_card_dai_links[0]));
+			memcpy(&msm_mici_snd_card_dai_links[1],
+			       &msm_mi2s_be_dai_links[MSM_MI2S_DAI_LINK_SEC_RX],
+			       sizeof(msm_mici_snd_card_dai_links[1]));
+			memcpy(&msm_mici_snd_card_dai_links[2],
+			       &msm_mi2s_be_dai_links[MSM_MI2S_DAI_LINK_SEC_TX],
+			       sizeof(msm_mici_snd_card_dai_links[2]));
+			dailink = msm_mici_snd_card_dai_links;
+		} else {
+			len_1 = ARRAY_SIZE(msm_common_dai_links);
+			len_2 = len_1 + ARRAY_SIZE(msm_tavil_fe_dai_links);
+			len_3 = len_2 + ARRAY_SIZE(msm_common_misc_fe_dai_links);
+			len_4 = len_3 + ARRAY_SIZE(msm_common_be_dai_links);
+			total_links = len_4 + ARRAY_SIZE(msm_tavil_be_dai_links);
+			memcpy(msm_tavil_snd_card_dai_links,
+			       msm_common_dai_links,
+			       sizeof(msm_common_dai_links));
+			memcpy(msm_tavil_snd_card_dai_links + len_1,
+			       msm_tavil_fe_dai_links,
+			       sizeof(msm_tavil_fe_dai_links));
+			memcpy(msm_tavil_snd_card_dai_links + len_2,
+			       msm_common_misc_fe_dai_links,
+			       sizeof(msm_common_misc_fe_dai_links));
+			memcpy(msm_tavil_snd_card_dai_links + len_3,
+			       msm_common_be_dai_links,
+			       sizeof(msm_common_be_dai_links));
+			memcpy(msm_tavil_snd_card_dai_links + len_4,
+			       msm_tavil_be_dai_links,
+			       sizeof(msm_tavil_be_dai_links));
+
+			if (of_property_read_bool(dev->of_node,
+						  "qcom,wcn-btfm")) {
+				dev_dbg(dev, "%s(): WCN BTFM support present\n",
+					__func__);
+				memcpy(msm_tavil_snd_card_dai_links +
+				       total_links, msm_wcn_be_dai_links,
+				       sizeof(msm_wcn_be_dai_links));
+				total_links += ARRAY_SIZE(msm_wcn_be_dai_links);
+			}
+
+			if (of_property_read_bool(dev->of_node,
+						  "qcom,ext-disp-audio-rx")) {
+				dev_dbg(dev,
+					"%s(): ext disp audio support present\n",
+					__func__);
+				memcpy(msm_tavil_snd_card_dai_links +
+				       total_links, ext_disp_be_dai_link,
+				       sizeof(ext_disp_be_dai_link));
+				total_links += ARRAY_SIZE(ext_disp_be_dai_link);
+			}
+			if (of_property_read_bool(dev->of_node,
+						  "qcom,mi2s-audio-intf")) {
+				memcpy(msm_tavil_snd_card_dai_links +
+				       total_links, msm_mi2s_be_dai_links,
+				       sizeof(msm_mi2s_be_dai_links));
+				total_links += ARRAY_SIZE(msm_mi2s_be_dai_links);
+			}
+			if (of_property_read_bool(dev->of_node,
+						  "qcom,auxpcm-audio-intf")) {
+				memcpy(msm_tavil_snd_card_dai_links +
+				       total_links, msm_auxpcm_be_dai_links,
+				       sizeof(msm_auxpcm_be_dai_links));
+				total_links += ARRAY_SIZE(msm_auxpcm_be_dai_links);
+			}
+			dailink = msm_tavil_snd_card_dai_links;
 		}
-		if (of_property_read_bool(dev->of_node,
-					  "qcom,mi2s-audio-intf")) {
-			memcpy(msm_tavil_snd_card_dai_links + total_links,
-			       msm_mi2s_be_dai_links,
-			       sizeof(msm_mi2s_be_dai_links));
-			total_links += ARRAY_SIZE(msm_mi2s_be_dai_links);
-		}
-		if (of_property_read_bool(dev->of_node,
-					  "qcom,auxpcm-audio-intf")) {
-			memcpy(msm_tavil_snd_card_dai_links + total_links,
-			msm_auxpcm_be_dai_links,
-			sizeof(msm_auxpcm_be_dai_links));
-			total_links += ARRAY_SIZE(msm_auxpcm_be_dai_links);
-		}
-		dailink = msm_tavil_snd_card_dai_links;
 	} else if (!strcmp(match->data, "stub_codec")) {
 		card = &snd_soc_card_stub_msm;
 		len_1 = ARRAY_SIZE(msm_stub_fe_dai_links);
