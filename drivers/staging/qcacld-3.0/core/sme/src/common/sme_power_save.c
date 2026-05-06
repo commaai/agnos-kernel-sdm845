@@ -484,6 +484,10 @@ QDF_STATUS sme_enable_sta_ps_check(tpAniSirGlobal mac_ctx, uint32_t session_id)
 {
 	struct ps_global_info *ps_global_info = &mac_ctx->sme.ps_global_info;
 
+	QDF_BUG(session_id < CSR_ROAM_SESSION_MAX);
+	if (session_id >= CSR_ROAM_SESSION_MAX)
+		return QDF_STATUS_E_INVAL;
+
 	/* Check if Sta Ps is enabled. */
 	if (!ps_global_info->ps_enabled) {
 		sme_debug("Cannot initiate PS. PS is disabled in ini");
@@ -499,8 +503,8 @@ QDF_STATUS sme_enable_sta_ps_check(tpAniSirGlobal mac_ctx, uint32_t session_id)
 			  session_id);
 		return QDF_STATUS_E_FAILURE;
 	}
-	return QDF_STATUS_SUCCESS;
 
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -518,8 +522,18 @@ QDF_STATUS sme_ps_enable_disable(tHalHandle hal_ctx, uint32_t session_id,
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_ctx);
 
 	status =  sme_enable_sta_ps_check(mac_ctx, session_id);
-	if (status != QDF_STATUS_SUCCESS)
+	if (status != QDF_STATUS_SUCCESS) {
+		/*
+		 * In non associated state driver wont handle the power save
+		 * But kernel expects return status success even
+		 * in the disconnected state.
+		 * TODO: If driver to remember the ps state to further use
+		 * after connection.
+		 */
+		if (!csr_is_conn_state_connected_infra(mac_ctx, session_id))
+			status = QDF_STATUS_SUCCESS;
 		return status;
+	}
 	status = sme_ps_process_command(mac_ctx, session_id, command);
 	return status;
 }
@@ -533,6 +547,10 @@ QDF_STATUS sme_ps_timer_flush_sync(tHalHandle hal, uint8_t session_id)
 	QDF_TIMER_STATE tstate;
 	struct sEnablePsParams *req;
 	t_wma_handle *wma;
+
+	QDF_BUG(session_id < CSR_ROAM_SESSION_MAX);
+	if (session_id >= CSR_ROAM_SESSION_MAX)
+		return QDF_STATUS_E_INVAL;
 
 	status = sme_enable_sta_ps_check(mac_ctx, session_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1049,7 +1067,7 @@ QDF_STATUS sme_ps_enable_auto_ps_timer(tHalHandle hal_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	sme_info("Start auto_ps_timer for %d ms", timeout);
+	sme_debug("Start auto_ps_timer for %d ms", timeout);
 
 	qdf_status = qdf_mc_timer_start(&ps_param->auto_ps_enable_timer,
 		timeout);

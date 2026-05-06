@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -258,7 +258,6 @@ struct sir_mgmt_msg {
 #define SIR_HAL_UPDATE_EDCA_PROFILE_IND    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 22)
 
 #define SIR_HAL_UPDATE_BEACON_IND          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 23)
-#define SIR_HAL_UPDATE_CF_IND              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 24)
 #define SIR_HAL_CHNL_SWITCH_REQ            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 25)
 #define SIR_HAL_ADD_TS_REQ                 (SIR_HAL_ITC_MSG_TYPES_BEGIN + 26)
 #define SIR_HAL_DEL_TS_REQ                 (SIR_HAL_ITC_MSG_TYPES_BEGIN + 27)
@@ -308,7 +307,7 @@ struct sir_mgmt_msg {
 #define SIR_HAL_WOW_ADD_PTRN               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 82)
 #define SIR_HAL_WOW_DEL_PTRN               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 83)
 #define SIR_HAL_WOWL_ENTER_REQ             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 84)
-#define SIR_HAL_WOWL_ENTER_RSP             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 85)
+#define SIR_HAL_WMA_ROAM_SYNC_TIMEOUT      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 85)
 #define SIR_HAL_WOWL_EXIT_REQ              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 86)
 #define SIR_HAL_WOWL_EXIT_RSP              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 87)
 /* / PE <-> HAL statistics messages */
@@ -705,6 +704,7 @@ struct sir_mgmt_msg {
 #define SIR_HAL_INVOKE_NEIGHBOR_REPORT      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 391)
 #define SIR_HAL_NDP_SCH_UPDATE_IND          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 392)
 #define SIR_HAL_GET_ROAM_SCAN_STATS         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 393)
+#define SIR_HAL_SEND_BCN_RSP                (SIR_HAL_ITC_MSG_TYPES_BEGIN + 394)
 
 #define SIR_HAL_MSG_TYPES_END               (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 /* CFG message types */

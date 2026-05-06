@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,6 +83,10 @@ typedef struct join_params {
 	tSirResultCodes result_code;
 } join_params;
 
+struct session_params {
+	uint16_t session_id;
+};
+
 typedef struct sPESession       /* Added to Support BT-AMP */
 {
 	/* To check session table is in use or free */
@@ -90,7 +94,8 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	uint16_t peSessionId;
 	uint8_t smeSessionId;
 	uint16_t transactionId;
-
+	qdf_wake_lock_t ap_ecsa_wakelock;
+	qdf_runtime_lock_t ap_ecsa_runtime_lock;
 	/* In AP role: BSSID and selfMacAddr will be the same. */
 	/* In STA role: they will be different */
 	tSirMacAddr bssId;
@@ -436,13 +441,11 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	/* Fast Transition (FT) */
 	tftPEContext ftPEContext;
 	bool isNonRoamReassoc;
-#ifdef WLAN_FEATURE_11W
-	qdf_mc_timer_t pmfComebackTimer;
-	tComebackTimerInfo pmfComebackTimerInfo;
-#endif /* WLAN_FEATURE_11W */
 	uint8_t  is_key_installed;
 	/* timer for reseting protection fileds at regular intervals */
 	qdf_mc_timer_t protection_fields_reset_timer;
+	/* timer to decrement CSA/ECSA count */
+	qdf_mc_timer_t ap_ecsa_timer;
 	void *mac_ctx;
 	/*
 	 * variable to store state of various protection struct like

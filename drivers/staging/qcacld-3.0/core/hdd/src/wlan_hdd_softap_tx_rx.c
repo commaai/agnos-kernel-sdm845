@@ -342,10 +342,8 @@ bool hdd_dhcp_indication(hdd_adapter_t *adapter,
 {
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
 	hdd_station_info_t *hdd_sta_info;
-
 	bool notify_tx_comp = false;
 
-	hdd_debug("adapter=%p, sta_id=%d, dir=%d", adapter, sta_id, dir);
 
 	if (((adapter->device_mode == QDF_SAP_MODE) ||
 	     (adapter->device_mode == QDF_P2P_GO_MODE)) &&
@@ -435,9 +433,11 @@ static netdev_tx_t __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	 * context may not be reinitialized at this time which may
 	 * lead to a crash.
 	 */
-	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state()) {
+	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
+	    cds_is_load_or_unload_in_progress()) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "%s: Recovery in Progress. Ignore!!!", __func__);
+			  "%s: Recovery/(Un)load in Progress. Ignore!!!",
+			  __func__);
 		goto drop_pkt;
 	}
 
@@ -1196,7 +1196,8 @@ QDF_STATUS hdd_softap_stop_bss(hdd_adapter_t *pAdapter)
 			}
 		}
 	}
-	if (pAdapter->device_mode == QDF_SAP_MODE)
+	if (pAdapter->device_mode == QDF_SAP_MODE &&
+	    !pHddCtx->config->disable_channel)
 		wlan_hdd_restore_channels(pHddCtx);
 
 	/* Mark the indoor channel (passive) to enable */
@@ -1204,6 +1205,14 @@ QDF_STATUS hdd_softap_stop_bss(hdd_adapter_t *pAdapter)
 			pAdapter->device_mode == QDF_SAP_MODE) {
 		hdd_update_indoor_channel(pHddCtx, false);
 		sme_update_channel_list(pHddCtx->hHal);
+	}
+
+	if (hdd_ipa_is_enabled(pHddCtx)) {
+		if (hdd_ipa_wlan_evt(pAdapter,
+				WLAN_HDD_GET_AP_CTX_PTR(pAdapter)->uBCStaId,
+				HDD_IPA_AP_DISCONNECT,
+				pAdapter->dev->dev_addr))
+			hdd_err("WLAN_AP_DISCONNECT event failed");
 	}
 
 	return qdf_status;

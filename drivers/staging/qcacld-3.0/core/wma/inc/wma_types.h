@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -151,6 +151,7 @@
 #define WMA_DELETE_BSS_RSP             SIR_HAL_DELETE_BSS_RSP
 #define WMA_DELETE_BSS_HO_FAIL_RSP     SIR_HAL_DELETE_BSS_HO_FAIL_RSP
 #define WMA_SEND_BEACON_REQ            SIR_HAL_SEND_BEACON_REQ
+#define WMA_SEND_BCN_RSP               SIR_HAL_SEND_BCN_RSP
 #define WMA_SEND_PROBE_RSP_TMPL        SIR_HAL_SEND_PROBE_RSP_TMPL
 
 #define WMA_SET_BSSKEY_REQ             SIR_HAL_SET_BSSKEY_REQ
@@ -160,7 +161,6 @@
 #define WMA_UPDATE_EDCA_PROFILE_IND    SIR_HAL_UPDATE_EDCA_PROFILE_IND
 
 #define WMA_UPDATE_BEACON_IND          SIR_HAL_UPDATE_BEACON_IND
-#define WMA_UPDATE_CF_IND              SIR_HAL_UPDATE_CF_IND
 #define WMA_CHNL_SWITCH_REQ            SIR_HAL_CHNL_SWITCH_REQ
 #define WMA_ADD_TS_REQ                 SIR_HAL_ADD_TS_REQ
 #define WMA_DEL_TS_REQ                 SIR_HAL_DEL_TS_REQ
@@ -220,7 +220,7 @@
 #define WMA_WOW_ADD_PTRN               SIR_HAL_WOW_ADD_PTRN
 #define WMA_WOW_DEL_PTRN               SIR_HAL_WOW_DEL_PTRN
 #define WMA_WOWL_ENTER_REQ             SIR_HAL_WOWL_ENTER_REQ
-#define WMA_WOWL_ENTER_RSP             SIR_HAL_WOWL_ENTER_RSP
+#define WMA_ROAM_SYNC_TIMEOUT          SIR_HAL_WMA_ROAM_SYNC_TIMEOUT
 #define WMA_WOWL_EXIT_REQ              SIR_HAL_WOWL_EXIT_REQ
 #define WMA_WOWL_EXIT_RSP              SIR_HAL_WOWL_EXIT_RSP
 /* / PE <-> HAL statistics messages */
@@ -739,6 +739,8 @@ wma_ds_peek_rx_packet_info
 
 void wma_tx_abort(uint8_t vdev_id);
 
+bool wma_is_rmf_mgmt_action_frame(uint8_t action_category);
+
 QDF_STATUS wma_tx_packet(void *pWMA,
 			 void *pFrmBuf,
 			 uint16_t frmLen,
@@ -788,7 +790,9 @@ QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 		QDF_STATUS (*pe_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
 			tpSirBssDescription  bss_desc_ptr,
-			enum sir_roam_op_code reason));
+			enum sir_roam_op_code reason),
+		QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
+			struct roam_pmkid_req_event *bss_list));
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 		QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
@@ -798,7 +802,9 @@ static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 		QDF_STATUS (*pe_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
 			tpSirBssDescription  bss_desc_ptr,
-			enum sir_roam_op_code reason))
+			enum sir_roam_op_code reason),
+		QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
+			struct roam_pmkid_req_event *bss_list))
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

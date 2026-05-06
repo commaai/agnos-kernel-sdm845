@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1220,6 +1220,11 @@ void *qdf_mem_malloc(size_t size)
 {
 	void *ptr;
 
+	if (!size || size > QDF_MEM_MAX_MALLOC) {
+		qdf_err("Cannot malloc %zu bytes", size);
+		return NULL;
+	}
+
 	ptr = qdf_mem_prealloc_get(size);
 	if (ptr)
 		return ptr;
@@ -1536,7 +1541,7 @@ static inline void *qdf_mem_dma_alloc(qdf_device_t osdev, void *dev,
 	return vaddr;
 }
 
-inline void
+static inline void
 qdf_mem_dma_free(void *dev, qdf_size_t size, void *vaddr, qdf_dma_addr_t paddr)
 {
 	qdf_mem_free(vaddr);
@@ -1549,7 +1554,7 @@ static inline void *qdf_mem_dma_alloc(qdf_device_t osdev, void *dev,
 	return dma_alloc_coherent(dev, size, paddr, qdf_mem_malloc_flags());
 }
 
-inline void
+static inline void
 qdf_mem_dma_free(void *dev, qdf_size_t size, void *vaddr, qdf_dma_addr_t paddr)
 {
 	dma_free_coherent(dev, size, vaddr, paddr);

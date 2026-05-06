@@ -198,6 +198,13 @@ void qdf_trace_set_value(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 		return;
 	}
 
+#ifdef FEATURE_SUPPORT_LGE // 2017.07.12 Logging level update by QCT request
+        if (module ==  QDF_MODULE_ID_HDD || module ==  QDF_MODULE_ID_SME || module ==  QDF_MODULE_ID_PE || module ==  QDF_MODULE_ID_QDF) {
+            g_qdf_trace_info[module].module_trace_level = 0xFFFF;
+            return;
+        }
+#endif
+
 	/* Treat 'none' differently.  NONE means we have to turn off all
 	 * the bits in the bit mask so none of the traces appear
 	 */
@@ -281,6 +288,18 @@ void qdf_snprintf(char *str_buffer, unsigned int size, char *str_format, ...)
 }
 qdf_export_symbol(qdf_snprintf);
 
+#ifdef MULTI_IF_NAME
+static const char *qdf_trace_wlan_modname(void)
+{
+	return MULTI_IF_NAME;
+}
+#else
+static const char *qdf_trace_wlan_modname(void)
+{
+	return "wlan";
+}
+#endif
+
 #ifdef QDF_ENABLE_TRACING
 void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 		   char *str_format, va_list val)
@@ -305,7 +324,7 @@ void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 
 		/* print the prefix string into the string buffer... */
 		n = snprintf(str_buffer, QDF_TRACE_BUFFER_SIZE,
-			     "wlan: [%d:%2s:%3s] ",
+			     "%s: [%d:%2s:%3s] ", qdf_trace_wlan_modname(),
 			     in_interrupt() ? 0 : current->pid,
 			     (char *)TRACE_LEVEL_STR[level],
 			     (char *)g_qdf_trace_info[module].module_name_str);
@@ -1928,7 +1947,9 @@ void qdf_dp_trace_data_pkt(qdf_nbuf_t nbuf,
 	if (qdf_dp_enable_check(nbuf, code, dir) == false)
 		return;
 
-	qdf_dp_add_record(code, qdf_nbuf_data(nbuf), nbuf->len - nbuf->data_len,
+	qdf_dp_add_record(code,
+			  nbuf ? qdf_nbuf_data(nbuf) : NULL,
+			  nbuf ? nbuf->len - nbuf->data_len : 0,
 			  (uint8_t *)&buf, sizeof(struct qdf_dp_trace_data_buf),
 			  (nbuf) ? QDF_NBUF_CB_DP_TRACE_PRINT(nbuf)
 			  : false);

@@ -190,7 +190,6 @@ struct ol_tx_desc_t *ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev,
 			if (qdf_unlikely(pool->avail_desc < pool->stop_th)
 				&& (pool->status != FLOW_POOL_ACTIVE_PAUSED)) {
 				pool->status = FLOW_POOL_ACTIVE_PAUSED;
-				qdf_spin_unlock_bh(&pool->flow_pool_lock);
 				/* pause network queues */
 				pdev->pause_cb(vdev->vdev_id,
 					       WLAN_STOP_ALL_NETIF_QUEUE,
@@ -199,13 +198,14 @@ struct ol_tx_desc_t *ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev,
 				pdev->pause_cb(vdev->vdev_id,
 					       WLAN_NETIF_PRIORITY_QUEUE_ON,
 					       WLAN_DATA_FLOW_CONTROL_PRIORITY);
+				qdf_spin_unlock_bh(&pool->flow_pool_lock);
 			} else if (qdf_unlikely(pool->avail_desc <
 						pool->stop_priority_th)) {
-				qdf_spin_unlock_bh(&pool->flow_pool_lock);
 				/* pause priority queue */
 				pdev->pause_cb(vdev->vdev_id,
 					       WLAN_NETIF_PRIORITY_QUEUE_OFF,
 					       WLAN_DATA_FLOW_CONTROL_PRIORITY);
+				qdf_spin_unlock_bh(&pool->flow_pool_lock);
 			} else {
 				qdf_spin_unlock_bh(&pool->flow_pool_lock);
 			}
@@ -738,9 +738,11 @@ void ol_tx_desc_frame_list_free(struct ol_txrx_pdev_t *pdev,
 		 * DMA mapped address. In such case, there's no need for WLAN
 		 * driver to DMA unmap the skb.
 		 */
-		if ((qdf_nbuf_get_users(msdu) <= 1) &&
-				!qdf_nbuf_ipa_owned_get(msdu))
-			qdf_nbuf_unmap(pdev->osdev, msdu, QDF_DMA_TO_DEVICE);
+		if (qdf_nbuf_get_users(msdu) <= 1) {
+			if (!qdf_nbuf_ipa_owned_get(msdu))
+				qdf_nbuf_unmap(pdev->osdev, msdu,
+					       QDF_DMA_TO_DEVICE);
+		}
 
 		/* free the tx desc */
 		ol_tx_desc_free(pdev, tx_desc);

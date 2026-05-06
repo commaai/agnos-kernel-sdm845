@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -52,6 +52,7 @@
 #include "ol_txrx.h"
 #include "pktlog_ac.h"
 #include "wlan_hdd_ipa.h"
+#include "qdf_cpuhp.h"
 
 #ifdef ENABLE_SMMU_S1_TRANSLATION
 #include "pld_common.h"
@@ -129,8 +130,8 @@ v_CONTEXT_t cds_init(void)
 	qdf_mem_init();
 	qdf_mc_timer_manager_init();
 	qdf_event_list_init();
+	qdf_cpuhp_init();
 
-	printk("COMMA: cds_init setting gp_cds_context");
 	gp_cds_context = &g_cds_context;
 
 	gp_cds_context->qdf_ctx = &g_qdf_ctx;
@@ -158,7 +159,6 @@ deinit:
 	qdf_lock_stats_deinit();
 	qdf_debugfs_exit();
 	gp_cds_context->qdf_ctx = NULL;
-	printk("COMMA: cds_init: deinit setting gp_cds_context");
 	gp_cds_context = NULL;
 	qdf_mem_zero(&g_cds_context, sizeof(g_cds_context));
 
@@ -176,6 +176,7 @@ void cds_deinit(void)
 		return;
 
 	cds_recovery_work_deinit();
+	qdf_cpuhp_deinit();
 	qdf_mc_timer_manager_exit();
 	qdf_mem_exit();
 	qdf_lock_stats_deinit();
@@ -183,7 +184,6 @@ void cds_deinit(void)
 	qdf_event_list_destroy();
 
 	gp_cds_context->qdf_ctx = NULL;
-	printk("COMMA: cds_deinit setting gp_cds_context");
 	gp_cds_context = NULL;
 
 	qdf_mem_zero(&g_cds_context, sizeof(g_cds_context));
@@ -758,10 +758,11 @@ pktlog_disable:
  */
 QDF_STATUS cds_enable(v_CONTEXT_t cds_context)
 {
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	QDF_STATUS qdf_status;
 	tSirRetStatus sirStatus = eSIR_SUCCESS;
 	p_cds_contextType p_cds_context = (p_cds_contextType) cds_context;
 	tHalMacStartParameters halStartParams;
+	int errno;
 
 	/* We support only one instance for now ... */
 	if (gp_cds_context != p_cds_context) {
@@ -770,66 +771,46 @@ QDF_STATUS cds_enable(v_CONTEXT_t cds_context)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if ((p_cds_context->pWMAContext == NULL) ||
-	    (p_cds_context->pMACContext == NULL)) {
-		if (p_cds_context->pWMAContext == NULL)
-			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-				  "%s: WMA NULL context", __func__);
-		else
-			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-				  "%s: MAC NULL context", __func__);
+	if (!p_cds_context->pWMAContext) {
+		cds_err("WMA NULL context");
+		return QDF_STATUS_E_FAILURE;
+	}
 
+	if (!p_cds_context->pMACContext) {
+		cds_err("MAC NULL context");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	/* Start the wma */
 	qdf_status = wma_start(p_cds_context);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Failed to start wma", __func__);
+		cds_err("Failed to start wma; status:%d", qdf_status);
 		return QDF_STATUS_E_FAILURE;
 	}
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: wma correctly started", __func__);
 
 	/* Start the MAC */
-	qdf_mem_zero(&halStartParams,
-		     sizeof(tHalMacStartParameters));
+	qdf_mem_zero(&halStartParams, sizeof(tHalMacStartParameters));
 
 	/* Start the MAC */
-	sirStatus =
-		mac_start(p_cds_context->pMACContext, &halStartParams);
+	sirStatus = mac_start(p_cds_context->pMACContext, &halStartParams);
 
 	if (eSIR_SUCCESS != sirStatus) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-			  "%s: Failed to start MAC", __func__);
+		cds_err("Failed to start MAC; status:%d", sirStatus);
 		goto err_wma_stop;
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: MAC correctly started", __func__);
-
 	/* START SME */
 	qdf_status = sme_start(p_cds_context->pMACContext);
-
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-			  "%s: Failed to start SME", __func__);
+		cds_err("Failed to start SME; status:%d", qdf_status);
 		goto err_mac_stop;
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: SME correctly started", __func__);
-
-	if (ol_txrx_pdev_attach_target
-		       (p_cds_context->pdev_txrx_ctx)) {
-	   QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-				"%s: Failed attach target", __func__);
-	   goto err_sme_stop;
+	errno = ol_txrx_pdev_attach_target(p_cds_context->pdev_txrx_ctx);
+	if (errno) {
+		cds_err("Failed to attach pdev target; errno:%d", errno);
+		goto err_sme_stop;
 	}
-
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: CDS Start is successful!!", __func__);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -935,6 +916,7 @@ QDF_STATUS cds_post_disable(void)
 	tp_wma_handle wma_handle;
 	struct hif_opaque_softc *hif_ctx;
 	ol_txrx_pdev_handle txrx_pdev;
+	QDF_STATUS qdf_status;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma_handle) {
@@ -976,6 +958,20 @@ QDF_STATUS cds_post_disable(void)
 	if (gp_cds_context->htc_ctx) {
 		wma_wmi_stop();
 		htc_stop(gp_cds_context->htc_ctx);
+	}
+
+	qdf_status = cds_close_rx_thread(gp_cds_context);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		cds_err("Failed to close RX thread!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (cds_get_pktcap_mode_enable()) {
+		qdf_status = cds_close_mon_thread(gp_cds_context);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			cds_err("Failed to close MON thread!");
+			return QDF_STATUS_E_INVAL;
+		}
 	}
 
 	ol_txrx_pdev_pre_detach(txrx_pdev, 1);
@@ -1184,7 +1180,7 @@ void *cds_get_context(QDF_MODULE_ID moduleId)
 	}
 
 	if (pModContext == NULL) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 			  "%s: Module ID %i context is Null", __func__,
 			  moduleId);
 	}
@@ -3066,4 +3062,30 @@ QDF_STATUS cds_deregister_mode_change_cb(void)
 	cds_ctx->mode_change_cb = NULL;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+bool cds_get_pktcap_mode_enable(void)
+{
+	hdd_context_t *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		cds_err("HDD context is NULL");
+		return false;
+	}
+
+	return hdd_ctx->config->pktcap_mode_enable;
+}
+
+uint8_t cds_get_pktcapture_mode(void)
+{
+	hdd_context_t *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		cds_err("HDD context is NULL");
+		return 0;
+	}
+
+	return hdd_ctx->pktcapture_mode;
 }

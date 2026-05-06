@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -647,13 +647,13 @@ extern int
 (*htt_rx_amsdu_pop)(htt_pdev_handle pdev,
 		    qdf_nbuf_t rx_ind_msg,
 		    qdf_nbuf_t *head_msdu, qdf_nbuf_t *tail_msdu,
-		    uint32_t *msdu_count);
+		    qdf_nbuf_t *head_mon_msdu, uint32_t *msdu_count);
 
 extern int
 (*htt_rx_frag_pop)(htt_pdev_handle pdev,
 		   qdf_nbuf_t rx_ind_msg,
 		   qdf_nbuf_t *head_msdu, qdf_nbuf_t *tail_msdu,
-		   uint32_t *msdu_count);
+		   qdf_nbuf_t *head_mon_msdu, uint32_t *msdu_count);
 
 /**
  * @brief Return the maximum number of available msdus currently
@@ -806,6 +806,12 @@ void htt_rx_msdu_buff_replenish(htt_pdev_handle pdev);
  * Return: number of buffers actually replenished
  */
 int htt_rx_msdu_buff_in_order_replenish(htt_pdev_handle pdev, uint32_t num);
+#else
+static inline
+int htt_rx_msdu_buff_in_order_replenish(htt_pdev_handle pdev, uint32_t num)
+{
+	return 0;
+}
 #endif
 
 /**

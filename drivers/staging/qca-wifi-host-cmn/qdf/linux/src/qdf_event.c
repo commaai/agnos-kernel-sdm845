@@ -29,6 +29,7 @@
 #include "qdf_event.h"
 #include <linux/export.h>
 #include <qdf_module.h>
+#include <soc/qcom/icnss.h>
 
 struct qdf_evt_node {
 	qdf_list_node_t node;
@@ -276,7 +277,7 @@ void qdf_complete_wait_events(void)
 	struct qdf_evt_node *event_node = NULL;
 	qdf_list_node_t *list_node = NULL;
 	QDF_STATUS status;
-
+	int i = 0;
 	if (qdf_list_empty(&qdf_wait_event_list))
 		return;
 
@@ -289,6 +290,7 @@ void qdf_complete_wait_events(void)
 						struct qdf_evt_node, node);
 
 		event_node->pevent->force_set = true;
+		i++;
 		qdf_event_set(event_node->pevent);
 
 		status = qdf_list_peek_next(&qdf_wait_event_list,
@@ -298,6 +300,7 @@ void qdf_complete_wait_events(void)
 			break;
 	}
 	qdf_spin_unlock(&qdf_wait_event_lock);
+	pr_err("%s : total nodes forcefully set = %d\n", __func__, i);
 }
 qdf_export_symbol(qdf_complete_wait_events);
 
@@ -342,6 +345,11 @@ QDF_STATUS qdf_wait_for_event_completion(qdf_event_t *event, uint32_t timeout)
 			  "Uninitialized event passed into %s", __func__);
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_INVAL;
+	}
+
+	if (icnss_is_fw_down()) {
+		pr_err("%s : Not adding the event in link list as FW is down\n", __func__);
+		return QDF_STATUS_E_FAULT;
 	}
 
 	event_node = qdf_mem_malloc(sizeof(*event_node));
