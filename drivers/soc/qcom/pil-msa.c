@@ -699,7 +699,7 @@ int pil_mss_reset_load_mba(struct pil_desc *pil)
 	md->attrs_dma |= DMA_ATTR_SKIP_ZEROING;
 	md->attrs_dma |= DMA_ATTR_STRONGLY_ORDERED;
 
-	ret = request_firmware(&dp_fw, dp_name, pil->dev);
+	ret = request_firmware_direct(&dp_fw, dp_name, pil->dev);
 	if (ret) {
 		dev_warn(pil->dev, "Debug policy not present - %s. Continue.\n",
 						dp_name);
