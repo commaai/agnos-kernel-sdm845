@@ -1545,7 +1545,18 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 		}
 		ret = IRQ_NONE;
 		resume = RESUME_TERMINATE;
-		if (!non_fatal_fault) {
+		/* openpilot#35788: the WLAN host (icnss) periodically trips
+		 * this fault during recovery from upstream blips. The original
+		 * BUG() takes down the whole device; for WLAN we'd rather let
+		 * firmware fail the DMA, trigger its own modem-PD SSR through
+		 * icnss, and bring WLAN back ~7s later with the kernel intact.
+		 * All other masters keep the original BUG(). */
+		if (smmu_domain->dev &&
+		    of_device_is_compatible(smmu_domain->dev->of_node,
+					    "qcom,icnss")) {
+			dev_err(smmu->dev,
+				"Unhandled WLAN context fault! (BUG suppressed; awaiting SSR)\n");
+		} else if (!non_fatal_fault) {
 			dev_err(smmu->dev,
 				"Unhandled arm-smmu context fault!\n");
 			BUG();

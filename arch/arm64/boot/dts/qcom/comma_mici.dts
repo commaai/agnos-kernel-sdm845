@@ -24,6 +24,11 @@
 #include "comma_common.dtsi"
 #include "dsi-panel-bantian.dtsi"
 
+&qupv3_se10_i2c {
+  /* Not populated on mici; probing it costs ~500ms at boot. */
+  /delete-node/ ti_ina321@40;
+};
+
 /* touch panel I2C, /dev/i2c-2 */
 &qupv3_se5_i2c {
   status = "ok";
@@ -243,6 +248,22 @@ status = "ok";
 &dai_mi2s1 {
   qcom,msm-mi2s-rx-lines = <2>;
 	qcom,msm-mi2s-tx-lines = <1>;
+};
+
+&snd_934x {
+  qcom,comma-skip-tavil-init;
+  qcom,comma-minimal-audio;
+
+  qcom,audio-routing =
+    "HiFi Playback", "IN_L",
+    "HiFi Playback", "IN_R",
+    "OUT_L", "HiFi Capture",
+    "OUT_R", "HiFi Capture";
+
+  asoc-platform = <&pcm0>, <&routing>;
+  asoc-platform-names = "msm-pcm-dsp.0", "msm-pcm-routing";
+  asoc-cpu = <&dai_mi2s1>;
+  asoc-cpu-names = "msm-dai-q6-mi2s.1";
 };
 
 /* Board definition */

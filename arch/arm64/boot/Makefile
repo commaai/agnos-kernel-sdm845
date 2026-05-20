@@ -46,8 +46,16 @@ $(obj)/Image.bz2: $(obj)/Image FORCE
 	$(call if_changed,bzip2)
 
 $(obj)/Image-dtb-hdr: $(obj)/Image FORCE
-	echo -n 'UNCOMPRESSED_IMG' > $@ && \
-	$(call size_append, $(filter-out FORCE,$^)) >> $@
+	( \
+		echo -n 'UNCOMPRESSED_IMG'; \
+		dec_size=$$(stat -c "%s" $(obj)/Image); \
+		printf "%08x\n" $$dec_size | sed 's/\(..\)/\1 /g' | { \
+			read ch0 ch1 ch2 ch3; \
+			for ch in $$ch3 $$ch2 $$ch1 $$ch0; do \
+				printf "\\$$(printf '%03o' $$((0x$$ch)))"; \
+			done; \
+		}; \
+	) > $@
 
 $(obj)/Image-dtb: $(obj)/Image-dtb-hdr $(obj)/Image $(DTB_OBJS) FORCE
 	$(call if_changed,cat)

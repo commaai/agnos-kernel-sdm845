@@ -9861,38 +9861,24 @@ static int hdd_update_mac_addr_to_fw(hdd_context_t *hdd_ctx)
  * hdd_initialize_mac_address() - API to get wlan mac addresses
  * @hdd_ctx: HDD Context
  *
- * Get MAC addresses from platform driver or wlan_mac.bin. If platform driver
- * is provisioned with mac addresses, driver uses it, else it will use
- * wlan_mac.bin to update HW MAC addresses.
+ * Get MAC addresses from platform driver. If platform driver is not
+ * provisioned with mac addresses, generate one from the SoC serial number.
  *
  * Return: None
  */
 static int hdd_initialize_mac_address(hdd_context_t *hdd_ctx)
 {
-	QDF_STATUS status;
 	int ret;
-	bool update_mac_addr_to_fw = true;
 
 	ret = hdd_platform_wlan_mac(hdd_ctx);
 	if (hdd_ctx->config->mac_provision || !ret)
 		return ret;
 
-	hdd_info("MAC is not programmed in platform driver ret: %d, use wlan_mac.bin",
+	hdd_info("MAC is not programmed in platform driver ret: %d, "
+		 "generate MAC from device serial no.",
 		 ret);
 
-	status = hdd_update_mac_config(hdd_ctx);
-
-	if (QDF_IS_STATUS_SUCCESS(status))
-		return 0;
-
-	hdd_info("MAC is not programmed in wlan_mac.bin ret %d, use default MAC",
-		 status);
-
-	/* Use fw provided MAC */
-	if (!qdf_is_macaddr_zero(&hdd_ctx->hw_macaddr)) {
-		hdd_update_macaddr(hdd_ctx, hdd_ctx->hw_macaddr, false);
-		update_mac_addr_to_fw = false;
-	} else if (hdd_generate_macaddr_auto(hdd_ctx) != 0) {
+	if (hdd_generate_macaddr_auto(hdd_ctx) != 0) {
 		struct qdf_mac_addr mac_addr;
 
 		hdd_err("MAC failure from device serial no.");
@@ -9905,13 +9891,12 @@ static int hdd_initialize_mac_address(hdd_context_t *hdd_ctx)
 		hdd_update_macaddr(hdd_ctx, mac_addr, true);
 	}
 
-	if (update_mac_addr_to_fw) {
-		ret = hdd_update_mac_addr_to_fw(hdd_ctx);
-		if (ret != 0) {
-			hdd_err("MAC address out-of-sync, ret:%d", ret);
-			QDF_ASSERT(ret);
-		}
+	ret = hdd_update_mac_addr_to_fw(hdd_ctx);
+	if (ret != 0) {
+		hdd_err("MAC address out-of-sync, ret:%d", ret);
+		QDF_ASSERT(ret);
 	}
+
 	return 0;
 }
 
