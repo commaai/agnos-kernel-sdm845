@@ -79,8 +79,14 @@
 			snps,disable-clk-gating;
 			snps,has-lpm-erratum;
 			snps,hird-threshold = /bits/ 8 <0x10>;
-			snps,usb3_lpm_capable;
+			/* SS link */
+			snps,lfps_filter_quirk;       /* filter LFPS */
+			snps,rx_detect_poll_quirk;    /* faster RxDetect */
+			snps,dis_u3_susphy_quirk;     /* keep SS PHY out of suspend */
+			snps,dis_u2_susphy_quirk;     /* keep HS PHY out of suspend */
+			/* disabled U1/U2 low power mode for more stable link */
 			usb-core-id = <0>;
+			maximum-speed = "super-speed";
 		};
 
 		qcom,usbbam@a704000 {
@@ -222,7 +228,7 @@
 			 0x1024 0x85 0x00 /* COM_SSC_STEP_SIZE1 */
 			 0x1028 0x07 0x00 /* COM_SSC_STEP_SIZE2 */
 			 0x1430 0x0b 0x00 /* RXA_UCDR_FASTLOCK_FO_GAIN */
-			 0x14d4 0x0f 0x00 /* RXA_RX_EQU_ADAPTOR_CNTRL2 */
+			 0x14d4 0x04 0x00 /* RXA_RX_EQU_ADAPTOR_CNTRL2 */
 			 0x14d8 0x4e 0x00 /* RXA_RX_EQU_ADAPTOR_CNTRL3 */
 			 0x14dc 0x18 0x00 /* RXA_RX_EQU_ADAPTOR_CNTRL4 */
 			 0x14f8 0x77 0x00 /* RXA_RX_EQ_OFFSET_ADAPTOR_CNTRL1 */
@@ -230,9 +236,9 @@
 			 0x1504 0x03 0x00 /* RXA_SIGDET_CNTRL */
 			 0x150c 0x16 0x00 /* RXA_SIGDET_DEGLITCH_CNTRL */
 			 0x1564 0x05 0x00 /* RXA_RX_MODE_00 */
-			 0x14c0 0x03 0x00 /* RXA_VGA_CAL_CNTRL2 */
+			 0x14c0 0x0f 0x00 /* RXA_VGA_CAL_CNTRL2 */
 			 0x1830 0x0b 0x00 /* RXB_UCDR_FASTLOCK_FO_GAIN */
-			 0x18d4 0x0f 0x00 /* RXB_RX_EQU_ADAPTOR_CNTRL2 */
+			 0x18d4 0x04 0x00 /* RXB_RX_EQU_ADAPTOR_CNTRL2 */
 			 0x18d8 0x4e 0x00 /* RXB_RX_EQU_ADAPTOR_CNTRL3 */
 			 0x18dc 0x18 0x00 /* RXB_RX_EQU_ADAPTOR_CNTRL4 */
 			 0x18f8 0x77 0x00 /* RXB_RX_EQ_OFFSET_ADAPTOR_CNTRL1 */
@@ -240,7 +246,7 @@
 			 0x1904 0x03 0x00 /* RXB_SIGDET_CNTRL */
 			 0x190c 0x16 0x00 /* RXB_SIGDET_DEGLITCH_CNTRL */
 			 0x1964 0x05 0x00 /* RXB_RX_MODE_00 */
-			 0x18c0 0x03 0x00 /* RXB_VGA_CAL_CNTRL2 */
+			 0x18c0 0x0f 0x00 /* RXB_VGA_CAL_CNTRL2 */
 			 0x1260 0x10 0x00 /* TXA_HIGHZ_DRVR_EN */
 			 0x12a4 0x12 0x00 /* TXA_RCV_DETECT_LVL_2 */
 			 0x128c 0x16 0x00 /* TXA_LANE_MODE_1 */
@@ -522,7 +528,7 @@
 			 0x4c0 0x0c 0x00 /* QSERDES_RX_VGA_CAL_CNTRL2 */
 			 0x564 0x50 0x00 /* QSERDES_RX_RX_MODE_00 */
 			 0x430 0x0b 0x00 /* QSERDES_RX_UCDR_FASTLOCK_FO_GAIN */
-			 0x4d4 0x0e 0x00 /* QSERDES_RX_RX_EQU_ADAPTOR_CNTRL2 */
+			 0x4d4 0x04 0x00 /* QSERDES_RX_RX_EQU_ADAPTOR_CNTRL2 */
 			 0x4d8 0x4e 0x00 /* QSERDES_RX_RX_EQU_ADAPTOR_CNTRL3 */
 			 0x4dc 0x18 0x00 /* QSERDES_RX_RX_EQU_ADAPTOR_CNTRL4 */
 			 0x4f8 0x77 0x00 /* RX_RX_EQ_OFFSET_ADAPTOR_CNTRL1 */
