@@ -94,6 +94,24 @@ MODULE_PARM_DESC(use_both_schemes,
 		"try the other device initialization scheme if the "
 		"first one fails");
 
+static bool asm2464_suppress_warm_reset;
+module_param_named(asm2464_suppress_warm_reset,
+		asm2464_suppress_warm_reset, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(asm2464_suppress_warm_reset,
+		"suppress ASM2464 USB3 roothub warm resets after userspace validates bridge control access");
+
+static int asm2464_warm_reset_budget = 20;
+module_param_named(asm2464_warm_reset_budget,
+		asm2464_warm_reset_budget, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(asm2464_warm_reset_budget,
+		"ASM2464 roothub warm resets to allow before logical reconnect; -1 means unlimited");
+
+static bool asm2464_disconnect_on_warm_reset;
+module_param_named(asm2464_disconnect_on_warm_reset,
+		asm2464_disconnect_on_warm_reset, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(asm2464_disconnect_on_warm_reset,
+		"disconnect/re-enumerate ASM2464 instead of repeatedly resetting an SS.Inactive link");
+
 /* Mutual exclusion for EHCI CF initialization.  This interferes with
  * port reset on some companion controllers.
  */
@@ -107,6 +125,13 @@ EXPORT_SYMBOL_GPL(ehci_cf_port_reset_rwsem);
 static void hub_release(struct kref *kref);
 static int usb_reset_and_verify_device(struct usb_device *udev);
 static int hub_port_disable(struct usb_hub *hub, int port1, int set_state);
+
+static bool usb_device_is_asm2464(struct usb_device *udev)
+{
+	return udev &&
+		le16_to_cpu(udev->descriptor.idVendor) == 0xadd1 &&
+		le16_to_cpu(udev->descriptor.idProduct) == 0x0001;
+}
 
 static inline char *portspeed(struct usb_hub *hub, int portstatus)
 {
@@ -5058,6 +5083,9 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 static void port_event(struct usb_hub *hub, int port1)
 		__must_hold(&port_dev->status_lock)
 {
+	static int asm2464_reset_devnum;
+	static int asm2464_reset_count;
+	static unsigned long asm2464_reset_last_jiffies;
 	int connect_change;
 	struct usb_port *port_dev = hub->ports[port1 - 1];
 	struct usb_device *udev = port_dev->child;
@@ -5071,7 +5099,14 @@ static void port_event(struct usb_hub *hub, int port1)
 	if (hub_port_status(hub, port1, &portstatus, &portchange) < 0)
 		return;
 
+	if (!(portstatus & USB_PORT_STAT_CONNECTION)) {
+		asm2464_reset_devnum = 0;
+		asm2464_reset_count = 0;
+	}
+
 	if (portchange & USB_PORT_STAT_C_CONNECTION) {
+		asm2464_reset_devnum = 0;
+		asm2464_reset_count = 0;
 		usb_clear_port_feature(hdev, port1, USB_PORT_FEAT_C_CONNECTION);
 		connect_change = 1;
 	}
@@ -5147,6 +5182,45 @@ static void port_event(struct usb_hub *hub, int port1)
 					HUB_BH_RESET_TIME, true) < 0)
 				hub_port_disable(hub, port1, 1);
 		} else {
+			if (usb_device_is_asm2464(udev)) {
+				if (asm2464_reset_devnum != udev->devnum ||
+						time_after(jiffies,
+							asm2464_reset_last_jiffies + 12 * HZ)) {
+					asm2464_reset_devnum = udev->devnum;
+					asm2464_reset_count = 0;
+				}
+				asm2464_reset_last_jiffies = jiffies;
+				if (asm2464_suppress_warm_reset ||
+						(asm2464_warm_reset_budget >= 0 &&
+						 asm2464_reset_count >= asm2464_warm_reset_budget)) {
+					asm2464_reset_count++;
+					if (asm2464_disconnect_on_warm_reset) {
+						dev_warn(&udev->dev,
+							"ASM2464 disconnecting stale SS link after warm-reset request %d on port %d status=0x%04x change=0x%04x forced=%d budget=%d\n",
+							asm2464_reset_count, port1,
+							portstatus, portchange,
+							asm2464_suppress_warm_reset,
+							asm2464_warm_reset_budget);
+						connect_change = 1;
+						hub_port_disable(hub, port1, 1);
+						goto skip_warm_reset;
+					}
+					dev_warn_ratelimited(&udev->dev,
+						"ASM2464 ignoring repeated roothub warm-reset request %d on port %d status=0x%04x change=0x%04x forced=%d budget=%d\n",
+						asm2464_reset_count, port1,
+						portstatus, portchange,
+						asm2464_suppress_warm_reset,
+						asm2464_warm_reset_budget);
+					goto skip_warm_reset;
+				}
+				asm2464_reset_count++;
+				dev_warn(&udev->dev,
+					"ASM2464 allowing roothub reset %d on port %d status=0x%04x change=0x%04x forced=%d budget=%d\n",
+					asm2464_reset_count, port1,
+					portstatus, portchange,
+					asm2464_suppress_warm_reset,
+					asm2464_warm_reset_budget);
+			}
 			usb_unlock_port(port_dev);
 			usb_lock_device(udev);
 			usb_reset_device(udev);
@@ -5156,6 +5230,7 @@ static void port_event(struct usb_hub *hub, int port1)
 		}
 	}
 
+skip_warm_reset:
 	if (connect_change)
 		hub_port_connect_change(hub, port1, portstatus, portchange);
 }

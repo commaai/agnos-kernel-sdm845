@@ -77,6 +77,11 @@ MODULE_PARM_DESC(cpu_to_affin, "affin usb irq to this cpu");
 #define USB3_HCCPARAMS2		(0x1c)
 #define HCC_CTC(p)		((p) & (1 << 3))
 #define USB3_PORTSC		(0x420)
+#define USB3_PORTPMSC		(0x424)
+#define USB3_PORTLI		(0x428)
+#define USB3_PORTHLPMC		(0x42c)
+#define USB3_PORT_STRIDE	(0x10)
+#define XDEV_RX_DETECT		(0x5 << 5)
 
 /**
  *  USB QSCRATCH Hardware registers
@@ -215,6 +220,8 @@ struct dwc3_msm {
 	struct usb_irq		wakeup_irq[USB_MAX_IRQ];
 	struct work_struct	resume_work;
 	struct work_struct	restart_usb_work;
+	struct work_struct	force_host_restart_work;
+	atomic_t		force_host_restart_active;
 	bool			in_restart;
 	struct workqueue_struct *dwc3_wq;
 	struct delayed_work	sm_work;
@@ -297,6 +304,12 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 						unsigned int value);
 static int dwc3_restart_usb_host_mode(struct notifier_block *nb,
 					unsigned long event, void *ptr);
+static int dwc3_force_usb_host_restart(struct dwc3_msm *mdwc);
+static int dwc3_force_usb_host_stop(struct dwc3_msm *mdwc);
+static int dwc3_force_usb_host_start(struct dwc3_msm *mdwc);
+static void dwc3_msm_powercycle_ss_ports(struct dwc3_msm *mdwc,
+					const char *reason);
+static void dwc3_force_usb_host_restart_work(struct work_struct *w);
 
 /**
  *
@@ -2661,10 +2674,13 @@ static void dwc3_resume_work(struct work_struct *w)
 		ret = extcon_get_property(edev, extcon_id,
 					EXTCON_PROP_USB_SS, &val);
 
-		/* Use default dwc->maximum_speed if speed isn't reported */
-		if (!ret)
-			dwc->maximum_speed = (val.intval == 0) ?
-					USB_SPEED_HIGH : USB_SPEED_SUPER;
+		/*
+		 * Do not downgrade an eGPU host link to HS when SS indication
+		 * disappears during a marginal hotplug. USB2 enumeration is not
+		 * useful for the eGPU and can leave the SS side wedged.
+		 */
+		if (!ret && val.intval != 0)
+			dwc->maximum_speed = USB_SPEED_SUPER;
 
 		if (dwc->maximum_speed > dwc->max_hw_supp_speed)
 			dwc->maximum_speed = dwc->max_hw_supp_speed;
@@ -2681,9 +2697,10 @@ static void dwc3_resume_work(struct work_struct *w)
 
 		ret = extcon_get_property(edev, extcon_id,
 				EXTCON_PROP_USB_TYPEC_POLARITY, &val);
-		if (ret)
-			mdwc->typec_orientation = ORIENTATION_NONE;
-		else
+		if (ret && mdwc->typec_orientation == ORIENTATION_NONE)
+			dev_warn(mdwc->dev,
+				"Type-C polarity unavailable and no previous orientation\n");
+		else if (!ret)
 			mdwc->typec_orientation = val.intval ?
 					ORIENTATION_CC2 : ORIENTATION_CC1;
 
@@ -3215,6 +3232,221 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 }
 
 static DEVICE_ATTR_RW(mode);
+
+static ssize_t host_restart_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+	int ret;
+
+	if (sysfs_streq(buf, "stop"))
+		ret = dwc3_force_usb_host_stop(mdwc);
+	else if (sysfs_streq(buf, "start"))
+		ret = dwc3_force_usb_host_start(mdwc);
+	else if (sysfs_streq(buf, "portcycle")) {
+		dwc3_msm_powercycle_ss_ports(mdwc, "forced host portcycle");
+		ret = 0;
+	}
+	else if (sysfs_streq(buf, "1") || sysfs_streq(buf, "restart")) {
+		if (atomic_xchg(&mdwc->force_host_restart_active, 1)) {
+			dev_warn(mdwc->dev,
+				"USB host restart already running; coalescing trigger\n");
+			return count;
+		}
+		schedule_work(&mdwc->force_host_restart_work);
+		return count;
+	}
+	else
+		return -EINVAL;
+	if (ret)
+		return ret;
+
+	return count;
+}
+
+static DEVICE_ATTR_WO(host_restart);
+
+static u32 dwc3_msm_ss_port_reg(struct dwc3_msm *mdwc, u32 port_off)
+{
+	u32 reg;
+	int i, num_ports;
+
+	if (!mdwc || !mdwc->in_host_mode)
+		return 0;
+
+	reg = dwc3_msm_read_reg(mdwc->base, USB3_HCSPARAMS1);
+	num_ports = HCS_MAX_PORTS(reg);
+	for (i = 0; i < num_ports; i++) {
+		reg = dwc3_msm_read_reg(mdwc->base,
+				USB3_PORTSC + i * USB3_PORT_STRIDE);
+		if ((reg & PORT_CONNECT) && DEV_SUPERSPEED(reg))
+			return dwc3_msm_read_reg(mdwc->base,
+				USB3_PORTSC + i * USB3_PORT_STRIDE + port_off);
+	}
+
+	return 0;
+}
+
+#define DWC3_MSM_SS_PORT_ATTR(_name, _reg)				\
+static ssize_t _name##_show(struct device *dev,				\
+		struct device_attribute *attr, char *buf)		\
+{									\
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);			\
+									\
+	return scnprintf(buf, PAGE_SIZE, "0x%08x\n",			\
+			dwc3_msm_ss_port_reg(mdwc, (_reg) - USB3_PORTSC)); \
+}									\
+static DEVICE_ATTR_RO(_name)
+
+DWC3_MSM_SS_PORT_ATTR(portsc, USB3_PORTSC);
+DWC3_MSM_SS_PORT_ATTR(port_pmsc, USB3_PORTPMSC);
+DWC3_MSM_SS_PORT_ATTR(portli, USB3_PORTLI);
+DWC3_MSM_SS_PORT_ATTR(port_hlpmc, USB3_PORTHLPMC);
+
+static void dwc3_msm_kick_ss_inactive_ports(struct dwc3_msm *mdwc,
+		const char *reason)
+{
+	u32 hcs, reg, val, pls;
+	int i, j, num_ports;
+
+	if (!mdwc || !mdwc->in_host_mode)
+		return;
+
+	hcs = dwc3_msm_read_reg(mdwc->base, USB3_HCSPARAMS1);
+	num_ports = HCS_MAX_PORTS(hcs);
+
+	for (i = 0; i < num_ports; i++) {
+		u32 port_off = USB3_PORTSC + i * USB3_PORT_STRIDE;
+
+		reg = dwc3_msm_read_reg(mdwc->base, port_off);
+		pls = reg & PORT_PLS_MASK;
+		if (reg & PORT_CONNECT)
+			continue;
+		if (pls != XDEV_INACTIVE && pls != XDEV_POLLING &&
+				pls != XDEV_COMP_MODE)
+			continue;
+
+		dev_warn(mdwc->dev,
+			"%s: SS port %d stuck raw PORTSC=0x%08x, issuing warm reset\n",
+			reason, i, reg);
+		val = xhci_port_state_to_neutral(reg) | PORT_WR;
+		dwc3_msm_write_reg(mdwc->base, port_off, val);
+
+		for (j = 0; j < 20; j++) {
+			msleep(20);
+			reg = dwc3_msm_read_reg(mdwc->base, port_off);
+			if (reg & PORT_WRC)
+				break;
+		}
+
+		if (reg & PORT_WRC)
+			dwc3_msm_write_reg(mdwc->base, port_off,
+				xhci_port_state_to_neutral(reg) | PORT_WRC);
+
+		msleep(50);
+		reg = dwc3_msm_read_reg(mdwc->base, port_off);
+		if (!(reg & PORT_CONNECT)) {
+			dev_warn(mdwc->dev,
+				"%s: SS port %d raw PORTSC=0x%08x, forcing RxDetect\n",
+				reason, i, reg);
+			val = xhci_port_state_to_neutral(reg);
+			val &= ~PORT_PLS_MASK;
+			val |= PORT_LINK_STROBE | XDEV_RX_DETECT;
+			dwc3_msm_write_reg(mdwc->base, port_off, val);
+		}
+
+		msleep(200);
+		reg = dwc3_msm_read_reg(mdwc->base, port_off);
+		if (!(reg & PORT_CONNECT)) {
+			dev_warn(mdwc->dev,
+				"%s: SS port %d raw PORTSC=0x%08x, cycling port power\n",
+				reason, i, reg);
+			val = xhci_port_state_to_neutral(reg);
+			val &= ~PORT_POWER;
+			dwc3_msm_write_reg(mdwc->base, port_off, val);
+			msleep(1000);
+			reg = dwc3_msm_read_reg(mdwc->base, port_off);
+			val = xhci_port_state_to_neutral(reg) | PORT_POWER;
+			dwc3_msm_write_reg(mdwc->base, port_off, val);
+			msleep(100);
+			reg = dwc3_msm_read_reg(mdwc->base, port_off);
+			val = xhci_port_state_to_neutral(reg);
+			val &= ~PORT_PLS_MASK;
+			val |= PORT_LINK_STROBE | XDEV_RX_DETECT;
+			dwc3_msm_write_reg(mdwc->base, port_off, val);
+		}
+	}
+}
+
+static void dwc3_msm_powercycle_ss_ports(struct dwc3_msm *mdwc,
+		const char *reason)
+{
+	u32 reg, val;
+	int i;
+
+	if (!mdwc || !mdwc->in_host_mode)
+		return;
+
+	for (i = 0; i < 2; i++) {
+		u32 port_off = USB3_PORTSC + i * USB3_PORT_STRIDE;
+
+		reg = dwc3_msm_read_reg(mdwc->base, port_off);
+		dev_warn(mdwc->dev,
+			"%s: SS port %d power-cycle start raw PORTSC=0x%08x\n",
+			reason, i, reg);
+
+		val = xhci_port_state_to_neutral(reg);
+		val &= ~PORT_POWER;
+		dwc3_msm_write_reg(mdwc->base, port_off, val);
+		msleep(1200);
+
+		reg = dwc3_msm_read_reg(mdwc->base, port_off);
+		val = xhci_port_state_to_neutral(reg) | PORT_POWER;
+		dwc3_msm_write_reg(mdwc->base, port_off, val);
+		msleep(120);
+
+		reg = dwc3_msm_read_reg(mdwc->base, port_off);
+		val = xhci_port_state_to_neutral(reg);
+		val &= ~PORT_PLS_MASK;
+		val |= PORT_LINK_STROBE | XDEV_RX_DETECT;
+		dwc3_msm_write_reg(mdwc->base, port_off, val);
+		msleep(250);
+
+		reg = dwc3_msm_read_reg(mdwc->base, port_off);
+		dev_warn(mdwc->dev,
+			"%s: SS port %d power-cycle done raw PORTSC=0x%08x\n",
+			reason, i, reg);
+	}
+}
+
+static ssize_t raw_port0_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	return scnprintf(buf, PAGE_SIZE,
+			"portsc=0x%08x portpmsc=0x%08x portli=0x%08x porthlpmc=0x%08x\n",
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTSC),
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTPMSC),
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTLI),
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTHLPMC));
+}
+static DEVICE_ATTR_RO(raw_port0);
+
+static ssize_t raw_port1_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	return scnprintf(buf, PAGE_SIZE,
+			"portsc=0x%08x portpmsc=0x%08x portli=0x%08x porthlpmc=0x%08x\n",
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTSC + USB3_PORT_STRIDE),
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTPMSC + USB3_PORT_STRIDE),
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTLI + USB3_PORT_STRIDE),
+			dwc3_msm_read_reg(mdwc->base, USB3_PORTHLPMC + USB3_PORT_STRIDE));
+}
+static DEVICE_ATTR_RO(raw_port1);
+
 static void msm_dwc3_perf_vote_work(struct work_struct *w);
 
 /* This node only shows max speed supported dwc3 and it should be
@@ -3346,10 +3578,13 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&mdwc->req_complete_list);
 	INIT_WORK(&mdwc->resume_work, dwc3_resume_work);
 	INIT_WORK(&mdwc->restart_usb_work, dwc3_restart_usb_work);
+	INIT_WORK(&mdwc->force_host_restart_work,
+			dwc3_force_usb_host_restart_work);
 	INIT_WORK(&mdwc->vbus_draw_work, dwc3_msm_vbus_draw_work);
 	INIT_DELAYED_WORK(&mdwc->sm_work, dwc3_otg_sm_work);
 	INIT_DELAYED_WORK(&mdwc->perf_vote_work, msm_dwc3_perf_vote_work);
 	INIT_DELAYED_WORK(&mdwc->sdp_check, check_for_sdp_connection);
+	atomic_set(&mdwc->force_host_restart_active, 0);
 
 	mdwc->dwc3_wq = alloc_ordered_workqueue("dwc3_wq", 0);
 	if (!mdwc->dwc3_wq) {
@@ -3698,9 +3933,16 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	}
 
 	device_create_file(&pdev->dev, &dev_attr_mode);
+	device_create_file(&pdev->dev, &dev_attr_host_restart);
 	device_create_file(&pdev->dev, &dev_attr_speed);
 	device_create_file(&pdev->dev, &dev_attr_usb_compliance_mode);
 	device_create_file(&pdev->dev, &dev_attr_xhci_link_compliance);
+	device_create_file(&pdev->dev, &dev_attr_portsc);
+	device_create_file(&pdev->dev, &dev_attr_port_pmsc);
+	device_create_file(&pdev->dev, &dev_attr_portli);
+	device_create_file(&pdev->dev, &dev_attr_port_hlpmc);
+	device_create_file(&pdev->dev, &dev_attr_raw_port0);
+	device_create_file(&pdev->dev, &dev_attr_raw_port1);
 
 	host_mode = usb_get_dr_mode(&mdwc->dwc3->dev) == USB_DR_MODE_HOST;
 	if (!dwc->is_drd && host_mode) {
@@ -3965,6 +4207,17 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 			atomic_read(&mdwc->dev->power.usage_count));
 		if (dwc->maximum_speed == USB_SPEED_SUPER) {
 			mdwc->ss_phy->flags |= PHY_HOST_MODE;
+			if (mdwc->type_c) {
+				mdwc->ss_phy->flags &= ~(PHY_LANE_A | PHY_LANE_B);
+				if (mdwc->typec_orientation == ORIENTATION_CC1)
+					mdwc->ss_phy->flags |= PHY_LANE_A;
+				else if (mdwc->typec_orientation == ORIENTATION_CC2)
+					mdwc->ss_phy->flags |= PHY_LANE_B;
+				dev_warn(mdwc->dev,
+					"SS host start orientation=%d ss_flags=0x%lx\n",
+					mdwc->typec_orientation,
+					mdwc->ss_phy->flags);
+			}
 			usb_phy_notify_connect(mdwc->ss_phy,
 						USB_SPEED_SUPER);
 		}
@@ -3989,6 +4242,7 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 
 		mdwc->usbdev_nb.notifier_call = msm_dwc3_usbdev_notify;
 		usb_register_atomic_notify(&mdwc->usbdev_nb);
+
 		ret = dwc3_host_init(dwc);
 		if (ret) {
 			dev_err(mdwc->dev,
@@ -4222,6 +4476,174 @@ static int dwc3_restart_usb_host_mode(struct notifier_block *nb,
 	dbg_event(0xFF, "complete_host_change", dwc->maximum_speed);
 err:
 	return ret;
+}
+
+static int dwc3_force_usb_host_restart(struct dwc3_msm *mdwc)
+{
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	int i, ret;
+
+	if (!dwc)
+		return -ENODEV;
+
+	dev_warn(mdwc->dev, "forcing USB host retrain for hotplug recovery\n");
+	dbg_event(0xFF, "force_hrestart", dwc->maximum_speed);
+
+	flush_delayed_work(&mdwc->sm_work);
+
+	if (mdwc->in_host_mode) {
+		ret = dwc3_otg_start_host(mdwc, 0);
+		if (ret)
+			dev_warn(mdwc->dev,
+				"forced host retrain: stop failed ret=%d\n", ret);
+		msleep(3000);
+	} else
+		dev_warn(mdwc->dev,
+			"forced host retrain: host mode was not active\n");
+
+	if (mdwc->ss_phy) {
+		dev_warn(mdwc->dev, "forced host retrain: SS PHY reset/init\n");
+		ret = usb_phy_reset(mdwc->ss_phy);
+		if (ret)
+			dev_warn(mdwc->dev,
+				"forced host retrain: SS PHY reset ret=%d\n", ret);
+		ret = usb_phy_init(mdwc->ss_phy);
+		if (ret)
+			dev_warn(mdwc->dev,
+				"forced host retrain: SS PHY init ret=%d\n", ret);
+	}
+
+	dwc->maximum_speed = USB_SPEED_SUPER;
+	dwc->gadget.max_speed = dwc->maximum_speed;
+	mdwc->vbus_active = false;
+	mdwc->id_state = DWC3_ID_GROUND;
+	mdwc->otg_state = OTG_STATE_A_HOST;
+	mdwc->hc_died = false;
+
+	ret = dwc3_otg_start_host(mdwc, 1);
+	if (ret) {
+		dev_warn(mdwc->dev,
+			"forced host retrain: start failed ret=%d\n", ret);
+		mdwc->otg_state = OTG_STATE_A_IDLE;
+		return ret;
+	}
+
+	for (i = 0; i < 12; i++) {
+		if (dwc3_msm_is_ss_rhport_connected(mdwc)) {
+			dev_warn(mdwc->dev,
+				"forced host retrain: SS connected after start wait %d\n",
+				i);
+			return 0;
+		}
+		msleep(500);
+	}
+
+	for (i = 0; i < 8; i++) {
+		dwc3_msm_kick_ss_inactive_ports(mdwc, "forced host retrain");
+		if (dwc3_msm_is_ss_rhport_connected(mdwc)) {
+			dev_warn(mdwc->dev,
+				"forced host retrain: SS connected after %d kicks\n",
+				i + 1);
+			break;
+		}
+		msleep(500);
+	}
+
+	return 0;
+}
+
+static void dwc3_force_usb_host_restart_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
+			force_host_restart_work);
+	int ret;
+
+	ret = dwc3_force_usb_host_restart(mdwc);
+	if (ret)
+		dev_warn(mdwc->dev, "async forced host restart ret=%d\n", ret);
+
+	atomic_set(&mdwc->force_host_restart_active, 0);
+}
+
+static int dwc3_force_usb_host_stop(struct dwc3_msm *mdwc)
+{
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	int ret = 0;
+
+	if (!dwc)
+		return -ENODEV;
+
+	dev_warn(mdwc->dev, "forcing USB host stop for hotplug recovery\n");
+	flush_delayed_work(&mdwc->sm_work);
+
+	if (mdwc->in_host_mode) {
+		ret = dwc3_otg_start_host(mdwc, 0);
+		if (ret)
+			return ret;
+	}
+
+	mdwc->vbus_active = false;
+	mdwc->id_state = DWC3_ID_FLOAT;
+	mdwc->otg_state = OTG_STATE_B_IDLE;
+	mdwc->hc_died = false;
+
+	return ret;
+}
+
+static int dwc3_force_usb_host_start(struct dwc3_msm *mdwc)
+{
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	int ret, wait;
+
+	if (!dwc)
+		return -ENODEV;
+
+	dev_warn(mdwc->dev, "forcing USB host start for hotplug recovery\n");
+	flush_delayed_work(&mdwc->sm_work);
+
+	if (mdwc->ss_phy) {
+		dev_warn(mdwc->dev, "forcing SS PHY reset/init before host start\n");
+		ret = usb_phy_reset(mdwc->ss_phy);
+		if (ret)
+			dev_warn(mdwc->dev, "SS PHY reset failed ret=%d\n", ret);
+		ret = usb_phy_init(mdwc->ss_phy);
+		if (ret)
+			dev_warn(mdwc->dev, "SS PHY init failed ret=%d\n", ret);
+	}
+
+	dwc->maximum_speed = USB_SPEED_SUPER;
+	dwc->gadget.max_speed = dwc->maximum_speed;
+	mdwc->vbus_active = false;
+	mdwc->id_state = DWC3_ID_GROUND;
+	mdwc->otg_state = OTG_STATE_A_HOST;
+	mdwc->hc_died = false;
+	if (!mdwc->in_host_mode) {
+		ret = dwc3_otg_start_host(mdwc, 1);
+		if (ret) {
+			dev_warn(mdwc->dev,
+				"forced USB host start failed ret=%d\n", ret);
+			mdwc->otg_state = OTG_STATE_A_IDLE;
+			return ret;
+		}
+	}
+
+	if (mdwc->in_host_mode) {
+		for (wait = 0; wait < 12; wait++) {
+			if (dwc3_msm_is_ss_rhport_connected(mdwc))
+				return 0;
+			msleep(500);
+		}
+
+		dwc3_msm_kick_ss_inactive_ports(mdwc,
+				"forced host start");
+		for (wait = 0; wait < 8; wait++) {
+			if (dwc3_msm_is_ss_rhport_connected(mdwc))
+				break;
+			msleep(500);
+		}
+	}
+
+	return 0;
 }
 
 static int get_psy_type(struct dwc3_msm *mdwc)
