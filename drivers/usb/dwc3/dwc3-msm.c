@@ -3222,6 +3222,9 @@ static ssize_t portli_show(struct device *dev,
 {
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 
+	if (!mdwc->in_host_mode)
+		return scnprintf(buf, PAGE_SIZE, "0x%08x\n", 0);
+
 	return scnprintf(buf, PAGE_SIZE, "0x%08x\n",
 			dwc3_msm_read_reg(mdwc->base, USB3_PORTLI));
 }
