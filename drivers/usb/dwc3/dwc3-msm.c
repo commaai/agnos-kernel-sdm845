@@ -3218,21 +3218,19 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 static DEVICE_ATTR_RW(mode);
 
 static ssize_t portli_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+			   struct device_attribute *attr, char *buf)
 {
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
-	u32 portli = 0;
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	int ret = -EAGAIN;
 
-	if (!mdwc->in_host_mode)
-		return scnprintf(buf, PAGE_SIZE, "0x%08x\n", 0);
+	mutex_lock(&mdwc->suspend_resume_mutex);
+	if (mdwc->in_host_mode && !atomic_read(&dwc->in_lpm))
+		ret = scnprintf(buf, PAGE_SIZE, "0x%08x\n",
+				dwc3_msm_read_reg(mdwc->base, USB3_PORTLI));
 
-	if (pm_runtime_get_sync(mdwc->dev) >= 0) {
-		portli = dwc3_msm_read_reg(mdwc->base, USB3_PORTLI);
-		pm_runtime_mark_last_busy(mdwc->dev);
-		pm_runtime_put_sync_autosuspend(mdwc->dev);
-	}
-
-	return scnprintf(buf, PAGE_SIZE, "0x%08x\n", portli);
+	mutex_unlock(&mdwc->suspend_resume_mutex);
+	return ret;
 }
 static DEVICE_ATTR_RO(portli);
 
