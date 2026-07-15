@@ -77,6 +77,7 @@ MODULE_PARM_DESC(cpu_to_affin, "affin usb irq to this cpu");
 #define USB3_HCCPARAMS2		(0x1c)
 #define HCC_CTC(p)		((p) & (1 << 3))
 #define USB3_PORTSC		(0x420)
+#define USB3_PORTLI		(0x428)
 
 /**
  *  USB QSCRATCH Hardware registers
@@ -3215,6 +3216,24 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 }
 
 static DEVICE_ATTR_RW(mode);
+
+static ssize_t portli_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	int ret = -EAGAIN;
+
+	mutex_lock(&mdwc->suspend_resume_mutex);
+	if (mdwc->in_host_mode && !atomic_read(&dwc->in_lpm))
+		ret = scnprintf(buf, PAGE_SIZE, "0x%08x\n",
+				dwc3_msm_read_reg(mdwc->base, USB3_PORTLI));
+
+	mutex_unlock(&mdwc->suspend_resume_mutex);
+	return ret;
+}
+static DEVICE_ATTR_RO(portli);
+
 static void msm_dwc3_perf_vote_work(struct work_struct *w);
 
 /* This node only shows max speed supported dwc3 and it should be
@@ -3701,6 +3720,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	device_create_file(&pdev->dev, &dev_attr_speed);
 	device_create_file(&pdev->dev, &dev_attr_usb_compliance_mode);
 	device_create_file(&pdev->dev, &dev_attr_xhci_link_compliance);
+	device_create_file(&pdev->dev, &dev_attr_portli);
 
 	host_mode = usb_get_dr_mode(&mdwc->dwc3->dev) == USB_DR_MODE_HOST;
 	if (!dwc->is_drd && host_mode) {
@@ -3740,6 +3760,7 @@ static int dwc3_msm_remove(struct platform_device *pdev)
 
 	device_remove_file(&pdev->dev, &dev_attr_mode);
 	device_remove_file(&pdev->dev, &dev_attr_xhci_link_compliance);
+	device_remove_file(&pdev->dev, &dev_attr_portli);
 	if (mdwc->usb_psy)
 		power_supply_put(mdwc->usb_psy);
 
