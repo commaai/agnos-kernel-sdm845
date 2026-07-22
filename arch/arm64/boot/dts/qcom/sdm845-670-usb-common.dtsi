@@ -23,7 +23,6 @@
 		reg-names = "core_base", "ahb2phy_base";
 		iommus = <&apps_smmu 0x740 0x0>;
 		qcom,smmu-s1-bypass;
-		comma,recover-ss-port;
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
