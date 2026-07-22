@@ -24,8 +24,6 @@
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 #include <linux/usb/phy.h>
-#include <linux/module.h>
-#include <linux/of.h>
 
 #include "xhci.h"
 #include "xhci-trace.h"
@@ -33,27 +31,6 @@
 #define	PORT_WAKE_BITS	(PORT_WKOC_E | PORT_WKDISC_E | PORT_WKCONN_E)
 #define	PORT_RWC_BITS	(PORT_CSC | PORT_PEC | PORT_WRC | PORT_OCC | \
 			 PORT_RC | PORT_PLC | PORT_PE)
-
-static bool recover_usb_ss = true;
-module_param_named(recover_usb_ss, recover_usb_ss, bool, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(recover_usb_ss, "report a change for the SS port when connected but disabled");
-
-static bool xhci_recover_usb3_hcd(struct usb_hcd *hcd)
-{
-	struct device *dev;
-
-	if (!recover_usb_ss || !hcd ||
-			hcd->speed < HCD_USB3)
-		return false;
-
-	for (dev = hcd->self.controller; dev; dev = dev->parent) {
-		if (dev->of_node &&
-		    of_property_read_bool(dev->of_node, "comma,recover-ss-port"))
-			return true;
-	}
-
-	return false;
-}
 
 /* USB 3 BOS descriptor and a capability descriptors, combined.
  * Fields will be adjusted and added later in xhci_create_usb3_bos_desc()
@@ -768,14 +745,6 @@ static u32 xhci_get_port_status(struct usb_hcd *hcd,
 		status |= USB_PORT_STAT_C_CONNECTION << 16;
 	if (raw_port_status & PORT_PEC)
 		status |= USB_PORT_STAT_C_ENABLE << 16;
-	else if (xhci_recover_usb3_hcd(hcd) &&
-			(raw_port_status & PORT_CONNECT) &&
-			!(raw_port_status & PORT_PE)) {
-		xhci_warn(xhci,
-			"SS port %d connected but disabled raw=0x%08x, retriggering enumeration\n",
-			wIndex + 1, raw_port_status);
-		status |= USB_PORT_STAT_C_ENABLE << 16;
-	}
 	if ((raw_port_status & PORT_OCC))
 		status |= USB_PORT_STAT_C_OVERCURRENT << 16;
 	if ((raw_port_status & PORT_RC))
@@ -1541,8 +1510,6 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 			break;
 		}
 		if ((temp & mask) != 0 ||
-			(xhci_recover_usb3_hcd(hcd) &&
-			 (temp & PORT_CONNECT) && !(temp & PORT_PE)) ||
 			(bus_state->port_c_suspend & 1 << i) ||
 			(bus_state->resume_done[i] && time_after_eq(
 			    jiffies, bus_state->resume_done[i]))) {
