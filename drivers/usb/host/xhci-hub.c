@@ -1611,8 +1611,9 @@ static bool xhci_port_missing_cas_quirk(int port_index,
 
 	portsc = readl(port_array[port_index]);
 
-	/* if any of these are set we are not stuck */
-	if (portsc & (PORT_CONNECT | PORT_CAS))
+	/* CAS, or a connected and enabled port, means we are not stuck */
+	if ((portsc & PORT_CAS) ||
+	    ((portsc & PORT_CONNECT) && (portsc & PORT_PE)))
 		return false;
 
 	if (((portsc & PORT_PLS_MASK) != XDEV_POLLING) &&

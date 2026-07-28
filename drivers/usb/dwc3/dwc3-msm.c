@@ -431,6 +431,26 @@ static bool dwc3_msm_is_host_superspeed(struct dwc3_msm *mdwc)
 	return false;
 }
 
+static bool dwc3_msm_ss_port_stuck(struct dwc3_msm *mdwc)
+{
+	u32 portsc;
+
+	/*
+	 * DWC3 exposes its single SuperSpeed root port after the USB2 root
+	 * port.  An unusable port in Polling cannot enter P3, so the QMP
+	 * PHY's autonomous receiver detector cannot become a wake source.
+	 */
+	portsc = dwc3_msm_read_reg(mdwc->base, USB3_PORTSC + 0x10);
+	if (portsc & PORT_CAS)
+		return false;
+
+	if ((portsc & PORT_CONNECT) && (portsc & PORT_PE))
+		return false;
+
+	return (portsc & PORT_PLS_MASK) == XDEV_POLLING ||
+	       (portsc & PORT_PLS_MASK) == XDEV_COMP_MODE;
+}
+
 static inline bool dwc3_msm_is_dev_superspeed(struct dwc3_msm *mdwc)
 {
 	u8 speed;
@@ -2115,8 +2135,23 @@ static void dwc3_msm_power_collapse_por(struct dwc3_msm *mdwc)
 
 static int dwc3_msm_prepare_suspend(struct dwc3_msm *mdwc)
 {
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	struct usb_hcd *hcd;
 	unsigned long timeout;
 	u32 reg = 0;
+
+	/*
+	 * A missing CAS indication can leave the SuperSpeed port in Polling
+	 * after the root hub has suspended.  Keep the wrapper awake and
+	 * request a root-hub resume; xHCI will warm-reset the stuck port.
+	 */
+	if (mdwc->in_host_mode && dwc3_msm_ss_port_stuck(mdwc)) {
+		hcd = platform_get_drvdata(dwc->xhci);
+		usb_hcd_resume_root_hub(hcd_to_xhci(hcd)->shared_hcd);
+		dev_info(mdwc->dev,
+			 "SuperSpeed port stuck before suspend, resuming root hub\n");
+		return -EBUSY;
+	}
 
 	if ((mdwc->in_host_mode || mdwc->in_device_mode)
 			&& dwc3_msm_is_superspeed(mdwc) && !mdwc->in_restart) {
@@ -3957,6 +3992,7 @@ static void msm_dwc3_perf_vote_work(struct work_struct *w)
 static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 {
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	struct usb_hcd *hcd;
 	int ret = 0;
 
 	/*
@@ -4025,6 +4061,9 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 			usb_unregister_notify(&mdwc->host_nb);
 			return ret;
 		}
+
+		hcd = platform_get_drvdata(dwc->xhci);
+		hcd_to_xhci(hcd)->quirks |= XHCI_MISSING_CAS;
 
 		/*
 		 * If the Compliance Transition Capability(CTC) flag of
