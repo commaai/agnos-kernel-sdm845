@@ -1611,7 +1611,7 @@ static bool xhci_port_missing_cas_quirk(int port_index,
 
 	portsc = readl(port_array[port_index]);
 
-	/* CAS, or a connected and enabled port, means we are not stuck */
+	/* CAS or a connected and enabled link does not need recovery. */
 	if ((portsc & PORT_CAS) ||
 	    ((portsc & PORT_CONNECT) && (portsc & PORT_PE)))
 		return false;

@@ -436,9 +436,12 @@ static bool dwc3_msm_ss_port_stuck(struct dwc3_msm *mdwc)
 	u32 portsc;
 
 	/*
-	 * DWC3 exposes its single SuperSpeed root port after the USB2 root
-	 * port.  An unusable port in Polling cannot enter P3, so the QMP
-	 * PHY's autonomous receiver detector cannot become a wake source.
+	 * The DWC3 xHCI register block places the SuperSpeed PORTSC
+	 * immediately after the USB2 PORTSC, hence the 0x10 offset.
+	 *
+	 * The QMP PHY can use autonomous wake detection only after the
+	 * SuperSpeed link reaches U3. A port left in Polling or Compliance
+	 * therefore needs recovery before the PHY clocks can be gated.
 	 */
 	portsc = dwc3_msm_read_reg(mdwc->base, USB3_PORTSC + 0x10);
 	if (portsc & PORT_CAS)
@@ -2141,9 +2144,9 @@ static int dwc3_msm_prepare_suspend(struct dwc3_msm *mdwc)
 	u32 reg = 0;
 
 	/*
-	 * A missing CAS indication can leave the SuperSpeed port in Polling
-	 * after the root hub has suspended.  Keep the wrapper awake and
-	 * request a root-hub resume; xHCI will warm-reset the stuck port.
+	 * Do not suspend the Qualcomm wrapper while the SuperSpeed port
+	 * needs recovery. Wake the root hub so xHCI can warm-reset the port;
+	 * runtime PM will retry after the link has recovered.
 	 */
 	if (mdwc->in_host_mode && dwc3_msm_ss_port_stuck(mdwc)) {
 		hcd = platform_get_drvdata(dwc->xhci);
