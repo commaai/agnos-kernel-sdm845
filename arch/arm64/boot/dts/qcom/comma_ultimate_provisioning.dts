@@ -137,6 +137,9 @@
 
 &qupv3_se0_spi {
   status = "ok";
+  pinctrl-names = "default", "sleep";
+  pinctrl-0 = <&qupv3_se0_spi_active &can_cs_active>;
+  pinctrl-1 = <&qupv3_se0_spi_sleep &can_cs_sleep>;
   cs-gpios = <0>,
              <&tlmm 27 GPIO_ACTIVE_LOW>,
              <&tlmm 28 GPIO_ACTIVE_LOW>,
@@ -159,6 +162,14 @@
     clock-names = "cclk";
     interrupt-parent = <&tlmm>;
     interrupts = <124 IRQ_TYPE_LEVEL_LOW>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&can0_int_default>;
+    /*
+     * All four TCAN4551s share this active-high reset.  Only CS0 owns the
+     * GPIO, so its probe deasserts and resets the complete bank once.
+     * The MCP2517FD on old boards ignores this property.
+     */
+    reset-gpios = <&tlmm 33 GPIO_ACTIVE_HIGH>;
     bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
     spi-max-frequency = <10000000>;
   };
@@ -171,6 +182,8 @@
     clock-names = "cclk";
     interrupt-parent = <&tlmm>;
     interrupts = <49 IRQ_TYPE_LEVEL_LOW>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&can1_int_default>;
     bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
     spi-max-frequency = <10000000>;
   };
@@ -183,6 +196,8 @@
     clock-names = "cclk";
     interrupt-parent = <&tlmm>;
     interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&can2_int_default>;
     bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
     spi-max-frequency = <10000000>;
   };
@@ -195,32 +210,105 @@
     clock-names = "cclk";
     interrupt-parent = <&tlmm>;
     interrupts = <32 IRQ_TYPE_LEVEL_LOW>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&can3_int_default>;
     bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
     spi-max-frequency = <10000000>;
   };
 };
 
 /*
- * The four TCAN4551s share an active-high reset line. Hold it deasserted and
- * let the driver reset each controller independently over SPI.
+ * TCAN4551 INT_N is open-drain, but this board revision has no external
+ * pull-ups. Use TLMM's 1.8 V pulls, matching the TCAN VIO supply.
  */
 &tlmm {
-  can_reset {
-    gpio-hog;
-    gpios = <33 GPIO_ACTIVE_HIGH>;
-    output-low;
-    line-name = "can-reset";
-  };
-};
+  /*
+   * This kernel's SPI core toggles GPIO chip selects but does not configure
+   * their direction.  Initialize the three additional active-low selects as
+   * outputs so they can actually be asserted by gpio_set_value().
+   */
+  can_cs_active: can-cs-active {
+    mux {
+      pins = "gpio27", "gpio28", "gpio29";
+      function = "gpio";
+    };
 
-/*
- * The inherited camera-2 pinctrl state also lists GPIO28, despite the sensor's
- * actual reset being GPIO12. Keep its MCLK pinctrl but leave CAN2_CS alone.
- */
-&cam_cci {
-  qcom,cam-sensor@2 {
-    pinctrl-0 = <&cam_sensor_mclk2_active>;
-    pinctrl-1 = <&cam_sensor_mclk2_suspend>;
+    config {
+      pins = "gpio27", "gpio28", "gpio29";
+      drive-strength = <6>;
+      bias-disable;
+      output-high;
+    };
+  };
+
+  can_cs_sleep: can-cs-sleep {
+    mux {
+      pins = "gpio27", "gpio28", "gpio29";
+      function = "gpio";
+    };
+
+    config {
+      pins = "gpio27", "gpio28", "gpio29";
+      drive-strength = <6>;
+      bias-disable;
+      output-high;
+    };
+  };
+
+  can0_int_default: can0-int-default {
+    mux {
+      pins = "gpio124";
+      function = "gpio";
+    };
+
+    config {
+      pins = "gpio124";
+      drive-strength = <2>;
+      bias-pull-up;
+      input-enable;
+    };
+  };
+
+  can1_int_default: can1-int-default {
+    mux {
+      pins = "gpio49";
+      function = "gpio";
+    };
+
+    config {
+      pins = "gpio49";
+      drive-strength = <2>;
+      bias-pull-up;
+      input-enable;
+    };
+  };
+
+  can2_int_default: can2-int-default {
+    mux {
+      pins = "gpio31";
+      function = "gpio";
+    };
+
+    config {
+      pins = "gpio31";
+      drive-strength = <2>;
+      bias-pull-up;
+      input-enable;
+    };
+  };
+
+  can3_int_default: can3-int-default {
+    mux {
+      pins = "gpio32";
+      function = "gpio";
+    };
+
+    config {
+      pins = "gpio32";
+      drive-strength = <2>;
+      bias-pull-up;
+      input-enable;
+    };
   };
 };
 
@@ -232,6 +320,17 @@
   /delete-property/ pinctrl-names;
   /delete-property/ pinctrl-0;
   /delete-property/ pinctrl-1;
+};
+
+/*
+ * The inherited camera-2 pinctrl state also lists GPIO28, despite the sensor's
+ * actual reset being GPIO12. Keep its MCLK pinctrl but leave CAN2_CS alone.
+ */
+&cam_cci {
+  qcom,cam-sensor@2 {
+    pinctrl-0 = <&cam_sensor_mclk2_active>;
+    pinctrl-1 = <&cam_sensor_mclk2_suspend>;
+  };
 };
 
 /* Board definition */

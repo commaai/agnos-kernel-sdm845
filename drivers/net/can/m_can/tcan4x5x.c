@@ -475,6 +475,17 @@ static int tcan4x5x_can_probe(struct spi_device *spi)
 		goto out_free_candev;
 
 	/*
+	 * The first controller owns the reset GPIO shared by all four TCANs.
+	 * Reset that bank before attempting the identification read: a TCAN
+	 * held in reset cannot answer SPI.
+	 */
+	if (priv->reset_gpio) {
+		ret = tcan4x5x_reset(priv);
+		if (ret)
+			goto out_power;
+	}
+
+	/*
 	 * The CS0 DT node also matches the MCP2517FD driver so old and new
 	 * provisioning boards can share one DTB.  Do not claim that node
 	 * unless the SPI device identifies itself as a TCAN.
@@ -483,13 +494,16 @@ static int tcan4x5x_can_probe(struct spi_device *spi)
 	if (ret)
 		goto out_power;
 	if (dev_id != TCAN4X5X_DEV_ID1_TCAN) {
+		dev_warn(&spi->dev, "unexpected device ID 0x%08x\n", dev_id);
 		ret = -ENODEV;
 		goto out_power;
 	}
 
-	ret = tcan4x5x_reset(priv);
-	if (ret)
-		goto out_power;
+	if (!priv->reset_gpio) {
+		ret = tcan4x5x_reset(priv);
+		if (ret)
+			goto out_power;
+	}
 
 	ret = m_can_class_register(mcan_class);
 	if (ret)
