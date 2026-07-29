@@ -137,20 +137,85 @@
 
 &qupv3_se0_spi {
   status = "ok";
+  cs-gpios = <0>,
+             <&tlmm 27 GPIO_ACTIVE_LOW>,
+             <&tlmm 28 GPIO_ACTIVE_LOW>,
+             <&tlmm 29 GPIO_ACTIVE_LOW>;
 
   panda_spi: spidev@0 {
     status = "disabled";
   };
 
   can0: can@0 {
-    compatible = "microchip,mcp2517fd";
+    compatible = "ti,tcan4x5x";
     status = "okay";
     reg = <0>;
     clocks = <&clk40M>;
+    clock-names = "cclk";
     interrupt-parent = <&tlmm>;
-    interrupts = <124 0>;
+    interrupts = <124 IRQ_TYPE_LEVEL_LOW>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
     spi-max-frequency = <10000000>;
   };
+
+  can1: can@1 {
+    compatible = "ti,tcan4x5x";
+    status = "okay";
+    reg = <1>;
+    clocks = <&clk40M>;
+    clock-names = "cclk";
+    interrupt-parent = <&tlmm>;
+    interrupts = <49 IRQ_TYPE_LEVEL_LOW>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+    spi-max-frequency = <10000000>;
+  };
+
+  can2: can@2 {
+    compatible = "ti,tcan4x5x";
+    status = "okay";
+    reg = <2>;
+    clocks = <&clk40M>;
+    clock-names = "cclk";
+    interrupt-parent = <&tlmm>;
+    interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+    spi-max-frequency = <10000000>;
+  };
+
+  can3: can@3 {
+    compatible = "ti,tcan4x5x";
+    status = "okay";
+    reg = <3>;
+    clocks = <&clk40M>;
+    clock-names = "cclk";
+    interrupt-parent = <&tlmm>;
+    interrupts = <32 IRQ_TYPE_LEVEL_LOW>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+    spi-max-frequency = <10000000>;
+  };
+};
+
+/*
+ * The four TCAN4551s share an active-high reset line. Hold it deasserted and
+ * let the driver reset each controller independently over SPI.
+ */
+&tlmm {
+  can_reset {
+    gpio-hog;
+    gpios = <33 GPIO_ACTIVE_HIGH>;
+    output-low;
+    line-name = "can-reset";
+  };
+};
+
+/*
+ * GPIO49 is CAN1_INT_N on this revision, not the secondary USB audio-switch
+ * enable. These inherited pinctrl states would otherwise drive it as an output.
+ */
+&usb1 {
+  /delete-property/ pinctrl-names;
+  /delete-property/ pinctrl-0;
+  /delete-property/ pinctrl-1;
 };
 
 /* Board definition */
