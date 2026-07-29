@@ -3951,6 +3951,10 @@ static const struct of_device_id mcp25xxfd_of_match[] = {
 		.compatible	= "microchip,mcp2517fd",
 		.data		= (void *)CAN_MCP2517FD,
 	},
+	{
+		.compatible	= "commaai,ultimate-can",
+		.data		= (void *)CAN_MCP2517FD,
+	},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mcp25xxfd_of_match);
@@ -4326,7 +4330,7 @@ static int mcp25xxfd_can_probe(struct spi_device *spi)
 	/* check in device tree for overrrides */
 	ret = mcp25xxfd_of_parse(priv);
 	if (ret)
-		return ret;
+		goto out_clk;
 
 	/* decide on real can clock rate */
 	priv->can.clock.freq = freq;
@@ -4337,7 +4341,8 @@ static int mcp25xxfd_can_probe(struct spi_device *spi)
 				"PLL clock frequency %i would exceed limit\n",
 				priv->can.clock.freq
 				);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto out_clk;
 		}
 	}
 	if (priv->config.clock_div2)
@@ -4390,10 +4395,8 @@ static int mcp25xxfd_can_probe(struct spi_device *spi)
 	}
 	if (ret) {
 		if (ret == -ENODEV)
-			dev_err(&spi->dev,
-				"Cannot initialize MCP%x. Wrong wiring?\n",
-				priv->model);
-		//goto error_probe;
+			dev_dbg(&spi->dev, "MCP%x not detected\n", priv->model);
+		goto error_probe;
 	}
 
 	/* setting up GPIO+INT as PUSHPULL , TXCAN PUSH/PULL, no Standby */
@@ -4410,7 +4413,7 @@ static int mcp25xxfd_can_probe(struct spi_device *spi)
 	ret = mcp25xxfd_cmd_write(spi, MCP25XXFD_IOCON, priv->regs.iocon,
 				  priv->spi_setup_speed_hz);
 	if (ret)
-		return ret;
+		goto error_probe;
 
 	/* and put controller to sleep */
 	mcp25xxfd_hw_sleep(spi);
@@ -4435,7 +4438,8 @@ out_clk:
 
 out_free:
 	free_candev(net);
-	dev_err(&spi->dev, "Probe failed, err=%d\n", -ret);
+	if (ret != -ENODEV)
+		dev_err(&spi->dev, "Probe failed, err=%d\n", ret);
 	return ret;
 }
 

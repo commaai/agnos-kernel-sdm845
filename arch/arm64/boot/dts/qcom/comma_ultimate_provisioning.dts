@@ -147,7 +147,12 @@
   };
 
   can0: can@0 {
-    compatible = "ti,tcan4x5x";
+    /*
+     * Old boards populate an MCP2517FD here; new boards use a TCAN4551.
+     * Both drivers match this board-level compatible and only bind after
+     * validating the actual SPI device.
+     */
+    compatible = "commaai,ultimate-can";
     status = "okay";
     reg = <0>;
     clocks = <&clk40M>;
@@ -205,6 +210,17 @@
     gpios = <33 GPIO_ACTIVE_HIGH>;
     output-low;
     line-name = "can-reset";
+  };
+};
+
+/*
+ * The inherited camera-2 pinctrl state also lists GPIO28, despite the sensor's
+ * actual reset being GPIO12. Keep its MCLK pinctrl but leave CAN2_CS alone.
+ */
+&cam_cci {
+  qcom,cam-sensor@2 {
+    pinctrl-0 = <&cam_sensor_mclk2_active>;
+    pinctrl-1 = <&cam_sensor_mclk2_suspend>;
   };
 };
 
