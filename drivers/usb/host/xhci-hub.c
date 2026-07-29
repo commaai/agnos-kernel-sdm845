@@ -1202,14 +1202,6 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			/* Disable port */
 			if (link_state == USB_SS_PORT_LS_SS_DISABLED) {
 				xhci_dbg(xhci, "Disable port %d\n", wIndex);
-				slot_id = xhci_find_slot_id_by_port(hcd, xhci,
-						wIndex + 1);
-				if (slot_id) {
-					spin_unlock_irqrestore(&xhci->lock, flags);
-					xhci_stop_device(xhci, slot_id, 1);
-					spin_lock_irqsave(&xhci->lock, flags);
-					temp = readl(port_array[wIndex]);
-				}
 				temp = xhci_port_state_to_neutral(temp);
 				/*
 				 * Clear all change bits, so that we get a new
