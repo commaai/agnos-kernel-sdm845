@@ -59,4 +59,7 @@
 /* Device needs a pause after every control message. */
 #define USB_QUIRK_DELAY_CTRL_MSG		BIT(13)
 
+/* Device can't reliably resume from runtime autosuspend. */
+#define USB_QUIRK_NO_AUTOSUSPEND		BIT(14)
+
 #endif /* __LINUX_USB_QUIRKS_H */

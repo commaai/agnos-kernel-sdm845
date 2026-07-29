@@ -1536,6 +1536,9 @@ int usb_resume(struct device *dev, pm_message_t msg)
  */
 void usb_enable_autosuspend(struct usb_device *udev)
 {
+	if (udev->quirks & USB_QUIRK_NO_AUTOSUSPEND)
+		return;
+
 	pm_runtime_allow(&udev->dev);
 }
 EXPORT_SYMBOL_GPL(usb_enable_autosuspend);
@@ -1851,6 +1854,9 @@ int usb_runtime_suspend(struct device *dev)
 {
 	struct usb_device	*udev = to_usb_device(dev);
 	int			status;
+
+	if (udev->quirks & USB_QUIRK_NO_AUTOSUSPEND)
+		return -EBUSY;
 
 	/* A USB device can be suspended if it passes the various autosuspend
 	 * checks.  Runtime suspend for a USB device means suspending all the
