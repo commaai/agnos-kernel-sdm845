@@ -150,11 +150,6 @@
   };
 
   can0: can@0 {
-    /*
-     * Old boards populate an MCP2517FD here; new boards use a TCAN4551.
-     * Both drivers match this board-level compatible and only bind after
-     * validating the actual SPI device.
-     */
     compatible = "commaai,ultimate-can";
     status = "okay";
     reg = <0>;
@@ -164,11 +159,6 @@
     interrupts = <124 IRQ_TYPE_LEVEL_LOW>;
     pinctrl-names = "default";
     pinctrl-0 = <&can0_int_default>;
-    /*
-     * All four TCAN4551s share this active-high reset.  Only CS0 owns the
-     * GPIO, so its probe deasserts and resets the complete bank once.
-     * The MCP2517FD on old boards ignores this property.
-     */
     reset-gpios = <&tlmm 33 GPIO_ACTIVE_HIGH>;
     bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
     spi-max-frequency = <10000000>;
@@ -217,16 +207,7 @@
   };
 };
 
-/*
- * TCAN4551 INT_N is open-drain, but this board revision has no external
- * pull-ups. Use TLMM's 1.8 V pulls, matching the TCAN VIO supply.
- */
 &tlmm {
-  /*
-   * This kernel's SPI core toggles GPIO chip selects but does not configure
-   * their direction.  Initialize the three additional active-low selects as
-   * outputs so they can actually be asserted by gpio_set_value().
-   */
   can_cs_active: can-cs-active {
     mux {
       pins = "gpio27", "gpio28", "gpio29";
@@ -312,20 +293,12 @@
   };
 };
 
-/*
- * GPIO49 is CAN1_INT_N on this revision, not the secondary USB audio-switch
- * enable. These inherited pinctrl states would otherwise drive it as an output.
- */
 &usb1 {
   /delete-property/ pinctrl-names;
   /delete-property/ pinctrl-0;
   /delete-property/ pinctrl-1;
 };
 
-/*
- * The inherited camera-2 pinctrl state also lists GPIO28, despite the sensor's
- * actual reset being GPIO12. Keep its MCLK pinctrl but leave CAN2_CS alone.
- */
 &cam_cci {
   qcom,cam-sensor@2 {
     pinctrl-0 = <&cam_sensor_mclk2_active>;
