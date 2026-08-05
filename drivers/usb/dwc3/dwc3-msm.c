@@ -77,7 +77,7 @@ MODULE_PARM_DESC(cpu_to_affin, "affin usb irq to this cpu");
 #define USB3_HCCPARAMS2		(0x1c)
 #define HCC_CTC(p)		((p) & (1 << 3))
 #define USB3_PORTSC		(0x420)
-#define USB3_PORTLI		(0x428)
+#define USB3_PORTLI		(0x438)
 
 /**
  *  USB QSCRATCH Hardware registers
