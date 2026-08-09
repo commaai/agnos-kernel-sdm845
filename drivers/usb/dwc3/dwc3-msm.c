@@ -3898,9 +3898,20 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 	struct usb_device *udev = ptr;
 	union power_supply_propval pval;
 	unsigned int max_power;
+	bool direct_attach;
 
 	if (event != USB_DEVICE_ADD && event != USB_DEVICE_REMOVE)
 		return NOTIFY_DONE;
+
+	direct_attach = udev->parent && !udev->parent->parent &&
+			udev->dev.parent->parent == &dwc->xhci->dev;
+	if (direct_attach && udev->speed >= USB_SPEED_SUPER) {
+		if (event == USB_DEVICE_ADD)
+			usb_phy_notify_device_connect(mdwc->ss_phy, udev->speed);
+		else
+			usb_phy_notify_device_disconnect(mdwc->ss_phy,
+					udev->speed);
+	}
 
 	if (!mdwc->usb_psy) {
 		mdwc->usb_psy = power_supply_get_by_name("usb");
@@ -3913,8 +3924,7 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 	 * i.e. dwc -> xhci -> root_hub -> udev
 	 * root_hub's udev->parent==NULL, so traverse struct device hierarchy
 	 */
-	if (udev->parent && !udev->parent->parent &&
-			udev->dev.parent->parent == &dwc->xhci->dev) {
+	if (direct_attach) {
 		if (event == USB_DEVICE_ADD && udev->actconfig) {
 			if (!dwc3_msm_is_ss_rhport_connected(mdwc)) {
 				/*

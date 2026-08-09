@@ -110,6 +110,11 @@ struct qmp_reg_val {
 	u32 delay;
 };
 
+static const u32 rx_eq_adaptor_regs[][3] = {
+	{ 0x14d4, 0x14d8, 0x14dc },
+	{ 0x18d4, 0x18d8, 0x18dc },
+};
+
 struct msm_ssphy_qmp {
 	struct usb_phy		phy;
 	void __iomem		*base;
@@ -143,6 +148,12 @@ struct msm_ssphy_qmp {
 	int			init_seq_len;
 	unsigned int		*qmp_phy_reg_offset;
 	int			reg_offset_cnt;
+	u32			rx_eq_adaptor_saved[2][3];
+	u32			rx_eq_gain2_code;
+	bool			rx_eq_gain2_manual;
+	bool			rx_eq_ever_connected;
+	bool			rx_eq_disconnect_seen;
+	unsigned long		rx_eq_lock_deadline;
 };
 
 static const struct of_device_id msm_usb_id_table[] = {
@@ -484,6 +495,16 @@ static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 		return ret;
 	}
 
+	if (phy->rx_eq_gain2_manual) {
+		int lane, reg_idx;
+
+		for (lane = 0; lane < ARRAY_SIZE(rx_eq_adaptor_regs); lane++)
+			for (reg_idx = 0; reg_idx < 3; reg_idx++)
+				phy->rx_eq_adaptor_saved[lane][reg_idx] =
+					readl_relaxed(phy->base +
+						rx_eq_adaptor_regs[lane][reg_idx]);
+	}
+
 	/* perform software reset of PHY common logic */
 	if (phy->phy.type == USB_PHY_TYPE_USB3_AND_DP)
 		writel_relaxed(0x00,
@@ -716,6 +737,72 @@ static int msm_ssphy_qmp_notify_disconnect(struct usb_phy *uphy,
 	return 0;
 }
 
+static void msm_ssphy_qmp_apply_rx_eq_gain2(struct msm_ssphy_qmp *phy,
+					    bool manual)
+{
+	int lane, reg_idx;
+
+	for (lane = 0; lane < ARRAY_SIZE(rx_eq_adaptor_regs); lane++) {
+		if (manual) {
+			writel_relaxed((phy->rx_eq_adaptor_saved[lane][0] & 0x0f) |
+				0xe0, phy->base + rx_eq_adaptor_regs[lane][0]);
+			writel_relaxed((phy->rx_eq_adaptor_saved[lane][1] & ~0x07) |
+				0x04, phy->base + rx_eq_adaptor_regs[lane][1]);
+			writel_relaxed((phy->rx_eq_adaptor_saved[lane][2] & ~0x1f) |
+				0x10 | phy->rx_eq_gain2_code,
+				phy->base + rx_eq_adaptor_regs[lane][2]);
+		} else {
+			for (reg_idx = 0; reg_idx < 3; reg_idx++)
+				writel_relaxed(
+					phy->rx_eq_adaptor_saved[lane][reg_idx],
+					phy->base +
+						rx_eq_adaptor_regs[lane][reg_idx]);
+		}
+	}
+	wmb();
+}
+
+static int msm_ssphy_qmp_notify_device_connect(struct usb_phy *uphy,
+				       enum usb_device_speed speed)
+{
+	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
+					phy);
+	unsigned long delay_ms;
+
+	if (!phy->rx_eq_gain2_manual || speed < USB_SPEED_SUPER)
+		return 0;
+
+	if (phy->rx_eq_disconnect_seen &&
+	    time_before(jiffies, phy->rx_eq_lock_deadline))
+		delay_ms = jiffies_to_msecs(phy->rx_eq_lock_deadline - jiffies);
+	else if (phy->rx_eq_disconnect_seen)
+		delay_ms = 0;
+	else
+		delay_ms = 100;
+	if (delay_ms)
+		msleep(delay_ms);
+	msm_ssphy_qmp_apply_rx_eq_gain2(phy, true);
+	phy->rx_eq_ever_connected = true;
+	return 0;
+}
+
+static int msm_ssphy_qmp_notify_device_disconnect(struct usb_phy *uphy,
+					  enum usb_device_speed speed)
+{
+	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
+					phy);
+
+	if (!phy->rx_eq_gain2_manual || speed < USB_SPEED_SUPER)
+		return 0;
+	if (!phy->rx_eq_ever_connected)
+		return 0;
+
+	phy->rx_eq_disconnect_seen = true;
+	phy->rx_eq_lock_deadline = jiffies + msecs_to_jiffies(1500);
+	msm_ssphy_qmp_apply_rx_eq_gain2(phy, false);
+	return 0;
+}
+
 static int msm_ssphy_qmp_get_clks(struct msm_ssphy_qmp *phy, struct device *dev)
 {
 	int ret = 0;
@@ -942,6 +1029,12 @@ static int msm_ssphy_qmp_probe(struct platform_device *pdev)
 
 	phy->emulation = of_property_read_bool(dev->of_node,
 						"qcom,emulation");
+	if (!of_property_read_u32(dev->of_node,
+			"qcom,rx-eq-gain2-manual", &phy->rx_eq_gain2_code)) {
+		if (phy->rx_eq_gain2_code > 0x0f)
+			return -EINVAL;
+		phy->rx_eq_gain2_manual = true;
+	}
 	if (!phy->emulation) {
 		of_get_property(dev->of_node, "qcom,qmp-phy-init-seq", &size);
 		if (size) {
@@ -1059,6 +1152,8 @@ static int msm_ssphy_qmp_probe(struct platform_device *pdev)
 	phy->phy.set_suspend		= msm_ssphy_qmp_set_suspend;
 	phy->phy.notify_connect		= msm_ssphy_qmp_notify_connect;
 	phy->phy.notify_disconnect	= msm_ssphy_qmp_notify_disconnect;
+	phy->phy.notify_device_connect	= msm_ssphy_qmp_notify_device_connect;
+	phy->phy.notify_device_disconnect = msm_ssphy_qmp_notify_device_disconnect;
 
 	if (phy->phy.type == USB_PHY_TYPE_USB3_AND_DP)
 		phy->phy.reset		= msm_ssphy_qmp_dp_combo_reset;

@@ -139,6 +139,10 @@ struct usb_phy {
 			enum usb_device_speed speed);
 	int	(*notify_disconnect)(struct usb_phy *x,
 			enum usb_device_speed speed);
+	int	(*notify_device_connect)(struct usb_phy *x,
+			enum usb_device_speed speed);
+	int	(*notify_device_disconnect)(struct usb_phy *x,
+			enum usb_device_speed speed);
 
 	/* reset the PHY clocks */
 	int     (*reset)(struct usb_phy *x);
@@ -349,6 +353,25 @@ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
 {
 	if (x && x->notify_disconnect)
 		return x->notify_disconnect(x, speed);
+	else
+		return 0;
+}
+
+static inline int
+usb_phy_notify_device_connect(struct usb_phy *x, enum usb_device_speed speed)
+{
+	if (x && x->notify_device_connect)
+		return x->notify_device_connect(x, speed);
+	else
+		return 0;
+}
+
+static inline int
+usb_phy_notify_device_disconnect(struct usb_phy *x,
+			enum usb_device_speed speed)
+{
+	if (x && x->notify_device_disconnect)
+		return x->notify_device_disconnect(x, speed);
 	else
 		return 0;
 }
