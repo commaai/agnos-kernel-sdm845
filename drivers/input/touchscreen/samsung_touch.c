@@ -898,6 +898,7 @@ static struct i2c_driver ss_ts_driver = {
 	.driver = {
 		.name	= SS_I2C_NAME,
 		.of_match_table = of_match_ptr(ss_ts_dt_ids),
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe		= ss_ts_probe,
     .remove     = ss_ts_remove,

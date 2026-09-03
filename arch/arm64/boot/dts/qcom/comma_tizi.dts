@@ -131,6 +131,23 @@
   qcom,dsi-pref-prim-pan = <&dsi_ss_fhd_ea8074_cmd>;
 };
 
+&snd_934x {
+  qcom,comma-skip-tavil-init;
+  qcom,comma-minimal-audio;
+  qcom,comma-tertiary-capture;
+
+  qcom,audio-routing =
+    "HiFi Playback", "IN_L",
+    "HiFi Playback", "IN_R",
+    "OUT_L", "HiFi Capture",
+    "OUT_R", "HiFi Capture";
+
+  asoc-platform = <&pcm0>, <&routing>;
+  asoc-platform-names = "msm-pcm-dsp.0", "msm-pcm-routing";
+  asoc-cpu = <&dai_mi2s1>, <&dai_mi2s2>;
+  asoc-cpu-names = "msm-dai-q6-mi2s.1", "msm-dai-q6-mi2s.2";
+};
+
 /* Panel */
 &dsi_mate10_lite_video {
   qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;

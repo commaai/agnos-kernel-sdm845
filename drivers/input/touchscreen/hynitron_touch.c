@@ -294,6 +294,7 @@ static struct i2c_driver hyn_ts_driver = {
 	.driver = {
 		.name	= HYN_I2C_NAME,
 		.of_match_table = of_match_ptr(hyn_ts_dt_ids),
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe		= hyn_ts_probe,
     .remove     = hyn_ts_remove,

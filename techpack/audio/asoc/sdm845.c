@@ -6171,8 +6171,9 @@ static struct snd_soc_dai_link msm_tavil_snd_card_dai_links[
 #define MSM_COMMON_DAI_LINK_MEDIA1	0
 #define MSM_MI2S_DAI_LINK_SEC_RX	2
 #define MSM_MI2S_DAI_LINK_SEC_TX	3
+#define MSM_MI2S_DAI_LINK_TERT_TX	5
 
-static struct snd_soc_dai_link msm_mici_snd_card_dai_links[3];
+static struct snd_soc_dai_link msm_comma_snd_card_dai_links[3];
 
 #if 0
 static int msm_snd_card_tavil_late_probe(struct snd_soc_card *card)
@@ -6475,17 +6476,25 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 
 		if (of_property_read_bool(dev->of_node,
 					  "qcom,comma-minimal-audio")) {
-			total_links = ARRAY_SIZE(msm_mici_snd_card_dai_links);
-			memcpy(&msm_mici_snd_card_dai_links[0],
+			int capture_link = MSM_MI2S_DAI_LINK_SEC_TX;
+
+			if (of_property_read_bool(dev->of_node,
+						  "qcom,comma-tertiary-capture")) {
+				capture_link = MSM_MI2S_DAI_LINK_TERT_TX;
+				mi2s_tx_cfg[TERT_MI2S].channels = 2;
+			}
+
+			total_links = ARRAY_SIZE(msm_comma_snd_card_dai_links);
+			memcpy(&msm_comma_snd_card_dai_links[0],
 			       &msm_common_dai_links[MSM_COMMON_DAI_LINK_MEDIA1],
-			       sizeof(msm_mici_snd_card_dai_links[0]));
-			memcpy(&msm_mici_snd_card_dai_links[1],
+			       sizeof(msm_comma_snd_card_dai_links[0]));
+			memcpy(&msm_comma_snd_card_dai_links[1],
 			       &msm_mi2s_be_dai_links[MSM_MI2S_DAI_LINK_SEC_RX],
-			       sizeof(msm_mici_snd_card_dai_links[1]));
-			memcpy(&msm_mici_snd_card_dai_links[2],
-			       &msm_mi2s_be_dai_links[MSM_MI2S_DAI_LINK_SEC_TX],
-			       sizeof(msm_mici_snd_card_dai_links[2]));
-			dailink = msm_mici_snd_card_dai_links;
+			       sizeof(msm_comma_snd_card_dai_links[1]));
+			memcpy(&msm_comma_snd_card_dai_links[2],
+			       &msm_mi2s_be_dai_links[capture_link],
+			       sizeof(msm_comma_snd_card_dai_links[2]));
+			dailink = msm_comma_snd_card_dai_links;
 		} else {
 			len_1 = ARRAY_SIZE(msm_common_dai_links);
 			len_2 = len_1 + ARRAY_SIZE(msm_tavil_fe_dai_links);
