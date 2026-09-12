@@ -3576,6 +3576,17 @@ static int icnss_smmu_init(struct icnss_priv *priv)
 		goto attach_fail;
 	}
 
+	// COMMA: to turn off the wlan crash reboot on smmu fault
+	ret = iommu_domain_set_attr(mapping->domain,
+					DOMAIN_ATTR_NON_FATAL_FAULTS,
+					&fast);
+	if (ret < 0) {
+		icnss_pr_err("Set non fatal faults attribute failed, err = %d\n",
+					ret);
+		goto set_attr_fail;
+	}
+	icnss_pr_dbg("SMMU NON FATAL FAULTS map set\n");
+
 	priv->smmu_mapping = mapping;
 
 	return ret;
