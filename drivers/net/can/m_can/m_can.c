@@ -288,6 +288,9 @@ enum m_can_reg {
 #define TXE_ELEMENT_SIZE	8
 #define TXB_ELEMENT_SIZE	72
 
+/* the most words to read or write at once, a run of FIFO elements */
+#define M_CAN_FIFO_BATCH_WORDS	64
+
 /* Message RAM Elements */
 #define M_CAN_FIFO_ID		0x0
 #define M_CAN_FIFO_DLC		0x4
@@ -331,17 +334,6 @@ static inline void m_can_write(struct m_can_classdev *cdev, enum m_can_reg reg,
 	cdev->ops->write_reg(cdev, reg, val);
 }
 
-static u32 m_can_fifo_read(struct m_can_classdev *cdev,
-			   u32 fgi, unsigned int offset)
-{
-	u32 addr_offset = cdev->mcfg[MRAM_RXF0].off + fgi * RXF0_ELEMENT_SIZE +
-			  offset;
-	u32 val;
-
-	cdev->ops->read_fifo(cdev, addr_offset, &val, 1);
-	return val;
-}
-
 static void m_can_fifo_write(struct m_can_classdev *cdev,
 			     u32 fpi, unsigned int offset, u32 val)
 {
@@ -355,16 +347,6 @@ static inline void m_can_fifo_write_no_off(struct m_can_classdev *cdev,
 					   u32 fpi, u32 val)
 {
 	cdev->ops->write_fifo(cdev, fpi, &val, 1);
-}
-
-static u32 m_can_txe_fifo_read(struct m_can_classdev *cdev, u32 fgi, u32 offset)
-{
-	u32 addr_offset = cdev->mcfg[MRAM_TXE].off + fgi * TXE_ELEMENT_SIZE +
-			  offset;
-	u32 val;
-
-	cdev->ops->read_fifo(cdev, addr_offset, &val, 1);
-	return val;
 }
 
 static inline bool m_can_tx_fifo_full(struct m_can_classdev *cdev)
@@ -436,20 +418,29 @@ static void m_can_clean(struct net_device *net)
 		can_free_echo_skb(cdev->net, putidx);
 		cdev->tx_skb = NULL;
 	}
+
+	if (cdev->is_peripheral) {
+		int i;
+
+		/* the frames in flight are gone, free their echo skbs, or
+		 * their FIFO elements can't be used again
+		 */
+		cancel_work_sync(&cdev->tx_work);
+		for (i = 0; i < cdev->can.echo_skb_max; i++)
+			can_free_echo_skb(net, i);
+		net->stats.tx_errors += skb_queue_len(&cdev->tx_skbs);
+		skb_queue_purge(&cdev->tx_skbs);
+	}
 }
 
-static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
+/* receive the RX FIFO element in elem */
+static void m_can_read_fifo(struct net_device *dev, const u32 *elem)
 {
 	struct net_device_stats *stats = &dev->stats;
-	struct m_can_classdev *cdev = netdev_priv(dev);
 	struct canfd_frame *cf;
 	struct sk_buff *skb;
-	u32 id, fgi, dlc;
-	int i;
+	u32 id = elem[0], dlc = elem[1];
 
-	/* calculate the fifo get index for where to read data */
-	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_SHIFT;
-	dlc = m_can_fifo_read(cdev, fgi, M_CAN_FIFO_DLC);
 	if (dlc & RX_BUF_FDF)
 		skb = alloc_canfd_skb(dev, &cf);
 	else
@@ -464,7 +455,6 @@ static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
 	else
 		cf->len = get_can_dlc((dlc >> 16) & 0x0F);
 
-	id = m_can_fifo_read(cdev, fgi, M_CAN_FIFO_ID);
 	if (id & RX_BUF_XTD)
 		cf->can_id = (id & CAN_EFF_MASK) | CAN_EFF_FLAG;
 	else
@@ -481,14 +471,8 @@ static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
 		if (dlc & RX_BUF_BRS)
 			cf->flags |= CANFD_BRS;
 
-		for (i = 0; i < cf->len; i += 4)
-			*(u32 *)(cf->data + i) =
-				m_can_fifo_read(cdev, fgi,
-						M_CAN_FIFO_DATA(i / 4));
+		memcpy(cf->data, &elem[2], cf->len);
 	}
-
-	/* acknowledge rx fifo 0 */
-	m_can_write(cdev, M_CAN_RXF0A, fgi);
 
 	stats->rx_packets++;
 	stats->rx_bytes += cf->len;
@@ -499,8 +483,9 @@ static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
 static int m_can_do_rx_poll(struct net_device *dev, int quota)
 {
 	struct m_can_classdev *cdev = netdev_priv(dev);
-	u32 pkts = 0;
-	u32 rxfs;
+	u32 words = RXF0_ELEMENT_SIZE / 4, num = cdev->mcfg[MRAM_RXF0].num;
+	u32 buf[M_CAN_FIFO_BATCH_WORDS];
+	u32 pkts = 0, rxfs, fgi, n, i;
 
 	rxfs = m_can_read(cdev, M_CAN_RXF0S);
 	if (!(rxfs & RXFS_FFL_MASK)) {
@@ -512,10 +497,27 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
 		if (rxfs & RXFS_RFL)
 			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
 
-		m_can_read_fifo(dev, rxfs);
+		/* read the elements up to the end of the fifo at once */
+		fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_SHIFT;
+		n = min3(rxfs & RXFS_FFL_MASK, num - fgi,
+			 (u32)ARRAY_SIZE(buf) / words);
+		n = min_t(u32, n, quota);
+		cdev->ops->read_fifo(cdev, cdev->mcfg[MRAM_RXF0].off +
+				     fgi * RXF0_ELEMENT_SIZE, buf, n * words);
+		for (i = 0; i < n; i++)
+			m_can_read_fifo(dev, &buf[i * words]);
 
-		quota--;
-		pkts++;
+		/* acking an element acks the ones before it too */
+		m_can_write(cdev, M_CAN_RXF0A, fgi + n - 1);
+
+		quota -= n;
+		pkts += n;
+
+		/* a peripheral's ISR acked RF0N before getting here, so newer
+		 * frames interrupt again
+		 */
+		if (cdev->is_peripheral && n == (rxfs & RXFS_FFL_MASK))
+			break;
 		rxfs = m_can_read(cdev, M_CAN_RXF0S);
 	}
 
@@ -850,7 +852,7 @@ static int m_can_rx_peripheral(struct net_device *dev)
 {
 	struct m_can_classdev *cdev = netdev_priv(dev);
 
-	m_can_rx_handler(dev, 1);
+	m_can_rx_handler(dev, INT_MAX);
 
 	m_can_enable_all_interrupts(cdev);
 
@@ -874,39 +876,36 @@ static int m_can_poll(struct napi_struct *napi, int quota)
 
 static void m_can_echo_tx_event(struct net_device *dev)
 {
-	u32 txe_count = 0;
-	u32 m_can_txefs;
-	u32 fgi = 0;
-	int i = 0;
-	unsigned int msg_mark;
-
 	struct m_can_classdev *cdev = netdev_priv(dev);
 	struct net_device_stats *stats = &dev->stats;
+	u32 num = cdev->mcfg[MRAM_TXE].num;
+	u32 buf[M_CAN_FIFO_BATCH_WORDS];
+	u32 txefs, fgi, count, n, i;
 
-	/* read tx event fifo status */
-	m_can_txefs = m_can_read(cdev, M_CAN_TXEFS);
+	txefs = m_can_read(cdev, M_CAN_TXEFS);
+	fgi = (txefs & TXEFS_EFGI_MASK) >> TXEFS_EFGI_SHIFT;
+	count = (txefs & TXEFS_EFFL_MASK) >> TXEFS_EFFL_SHIFT;
 
-	/* Get Tx Event fifo element count */
-	txe_count = (m_can_txefs & TXEFS_EFFL_MASK)
-			>> TXEFS_EFFL_SHIFT;
+	while (count) {
+		/* read the events up to the end of the fifo at once */
+		n = min3(count, num - fgi, (u32)ARRAY_SIZE(buf) / 2);
+		cdev->ops->read_fifo(cdev, cdev->mcfg[MRAM_TXE].off +
+				     fgi * TXE_ELEMENT_SIZE, buf, n * 2);
 
-	/* Get and process all sent elements */
-	for (i = 0; i < txe_count; i++) {
-		/* retrieve get index */
-		fgi = (m_can_read(cdev, M_CAN_TXEFS) & TXEFS_EFGI_MASK)
-			>> TXEFS_EFGI_SHIFT;
-
-		/* get message marker */
-		msg_mark = (m_can_txe_fifo_read(cdev, fgi, 4) &
-			    TX_EVENT_MM_MASK) >> TX_EVENT_MM_SHIFT;
-
-		/* ack txe element */
+		/* acking an element acks the ones before it too */
 		m_can_write(cdev, M_CAN_TXEFA, (TXEFA_EFAI_MASK &
-						(fgi << TXEFA_EFAI_SHIFT)));
+						((fgi + n - 1) << TXEFA_EFAI_SHIFT)));
 
-		/* update stats */
-		stats->tx_bytes += can_get_echo_skb(dev, msg_mark);
-		stats->tx_packets++;
+		/* the message marker is the echo skb index */
+		for (i = 0; i < n; i++) {
+			stats->tx_bytes += can_get_echo_skb(dev,
+				(buf[2 * i + 1] & TX_EVENT_MM_MASK) >>
+				TX_EVENT_MM_SHIFT);
+			stats->tx_packets++;
+		}
+
+		count -= n;
+		fgi = (fgi + n) % num;
 	}
 }
 
@@ -955,8 +954,11 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 			/* New TX FIFO Element arrived */
 			m_can_echo_tx_event(dev);
 			can_led_event(dev, CAN_LED_EVENT_TX);
-			if (netif_queue_stopped(dev) &&
-			    !m_can_tx_fifo_full(cdev))
+			if (cdev->is_peripheral)
+				/* the TX work wakes the queue */
+				queue_work(cdev->tx_wq, &cdev->tx_work);
+			else if (netif_queue_stopped(dev) &&
+				 !m_can_tx_fifo_full(cdev))
 				netif_wake_queue(dev);
 		}
 	}
@@ -1391,6 +1393,7 @@ static int m_can_close(struct net_device *dev)
 		cdev->tx_skb = NULL;
 		destroy_workqueue(cdev->tx_wq);
 		cdev->tx_wq = NULL;
+		skb_queue_purge(&cdev->tx_skbs);
 	}
 
 	close_candev(dev);
@@ -1532,13 +1535,74 @@ static netdev_tx_t m_can_tx_handler(struct m_can_classdev *cdev)
 	return NETDEV_TX_OK;
 }
 
+/* peripherals: write the queued frames to the TX FIFO, consecutive elements
+ * at once, and request them all with one TXBAR write
+ */
 static void m_can_tx_work_queue(struct work_struct *ws)
 {
 	struct m_can_classdev *cdev = container_of(ws, struct m_can_classdev,
 						tx_work);
+	struct net_device *dev = cdev->net;
+	u32 words = TXB_ELEMENT_SIZE / 4, num = cdev->mcfg[MRAM_TXB].num;
+	u32 buf[M_CAN_FIFO_BATCH_WORDS];
+	u32 txfqs, free, putidx, start, n = 0, txbar = 0;
+	struct canfd_frame *cf;
+	struct sk_buff *skb;
 
-	m_can_tx_handler(cdev);
-	cdev->tx_skb = NULL;
+	txfqs = m_can_read(cdev, M_CAN_TXFQS);
+	free = (txfqs & TXFQS_TFFL_MASK) >> TXFQS_TFFL_SHIFT;
+	putidx = (txfqs & TXFQS_TFQPI_MASK) >> TXFQS_TFQPI_SHIFT;
+	start = putidx;
+
+	/* an element's echo skb is freed when its TX event is handled */
+	while (free && !cdev->can.echo_skb[putidx] &&
+	       (skb = skb_dequeue(&cdev->tx_skbs))) {
+		u32 *elem = &buf[n * words];
+
+		cf = (struct canfd_frame *)skb->data;
+		if (cf->can_id & CAN_EFF_FLAG)
+			elem[0] = (cf->can_id & CAN_EFF_MASK) | TX_BUF_XTD;
+		else
+			elem[0] = (cf->can_id & CAN_SFF_MASK) << 18;
+		if (cf->can_id & CAN_RTR_FLAG)
+			elem[0] |= TX_BUF_RTR;
+
+		/* the put index is the message marker, to find the echo skb
+		 * when the TX event comes back
+		 */
+		elem[1] = ((putidx << TX_BUF_MM_SHIFT) & TX_BUF_MM_MASK) |
+			  (can_len2dlc(cf->len) << 16) | TX_BUF_EFC;
+		if (can_is_canfd_skb(skb)) {
+			elem[1] |= TX_BUF_FDF;
+			if (cf->flags & CANFD_BRS)
+				elem[1] |= TX_BUF_BRS;
+		}
+		memset(&elem[2], 0, (words - 2) * 4);
+		memcpy(&elem[2], cf->data, cf->len);
+
+		can_put_echo_skb(skb, dev, putidx);
+
+		txbar |= BIT(putidx);
+		putidx = (putidx + 1) % num;
+		free--;
+		n++;
+
+		if (putidx == 0 || (n + 1) * words > ARRAY_SIZE(buf)) {
+			cdev->ops->write_fifo(cdev, cdev->mcfg[MRAM_TXB].off +
+					      start * TXB_ELEMENT_SIZE, buf,
+					      n * words);
+			start = putidx;
+			n = 0;
+		}
+	}
+	if (n)
+		cdev->ops->write_fifo(cdev, cdev->mcfg[MRAM_TXB].off +
+				      start * TXB_ELEMENT_SIZE, buf, n * words);
+	if (txbar)
+		m_can_write(cdev, M_CAN_TXBAR, txbar);
+
+	if (skb_queue_len(&cdev->tx_skbs) < cdev->can.echo_skb_max)
+		netif_wake_queue(dev);
 }
 
 static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
@@ -1550,23 +1614,19 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 
 	if (cdev->is_peripheral) {
-		if (cdev->tx_skb) {
-			netdev_err(dev, "hard_xmit called while tx busy\n");
-			return NETDEV_TX_BUSY;
+		if (cdev->can.state == CAN_STATE_BUS_OFF) {
+			kfree_skb(skb);
+			dev->stats.tx_dropped++;
+			return NETDEV_TX_OK;
 		}
 
-		if (cdev->can.state == CAN_STATE_BUS_OFF) {
-			m_can_clean(dev);
-		} else {
-			/* Need to stop the queue to avoid numerous requests
-			 * from being sent.  Suggested improvement is to create
-			 * a queueing mechanism that will queue the skbs and
-			 * process them in order.
-			 */
-			cdev->tx_skb = skb;
-			netif_stop_queue(cdev->net);
-			queue_work(cdev->tx_wq, &cdev->tx_work);
-		}
+		/* register access can sleep, so the TX work writes the frames,
+		 * a TX FIFO's worth at a time
+		 */
+		skb_queue_tail(&cdev->tx_skbs, skb);
+		if (skb_queue_len(&cdev->tx_skbs) >= cdev->can.echo_skb_max)
+			netif_stop_queue(dev);
+		queue_work(cdev->tx_wq, &cdev->tx_work);
 	} else {
 		cdev->tx_skb = skb;
 		return m_can_tx_handler(cdev);
@@ -1594,6 +1654,7 @@ static int m_can_open(struct net_device *dev)
 	/* register interrupt handler */
 	if (cdev->is_peripheral) {
 		cdev->tx_skb = NULL;
+		skb_queue_head_init(&cdev->tx_skbs);
 		cdev->tx_wq = alloc_workqueue("mcan_wq",
 					      WQ_FREEZABLE | WQ_MEM_RECLAIM, 0);
 		if (!cdev->tx_wq) {

@@ -81,6 +81,8 @@ struct m_can_classdev {
 	struct workqueue_struct *tx_wq;
 	struct work_struct tx_work;
 	struct sk_buff *tx_skb;
+	/* peripherals: frames waiting for the TX work */
+	struct sk_buff_head tx_skbs;
 
 	struct can_bittiming_const *bit_timing;
 	struct can_bittiming_const *data_timing;
