@@ -807,9 +807,12 @@ static int m_can_rx_handler(struct net_device *dev, int quota)
 {
 	struct m_can_classdev *cdev = netdev_priv(dev);
 	int work_done = 0;
-	u32 irqstatus, psr;
+	u32 irqstatus, psr = 0;
 
-	irqstatus = cdev->irqstatus | m_can_read(cdev, M_CAN_IR);
+	/* a peripheral's ISR just read IR, anything newer interrupts again */
+	irqstatus = cdev->irqstatus;
+	if (!cdev->is_peripheral)
+		irqstatus |= m_can_read(cdev, M_CAN_IR);
 	if (!irqstatus)
 		goto end;
 
@@ -834,7 +837,8 @@ static int m_can_rx_handler(struct net_device *dev, int quota)
 		}
 	}
 
-	psr = m_can_read(cdev, M_CAN_PSR);
+	if (irqstatus & (IR_ERR_STATE | IR_ERR_BUS_30X))
+		psr = m_can_read(cdev, M_CAN_PSR);
 
 	if (irqstatus & IR_ERR_STATE)
 		work_done += m_can_handle_state_errors(dev, psr);
@@ -850,11 +854,7 @@ end:
 
 static int m_can_rx_peripheral(struct net_device *dev)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
-
 	m_can_rx_handler(dev, INT_MAX);
-
-	m_can_enable_all_interrupts(cdev);
 
 	return 0;
 }
@@ -917,8 +917,16 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 	u32 ir;
 
 	ir = m_can_read(cdev, M_CAN_IR);
-	if (!ir)
+	if (!ir) {
+		/* the level IRQ of a peripheral can also be its own, clear
+		 * those too or it never deasserts
+		 */
+		if (cdev->is_peripheral && cdev->ops->clear_interrupts) {
+			cdev->ops->clear_interrupts(cdev);
+			return IRQ_HANDLED;
+		}
 		return IRQ_NONE;
+	}
 
 	/* ACK all irqs */
 	if (ir & IR_ALL_INT)
@@ -934,11 +942,15 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 	 */
 	if ((ir & IR_RF0N) || (ir & IR_ERR_ALL_30X)) {
 		cdev->irqstatus = ir;
-		m_can_disable_all_interrupts(cdev);
-		if (!cdev->is_peripheral)
+		if (!cdev->is_peripheral) {
+			m_can_disable_all_interrupts(cdev);
 			napi_schedule(&cdev->napi);
-		else
+		} else {
+			/* the threaded IRQ is oneshot, the line stays masked
+			 * until this returns
+			 */
 			m_can_rx_peripheral(dev);
+		}
 	}
 
 	if (cdev->version == 30) {
@@ -1208,6 +1220,16 @@ static void m_can_chip_config(struct net_device *dev)
 				    ~(IR_ERR_LEC_31X));
 	else
 		m_can_write(cdev, M_CAN_IE, IR_ALL_INT);
+
+	/* every interrupt costs bus accesses on peripherals, so don't take
+	 * the ones that aren't handled: TX complete, TX FIFO empty, timestamp
+	 * wraparound, the FIFO watermarks/full and the unused RX FIFO 1/buffers
+	 */
+	if (cdev->is_peripheral)
+		m_can_write(cdev, M_CAN_IE, m_can_read(cdev, M_CAN_IE) &
+			    ~(IR_TC | IR_TCF | IR_TFE | IR_TSW | IR_HPM |
+			      IR_TEFW | IR_TEFF | IR_RF0W | IR_RF0F |
+			      IR_RF1N | IR_RF1W | IR_RF1F | IR_RF1L | IR_DRX));
 
 	/* route all interrupts to INT0 */
 	m_can_write(cdev, M_CAN_ILS, ILS_ALL_INT0);
