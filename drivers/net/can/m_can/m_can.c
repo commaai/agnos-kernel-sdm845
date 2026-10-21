@@ -421,6 +421,17 @@ static void m_can_clean(struct net_device *net)
 {
 	struct m_can_classdev *cdev = netdev_priv(net);
 
+	if (cdev->is_peripheral) {
+		int i;
+
+		net->stats.tx_errors += atomic_read(&cdev->tx_pending);
+		skb_queue_purge(&cdev->tx_q);
+		for (i = 0; i < cdev->can.echo_skb_max; i++)
+			can_free_echo_skb(net, i);
+		atomic_set(&cdev->tx_pending, 0);
+		return;
+	}
+
 	if (cdev->tx_skb) {
 		int putidx = 0;
 
@@ -846,7 +857,7 @@ static int m_can_rx_peripheral(struct net_device *dev)
 {
 	struct m_can_classdev *cdev = netdev_priv(dev);
 
-	m_can_rx_handler(dev, 1);
+	m_can_rx_handler(dev, M_CAN_NAPI_WEIGHT);
 
 	m_can_enable_all_interrupts(cdev);
 
@@ -868,42 +879,34 @@ static int m_can_poll(struct napi_struct *napi, int quota)
 	return work_done;
 }
 
-static void m_can_echo_tx_event(struct net_device *dev)
+static int m_can_echo_tx_event(struct net_device *dev)
 {
-	u32 txe_count = 0;
-	u32 m_can_txefs;
-	u32 fgi = 0;
-	int i = 0;
-	unsigned int msg_mark;
-
 	struct m_can_classdev *cdev = netdev_priv(dev);
 	struct net_device_stats *stats = &dev->stats;
+	u32 txefs, fgi = 0, msg_mark;
+	int i, count;
 
-	/* read tx event fifo status */
-	m_can_txefs = m_can_read(cdev, M_CAN_TXEFS);
+	txefs = m_can_read(cdev, M_CAN_TXEFS);
+	count = (txefs & TXEFS_EFFL_MASK) >> TXEFS_EFFL_SHIFT;
+	fgi = (txefs & TXEFS_EFGI_MASK) >> TXEFS_EFGI_SHIFT;
 
-	/* Get Tx Event fifo element count */
-	txe_count = (m_can_txefs & TXEFS_EFFL_MASK)
-			>> TXEFS_EFFL_SHIFT;
-
-	/* Get and process all sent elements */
-	for (i = 0; i < txe_count; i++) {
-		/* retrieve get index */
-		fgi = (m_can_read(cdev, M_CAN_TXEFS) & TXEFS_EFGI_MASK)
-			>> TXEFS_EFGI_SHIFT;
-
-		/* get message marker */
+	for (i = 0; i < count; i++) {
 		msg_mark = (m_can_txe_fifo_read(cdev, fgi, 4) &
 			    TX_EVENT_MM_MASK) >> TX_EVENT_MM_SHIFT;
-
-		/* ack txe element */
-		m_can_write(cdev, M_CAN_TXEFA, (TXEFA_EFAI_MASK &
-						(fgi << TXEFA_EFAI_SHIFT)));
-
-		/* update stats */
-		stats->tx_bytes += can_get_echo_skb(dev, msg_mark);
+		if (msg_mark < cdev->can.echo_skb_max)
+			stats->tx_bytes += can_get_echo_skb(dev, msg_mark);
 		stats->tx_packets++;
+		if (i == count - 1)
+			break;
+		fgi = (fgi + 1) % cdev->mcfg[MRAM_TXE].num;
 	}
+
+	/* acknowledging the last element releases all before it */
+	if (count)
+		m_can_write(cdev, M_CAN_TXEFA, TXEFA_EFAI_MASK &
+			    (fgi << TXEFA_EFAI_SHIFT));
+
+	return count;
 }
 
 static irqreturn_t m_can_isr(int irq, void *dev_id)
@@ -949,11 +952,18 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 	} else  {
 		if (ir & IR_TEFN) {
 			/* New TX FIFO Element arrived */
-			m_can_echo_tx_event(dev);
+			int done = m_can_echo_tx_event(dev);
+
 			can_led_event(dev, CAN_LED_EVENT_TX);
-			if (netif_queue_stopped(dev) &&
-			    !m_can_tx_fifo_full(cdev))
+			if (cdev->is_peripheral) {
+				atomic_sub(done, &cdev->tx_pending);
+				if (atomic_read(&cdev->tx_pending) <
+				    cdev->mcfg[MRAM_TXB].num)
+					netif_wake_queue(dev);
+			} else if (netif_queue_stopped(dev) &&
+				   !m_can_tx_fifo_full(cdev)) {
 				netif_wake_queue(dev);
+			}
 		}
 	}
 
@@ -1387,6 +1397,8 @@ static int m_can_close(struct net_device *dev)
 		cdev->tx_skb = NULL;
 		destroy_workqueue(cdev->tx_wq);
 		cdev->tx_wq = NULL;
+		skb_queue_purge(&cdev->tx_q);
+		atomic_set(&cdev->tx_pending, 0);
 	}
 
 	close_candev(dev);
@@ -1528,13 +1540,72 @@ static netdev_tx_t m_can_tx_handler(struct m_can_classdev *cdev)
 	return NETDEV_TX_OK;
 }
 
+/* write one frame into tx fifo element putidx, one bus transaction if possible */
+static void m_can_tx_write_element(struct m_can_classdev *cdev,
+				   struct sk_buff *skb, u32 putidx)
+{
+	struct canfd_frame *cf = (struct canfd_frame *)skb->data;
+	u32 buf[2 + CANFD_MAX_DLEN / 4];
+	u32 id, fdflags = 0;
+	int i, words;
+
+	if (cf->can_id & CAN_EFF_FLAG)
+		id = (cf->can_id & CAN_EFF_MASK) | TX_BUF_XTD;
+	else
+		id = (cf->can_id & CAN_SFF_MASK) << 18;
+	if (cf->can_id & CAN_RTR_FLAG)
+		id |= TX_BUF_RTR;
+
+	if (can_is_canfd_skb(skb)) {
+		fdflags |= TX_BUF_FDF;
+		if (cf->flags & CANFD_BRS)
+			fdflags |= TX_BUF_BRS;
+	}
+
+	words = DIV_ROUND_UP(cf->len, 4);
+	buf[0] = id;
+	buf[1] = ((putidx << TX_BUF_MM_SHIFT) & TX_BUF_MM_MASK) |
+		 (can_len2dlc(cf->len) << 16) | fdflags | TX_BUF_EFC;
+	memset(&buf[2], 0, words * 4);
+	memcpy(&buf[2], cf->data, cf->len);
+
+	if (cdev->ops->write_fifo_bulk) {
+		cdev->ops->write_fifo_bulk(cdev, cdev->mcfg[MRAM_TXB].off +
+					   putidx * TXB_ELEMENT_SIZE, buf,
+					   2 + words);
+	} else {
+		for (i = 0; i < 2 + words; i++)
+			m_can_fifo_write(cdev, putidx, i * 4, buf[i]);
+	}
+}
+
 static void m_can_tx_work_queue(struct work_struct *ws)
 {
 	struct m_can_classdev *cdev = container_of(ws, struct m_can_classdev,
 						tx_work);
+	struct net_device *dev = cdev->net;
+	u32 num = cdev->mcfg[MRAM_TXB].num;
+	struct sk_buff *skb;
+	u32 txbar = 0;
+	int putidx = -1;
 
-	m_can_tx_handler(cdev);
-	cdev->tx_skb = NULL;
+	/* tx_pending caps queued + in fifo at the fifo size, so every element
+	 * written here is free. TFQPI only advances on TXBAR, so read it once
+	 * and count up for the rest of the batch
+	 */
+	while ((skb = skb_dequeue(&cdev->tx_q))) {
+		if (putidx < 0)
+			putidx = (m_can_read(cdev, M_CAN_TXFQS) &
+				  TXFQS_TFQPI_MASK) >> TXFQS_TFQPI_SHIFT;
+
+		m_can_tx_write_element(cdev, skb, putidx);
+		can_put_echo_skb(skb, dev, putidx);
+		txbar |= BIT(putidx);
+		putidx = (putidx + 1) % num;
+	}
+
+	if (txbar)
+		m_can_write(cdev, M_CAN_TXBAR, txbar);
 }
 
 static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
@@ -1546,23 +1617,23 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 
 	if (cdev->is_peripheral) {
-		if (cdev->tx_skb) {
-			netdev_err(dev, "hard_xmit called while tx busy\n");
-			return NETDEV_TX_BUSY;
-		}
+		u32 num = cdev->mcfg[MRAM_TXB].num;
 
 		if (cdev->can.state == CAN_STATE_BUS_OFF) {
-			m_can_clean(dev);
-		} else {
-			/* Need to stop the queue to avoid numerous requests
-			 * from being sent.  Suggested improvement is to create
-			 * a queueing mechanism that will queue the skbs and
-			 * process them in order.
-			 */
-			cdev->tx_skb = skb;
-			netif_stop_queue(cdev->net);
-			queue_work(cdev->tx_wq, &cdev->tx_work);
+			kfree_skb(skb);
+			dev->stats.tx_dropped++;
+			return NETDEV_TX_OK;
 		}
+
+		skb_queue_tail(&cdev->tx_q, skb);
+		if (atomic_inc_return(&cdev->tx_pending) >= num) {
+			netif_stop_queue(dev);
+			/* the isr may have freed room before we stopped */
+			smp_mb__after_atomic();
+			if (atomic_read(&cdev->tx_pending) < num)
+				netif_wake_queue(dev);
+		}
+		queue_work(cdev->tx_wq, &cdev->tx_work);
 	} else {
 		cdev->tx_skb = skb;
 		return m_can_tx_handler(cdev);
@@ -1590,8 +1661,10 @@ static int m_can_open(struct net_device *dev)
 	/* register interrupt handler */
 	if (cdev->is_peripheral) {
 		cdev->tx_skb = NULL;
+		skb_queue_head_init(&cdev->tx_q);
+		atomic_set(&cdev->tx_pending, 0);
 		cdev->tx_wq = alloc_workqueue("mcan_wq",
-					      WQ_FREEZABLE | WQ_MEM_RECLAIM, 0);
+					      WQ_FREEZABLE | WQ_MEM_RECLAIM | WQ_HIGHPRI, 0);
 		if (!cdev->tx_wq) {
 			err = -ENOMEM;
 			goto out_wq_fail;
