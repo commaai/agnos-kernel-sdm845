@@ -363,15 +363,8 @@ static int tcan4x5x_init(struct m_can_classdev *cdev)
 	if (ret)
 		return ret;
 
-	ret = regmap_update_bits(tcan4x5x->regmap, TCAN4X5X_CONFIG,
-				 TCAN4X5X_MODE_SEL_MASK, TCAN4X5X_MODE_NORMAL);
-	if (ret)
-		return ret;
-
-	/* Zero out the MCAN buffers */
-	m_can_init_ram(cdev);
-
-	return ret;
+	return regmap_update_bits(tcan4x5x->regmap, TCAN4X5X_CONFIG,
+				  TCAN4X5X_MODE_SEL_MASK, TCAN4X5X_MODE_NORMAL);
 }
 
 static int tcan4x5x_parse_config(struct m_can_classdev *cdev)
