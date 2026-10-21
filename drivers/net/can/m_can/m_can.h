@@ -51,6 +51,9 @@ enum m_can_mram_cfg {
 	MRAM_CFG_NUM,
 };
 
+/* message ram configuration data length */
+#define MRAM_CFG_LEN	8
+
 /* address offset and element number for each FIFO/Buffer in the Message RAM */
 struct mram_cfg {
 	u16 off;
@@ -99,6 +102,9 @@ struct m_can_classdev {
 	int is_peripheral;
 
 	struct mram_cfg mcfg[MRAM_CFG_NUM];
+	/* the DT's message RAM config, laid out with RX/TX elements this big */
+	u32 mram_cfg_vals[MRAM_CFG_LEN];
+	u32 elem_size;
 };
 
 struct m_can_classdev *m_can_class_allocate_dev(struct device *dev);

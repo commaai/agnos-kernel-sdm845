@@ -79,9 +79,6 @@ enum m_can_reg {
 /* napi related */
 #define M_CAN_NAPI_WEIGHT	64
 
-/* message ram configuration data length */
-#define MRAM_CFG_LEN	8
-
 /* Core Release Register (CREL) */
 #define CREL_REL_SHIFT		28
 #define CREL_REL_MASK		(0xF << CREL_REL_SHIFT)
@@ -282,14 +279,17 @@ enum m_can_reg {
 /* Message RAM Configuration (in bytes) */
 #define SIDF_ELEMENT_SIZE	4
 #define XIDF_ELEMENT_SIZE	8
-#define RXF0_ELEMENT_SIZE	72
-#define RXF1_ELEMENT_SIZE	72
-#define RXB_ELEMENT_SIZE	72
 #define TXE_ELEMENT_SIZE	8
-#define TXB_ELEMENT_SIZE	72
+/* RX FIFO, RX buffer and TX buffer elements: ID, DLC and the data field */
+#define M_CAN_ELEMENT_SIZE(data_len)	(8 + (data_len))
 
 /* the most words to read or write at once, a run of FIFO elements */
 #define M_CAN_FIFO_BATCH_WORDS	64
+
+/* the most FIFO elements the registers can configure */
+#define M_CAN_RXF_MAX		64
+#define M_CAN_TXE_MAX		32
+#define M_CAN_TXB_MAX		32
 
 /* Message RAM Elements */
 #define M_CAN_FIFO_ID		0x0
@@ -337,7 +337,7 @@ static inline void m_can_write(struct m_can_classdev *cdev, enum m_can_reg reg,
 static void m_can_fifo_write(struct m_can_classdev *cdev,
 			     u32 fpi, unsigned int offset, u32 val)
 {
-	u32 addr_offset = cdev->mcfg[MRAM_TXB].off + fpi * TXB_ELEMENT_SIZE +
+	u32 addr_offset = cdev->mcfg[MRAM_TXB].off + fpi * cdev->elem_size +
 			  offset;
 
 	cdev->ops->write_fifo(cdev, addr_offset, &val, 1);
@@ -483,7 +483,7 @@ static void m_can_read_fifo(struct net_device *dev, const u32 *elem)
 static int m_can_do_rx_poll(struct net_device *dev, int quota)
 {
 	struct m_can_classdev *cdev = netdev_priv(dev);
-	u32 words = RXF0_ELEMENT_SIZE / 4, num = cdev->mcfg[MRAM_RXF0].num;
+	u32 words = cdev->elem_size / 4, num = cdev->mcfg[MRAM_RXF0].num;
 	u32 buf[M_CAN_FIFO_BATCH_WORDS];
 	u32 pkts = 0, rxfs, fgi, n, i;
 
@@ -503,7 +503,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
 			 (u32)ARRAY_SIZE(buf) / words);
 		n = min_t(u32, n, quota);
 		cdev->ops->read_fifo(cdev, cdev->mcfg[MRAM_RXF0].off +
-				     fgi * RXF0_ELEMENT_SIZE, buf, n * words);
+				     fgi * cdev->elem_size, buf, n * words);
 		for (i = 0; i < n; i++)
 			m_can_read_fifo(dev, &buf[i * words]);
 
@@ -1087,15 +1087,36 @@ static int m_can_set_bittiming(struct net_device *dev)
  * - configure mode
  * - setup bittiming
  */
+static u32 m_can_of_parse_mram(struct m_can_classdev *cdev,
+			       const u32 *mram_config_vals, u32 scale);
+
 static void m_can_chip_config(struct net_device *dev)
 {
 	struct m_can_classdev *cdev = netdev_priv(dev);
-	u32 cccr, test;
+	u32 cccr, test, end;
+	bool small;
 
 	m_can_config_endisable(cdev, true);
 
-	/* RX Buffer/FIFO Element Size 64 bytes data field */
-	m_can_write(cdev, M_CAN_RXESC, M_CAN_RXESC_64BYTES);
+	/* without CAN FD, 8 byte data fields keep consecutive elements close
+	 * enough for peripherals to read and write a run of them at once
+	 */
+	small = cdev->is_peripheral && !(cdev->can.ctrlmode & CAN_CTRLMODE_FD);
+	cdev->elem_size = M_CAN_ELEMENT_SIZE(CANFD_MAX_DLEN);
+	end = m_can_of_parse_mram(cdev, cdev->mram_cfg_vals, 1);
+	if (small) {
+		/* and four of them take less room than a CAN FD element, so
+		 * use 4x the FIFO elements if the TX event FIFO still fits
+		 */
+		cdev->elem_size = M_CAN_ELEMENT_SIZE(8);
+		if (m_can_of_parse_mram(cdev, cdev->mram_cfg_vals, 4) > end)
+			m_can_of_parse_mram(cdev, cdev->mram_cfg_vals, 1);
+	}
+	cdev->can.echo_skb_max = cdev->mcfg[MRAM_TXB].num;
+
+	/* RX Buffer/FIFO Element Size */
+	m_can_write(cdev, M_CAN_RXESC,
+		    small ? M_CAN_RXESC_8BYTES : M_CAN_RXESC_64BYTES);
 
 	/* Accept Non-matching Frames Into FIFO 0 */
 	m_can_write(cdev, M_CAN_GFC, 0x0);
@@ -1111,8 +1132,9 @@ static void m_can_chip_config(struct net_device *dev)
 			    (cdev->mcfg[MRAM_TXB].off));
 	}
 
-	/* support 64 bytes payload */
-	m_can_write(cdev, M_CAN_TXESC, TXESC_TBDS_64BYTES);
+	/* TX Buffer Element Size */
+	m_can_write(cdev, M_CAN_TXESC,
+		    small ? TXESC_TBDS_8BYTES : TXESC_TBDS_64BYTES);
 
 	/* TX Event FIFO */
 	if (cdev->version == 30) {
@@ -1543,7 +1565,7 @@ static void m_can_tx_work_queue(struct work_struct *ws)
 	struct m_can_classdev *cdev = container_of(ws, struct m_can_classdev,
 						tx_work);
 	struct net_device *dev = cdev->net;
-	u32 words = TXB_ELEMENT_SIZE / 4, num = cdev->mcfg[MRAM_TXB].num;
+	u32 words = cdev->elem_size / 4, num = cdev->mcfg[MRAM_TXB].num;
 	u32 buf[M_CAN_FIFO_BATCH_WORDS];
 	u32 txfqs, free, putidx, start, n = 0, txbar = 0;
 	struct canfd_frame *cf;
@@ -1589,7 +1611,7 @@ static void m_can_tx_work_queue(struct work_struct *ws)
 
 		if (putidx == 0 || (n + 1) * words > ARRAY_SIZE(buf)) {
 			cdev->ops->write_fifo(cdev, cdev->mcfg[MRAM_TXB].off +
-					      start * TXB_ELEMENT_SIZE, buf,
+					      start * cdev->elem_size, buf,
 					      n * words);
 			start = putidx;
 			n = 0;
@@ -1597,7 +1619,7 @@ static void m_can_tx_work_queue(struct work_struct *ws)
 	}
 	if (n)
 		cdev->ops->write_fifo(cdev, cdev->mcfg[MRAM_TXB].off +
-				      start * TXB_ELEMENT_SIZE, buf, n * words);
+				      start * cdev->elem_size, buf, n * words);
 	if (txbar)
 		m_can_write(cdev, M_CAN_TXBAR, txbar);
 
@@ -1714,8 +1736,11 @@ static int register_m_can_dev(struct net_device *dev)
 	return register_candev(dev);
 }
 
-static void m_can_of_parse_mram(struct m_can_classdev *cdev,
-				const u32 *mram_config_vals)
+/* lay out the message RAM with scale times the DT's FIFO elements, returns
+ * the end of the layout
+ */
+static u32 m_can_of_parse_mram(struct m_can_classdev *cdev,
+			       const u32 *mram_config_vals, u32 scale)
 {
 	cdev->mcfg[MRAM_SIDF].off = mram_config_vals[0];
 	cdev->mcfg[MRAM_SIDF].num = mram_config_vals[1];
@@ -1724,22 +1749,23 @@ static void m_can_of_parse_mram(struct m_can_classdev *cdev,
 	cdev->mcfg[MRAM_XIDF].num = mram_config_vals[2];
 	cdev->mcfg[MRAM_RXF0].off = cdev->mcfg[MRAM_XIDF].off +
 			cdev->mcfg[MRAM_XIDF].num * XIDF_ELEMENT_SIZE;
-	cdev->mcfg[MRAM_RXF0].num = mram_config_vals[3] &
-			(RXFC_FS_MASK >> RXFC_FS_SHIFT);
+	cdev->mcfg[MRAM_RXF0].num = min_t(u32, scale * (mram_config_vals[3] &
+			(RXFC_FS_MASK >> RXFC_FS_SHIFT)), M_CAN_RXF_MAX);
 	cdev->mcfg[MRAM_RXF1].off = cdev->mcfg[MRAM_RXF0].off +
-			cdev->mcfg[MRAM_RXF0].num * RXF0_ELEMENT_SIZE;
-	cdev->mcfg[MRAM_RXF1].num = mram_config_vals[4] &
-			(RXFC_FS_MASK >> RXFC_FS_SHIFT);
+			cdev->mcfg[MRAM_RXF0].num * cdev->elem_size;
+	cdev->mcfg[MRAM_RXF1].num = min_t(u32, scale * (mram_config_vals[4] &
+			(RXFC_FS_MASK >> RXFC_FS_SHIFT)), M_CAN_RXF_MAX);
 	cdev->mcfg[MRAM_RXB].off = cdev->mcfg[MRAM_RXF1].off +
-			cdev->mcfg[MRAM_RXF1].num * RXF1_ELEMENT_SIZE;
+			cdev->mcfg[MRAM_RXF1].num * cdev->elem_size;
 	cdev->mcfg[MRAM_RXB].num = mram_config_vals[5];
 	cdev->mcfg[MRAM_TXE].off = cdev->mcfg[MRAM_RXB].off +
-			cdev->mcfg[MRAM_RXB].num * RXB_ELEMENT_SIZE;
-	cdev->mcfg[MRAM_TXE].num = mram_config_vals[6];
+			cdev->mcfg[MRAM_RXB].num * cdev->elem_size;
+	cdev->mcfg[MRAM_TXE].num = min_t(u32, scale * mram_config_vals[6],
+					 M_CAN_TXE_MAX);
 	cdev->mcfg[MRAM_TXB].off = cdev->mcfg[MRAM_TXE].off +
 			cdev->mcfg[MRAM_TXE].num * TXE_ELEMENT_SIZE;
-	cdev->mcfg[MRAM_TXB].num = mram_config_vals[7] &
-			(TXBC_NDTB_MASK >> TXBC_NDTB_SHIFT);
+	cdev->mcfg[MRAM_TXB].num = min_t(u32, scale * (mram_config_vals[7] &
+			(TXBC_NDTB_MASK >> TXBC_NDTB_SHIFT)), M_CAN_TXB_MAX);
 
 	dev_dbg(cdev->dev,
 		"sidf 0x%x %d xidf 0x%x %d rxf0 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d\n",
@@ -1750,6 +1776,9 @@ static void m_can_of_parse_mram(struct m_can_classdev *cdev,
 		cdev->mcfg[MRAM_RXB].off, cdev->mcfg[MRAM_RXB].num,
 		cdev->mcfg[MRAM_TXE].off, cdev->mcfg[MRAM_TXE].num,
 		cdev->mcfg[MRAM_TXB].off, cdev->mcfg[MRAM_TXB].num);
+
+	return cdev->mcfg[MRAM_TXB].off +
+	       cdev->mcfg[MRAM_TXB].num * cdev->elem_size;
 }
 
 void m_can_init_ram(struct m_can_classdev *cdev)
@@ -1761,7 +1790,7 @@ void m_can_init_ram(struct m_can_classdev *cdev)
 	 */
 	start = cdev->mcfg[MRAM_SIDF].off;
 	end = cdev->mcfg[MRAM_TXB].off +
-		cdev->mcfg[MRAM_TXB].num * TXB_ELEMENT_SIZE;
+		cdev->mcfg[MRAM_TXB].num * cdev->elem_size;
 
 	for (i = start; i < end; i += 4)
 		m_can_fifo_write_no_off(cdev, i, 0x0);
@@ -1807,7 +1836,9 @@ struct m_can_classdev *m_can_class_allocate_dev(struct device *dev)
 	tx_fifo_size = mram_config_vals[7];
 
 	/* allocate the m_can device */
-	net_dev = alloc_candev(sizeof(*class_dev), tx_fifo_size);
+	/* with echo skbs for the biggest TX FIFO a layout can use */
+	net_dev = alloc_candev(sizeof(*class_dev),
+			       max_t(u32, tx_fifo_size, M_CAN_TXB_MAX));
 	if (!net_dev) {
 		dev_err(dev, "Failed to allocate CAN device");
 		goto out;
@@ -1823,7 +1854,11 @@ struct m_can_classdev *m_can_class_allocate_dev(struct device *dev)
 	class_dev->dev = dev;
 	SET_NETDEV_DEV(net_dev, dev);
 
-	m_can_of_parse_mram(class_dev, mram_config_vals);
+	memcpy(class_dev->mram_cfg_vals, mram_config_vals,
+	       sizeof(mram_config_vals));
+	class_dev->elem_size = M_CAN_ELEMENT_SIZE(CANFD_MAX_DLEN);
+	m_can_of_parse_mram(class_dev, mram_config_vals, 1);
+	class_dev->can.echo_skb_max = class_dev->mcfg[MRAM_TXB].num;
 out:
 	return class_dev;
 }
