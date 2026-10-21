@@ -336,8 +336,10 @@ static u32 m_can_fifo_read(struct m_can_classdev *cdev,
 {
 	u32 addr_offset = cdev->mcfg[MRAM_RXF0].off + fgi * RXF0_ELEMENT_SIZE +
 			  offset;
+	u32 val;
 
-	return cdev->ops->read_fifo(cdev, addr_offset);
+	cdev->ops->read_fifo(cdev, addr_offset, &val, 1);
+	return val;
 }
 
 static void m_can_fifo_write(struct m_can_classdev *cdev,
@@ -346,21 +348,23 @@ static void m_can_fifo_write(struct m_can_classdev *cdev,
 	u32 addr_offset = cdev->mcfg[MRAM_TXB].off + fpi * TXB_ELEMENT_SIZE +
 			  offset;
 
-	cdev->ops->write_fifo(cdev, addr_offset, val);
+	cdev->ops->write_fifo(cdev, addr_offset, &val, 1);
 }
 
 static inline void m_can_fifo_write_no_off(struct m_can_classdev *cdev,
 					   u32 fpi, u32 val)
 {
-	cdev->ops->write_fifo(cdev, fpi, val);
+	cdev->ops->write_fifo(cdev, fpi, &val, 1);
 }
 
 static u32 m_can_txe_fifo_read(struct m_can_classdev *cdev, u32 fgi, u32 offset)
 {
 	u32 addr_offset = cdev->mcfg[MRAM_TXE].off + fgi * TXE_ELEMENT_SIZE +
 			  offset;
+	u32 val;
 
-	return cdev->ops->read_fifo(cdev, addr_offset);
+	cdev->ops->read_fifo(cdev, addr_offset, &val, 1);
+	return val;
 }
 
 static inline bool m_can_tx_fifo_full(struct m_can_classdev *cdev)

@@ -125,7 +125,16 @@ struct tcan4x5x_priv {
 	/* Register based ip */
 	int mram_start;
 	int reg_offset;
+
+	/* DMA safe buffers to do each access in one SPI transfer, accesses
+	 * are serialized by the regmap lock
+	 */
+	u32 *spi_tx_buf;
+	u32 *spi_rx_buf;
 };
+
+/* the header and up to 64 words, the most m_can accesses at once */
+#define TCAN4X5X_SPI_BUF_WORDS (1 + 64)
 
 static struct can_bittiming_const tcan4x5x_bittiming_const = {
 	.name = DEVICE_NAME,
@@ -189,22 +198,21 @@ static int regmap_spi_gather_write(void *context, const void *reg,
 				   size_t reg_len, const void *val,
 				   size_t val_len)
 {
-	struct device *dev = context;
-	struct spi_device *spi = to_spi_device(dev);
-	struct spi_message m;
-	u32 addr;
-	struct spi_transfer t[2] = {
-		{ .tx_buf = &addr, .len = reg_len, .cs_change = 0,},
-		{ .tx_buf = val, .len = val_len, },
+	struct spi_device *spi = to_spi_device(context);
+	struct tcan4x5x_priv *priv = spi_get_drvdata(spi);
+	struct spi_transfer t = {
+		.tx_buf = priv->spi_tx_buf,
+		.len = 4 + val_len,
 	};
 
-	addr = TCAN4X5X_WRITE_CMD | (*((u16 *)reg) << 8) | val_len >> 2;
+	if (WARN_ON(val_len > (TCAN4X5X_SPI_BUF_WORDS - 1) * 4))
+		return -EINVAL;
 
-	spi_message_init(&m);
-	spi_message_add_tail(&t[0], &m);
-	spi_message_add_tail(&t[1], &m);
+	priv->spi_tx_buf[0] = TCAN4X5X_WRITE_CMD | (*((u16 *)reg) << 8) |
+			      val_len >> 2;
+	memcpy(&priv->spi_tx_buf[1], val, val_len);
 
-	return spi_sync(spi, &m);
+	return spi_sync_transfer(spi, &t, 1);
 }
 
 static int tcan4x5x_regmap_write(void *context, const void *data, size_t count)
@@ -232,12 +240,27 @@ static int tcan4x5x_regmap_read(void *context,
 				const void *reg, size_t reg_size,
 				void *val, size_t val_size)
 {
-	struct device *dev = context;
-	struct spi_device *spi = to_spi_device(dev);
+	struct spi_device *spi = to_spi_device(context);
+	struct tcan4x5x_priv *priv = spi_get_drvdata(spi);
+	struct spi_transfer t = {
+		.tx_buf = priv->spi_tx_buf,
+		.rx_buf = priv->spi_rx_buf,
+		.len = 4 + val_size,
+	};
+	int ret;
 
-	u32 addr = TCAN4X5X_READ_CMD | (*((u16 *)reg) << 8) | val_size >> 2;
+	if (WARN_ON(val_size > (TCAN4X5X_SPI_BUF_WORDS - 1) * 4))
+		return -EINVAL;
 
-	return spi_write_then_read(spi, &addr, reg_size, (u32 *)val, val_size);
+	/* full duplex, the data is clocked in after the header */
+	memset(priv->spi_tx_buf, 0, t.len);
+	priv->spi_tx_buf[0] = TCAN4X5X_READ_CMD | (*((u16 *)reg) << 8) |
+			      val_size >> 2;
+
+	ret = spi_sync_transfer(spi, &t, 1);
+	if (!ret)
+		memcpy(val, &priv->spi_rx_buf[1], val_size);
+	return ret;
 }
 
 static struct regmap_bus tcan4x5x_bus = {
@@ -261,14 +284,13 @@ static u32 tcan4x5x_read_reg(struct m_can_classdev *cdev, int reg)
 	return val;
 }
 
-static u32 tcan4x5x_read_fifo(struct m_can_classdev *cdev, int addr_offset)
+static int tcan4x5x_read_fifo(struct m_can_classdev *cdev, int addr_offset,
+			      void *val, size_t val_count)
 {
 	struct tcan4x5x_priv *priv = cdev->device_data;
-	u32 val;
 
-	regmap_read(priv->regmap, priv->mram_start + addr_offset, &val);
-
-	return val;
+	return regmap_bulk_read(priv->regmap, priv->mram_start + addr_offset,
+				val, val_count);
 }
 
 static int tcan4x5x_write_reg(struct m_can_classdev *cdev, int reg, int val)
@@ -279,11 +301,13 @@ static int tcan4x5x_write_reg(struct m_can_classdev *cdev, int reg, int val)
 }
 
 static int tcan4x5x_write_fifo(struct m_can_classdev *cdev,
-			       int addr_offset, int val)
+			       int addr_offset, const void *val,
+			       size_t val_count)
 {
 	struct tcan4x5x_priv *priv = cdev->device_data;
 
-	return regmap_write(priv->regmap, priv->mram_start + addr_offset, val);
+	return regmap_bulk_write(priv->regmap, priv->mram_start + addr_offset,
+				 val, val_count);
 }
 
 static int tcan4x5x_power_enable(struct regulator *reg, int enable)
@@ -462,6 +486,15 @@ static int tcan4x5x_can_probe(struct spi_device *spi)
 	ret = spi_setup(spi);
 	if (ret)
 		goto out_free_candev;
+
+	priv->spi_tx_buf = devm_kzalloc(&spi->dev, TCAN4X5X_SPI_BUF_WORDS * 4,
+					GFP_KERNEL);
+	priv->spi_rx_buf = devm_kzalloc(&spi->dev, TCAN4X5X_SPI_BUF_WORDS * 4,
+					GFP_KERNEL);
+	if (!priv->spi_tx_buf || !priv->spi_rx_buf) {
+		ret = -ENOMEM;
+		goto out_free_candev;
+	}
 
 	priv->regmap = devm_regmap_init(&spi->dev, &tcan4x5x_bus,
 					&spi->dev, &tcan4x5x_regmap);
