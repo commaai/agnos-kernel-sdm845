@@ -1446,6 +1446,14 @@ static int determine_ethernet_addr(struct r8152 *tp, struct sockaddr *sa)
 	if (ret < 0) {
 		netif_err(tp, probe, dev, "Get ether addr fail\n");
 	} else if (!is_valid_ether_addr(sa->sa_data)) {
+		/* no MAC in the efuse: after a reset, keep the address the
+		 * netdev already has (random, or set by userspace) so the
+		 * network doesn't see a new device
+		 */
+		if (is_valid_ether_addr(dev->dev_addr)) {
+			ether_addr_copy(sa->sa_data, dev->dev_addr);
+			return 0;
+		}
 		netif_err(tp, probe, dev, "Invalid ether addr %pM\n",
 			  sa->sa_data);
 		eth_hw_addr_random(dev);
