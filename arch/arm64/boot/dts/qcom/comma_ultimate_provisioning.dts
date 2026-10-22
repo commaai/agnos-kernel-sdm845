@@ -160,7 +160,7 @@
     pinctrl-names = "default";
     pinctrl-0 = <&can0_int_default>;
     reset-gpios = <&tlmm 33 GPIO_ACTIVE_HIGH>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
     spi-max-frequency = <10000000>;
   };
 
@@ -174,7 +174,7 @@
     interrupts = <49 IRQ_TYPE_LEVEL_LOW>;
     pinctrl-names = "default";
     pinctrl-0 = <&can1_int_default>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
     spi-max-frequency = <10000000>;
   };
 
@@ -188,7 +188,7 @@
     interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
     pinctrl-names = "default";
     pinctrl-0 = <&can2_int_default>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
     spi-max-frequency = <10000000>;
   };
 
@@ -202,7 +202,7 @@
     interrupts = <32 IRQ_TYPE_LEVEL_LOW>;
     pinctrl-names = "default";
     pinctrl-0 = <&can3_int_default>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
     spi-max-frequency = <10000000>;
   };
 };

@@ -51,6 +51,9 @@ enum m_can_mram_cfg {
 	MRAM_CFG_NUM,
 };
 
+/* message ram configuration data length */
+#define MRAM_CFG_LEN	8
+
 /* address offset and element number for each FIFO/Buffer in the Message RAM */
 struct mram_cfg {
 	u16 off;
@@ -63,9 +66,10 @@ struct m_can_ops {
 	int (*clear_interrupts)(struct m_can_classdev *cdev);
 	u32 (*read_reg)(struct m_can_classdev *cdev, int reg);
 	int (*write_reg)(struct m_can_classdev *cdev, int reg, int val);
-	u32 (*read_fifo)(struct m_can_classdev *cdev, int addr_offset);
+	int (*read_fifo)(struct m_can_classdev *cdev, int addr_offset,
+			 void *val, size_t val_count);
 	int (*write_fifo)(struct m_can_classdev *cdev, int addr_offset,
-			  int val);
+			  const void *val, size_t val_count);
 	int (*init)(struct m_can_classdev *cdev);
 };
 
@@ -80,6 +84,8 @@ struct m_can_classdev {
 	struct workqueue_struct *tx_wq;
 	struct work_struct tx_work;
 	struct sk_buff *tx_skb;
+	/* peripherals: frames waiting for the TX work */
+	struct sk_buff_head tx_skbs;
 
 	struct can_bittiming_const *bit_timing;
 	struct can_bittiming_const *data_timing;
@@ -96,6 +102,9 @@ struct m_can_classdev {
 	int is_peripheral;
 
 	struct mram_cfg mcfg[MRAM_CFG_NUM];
+	/* the DT's message RAM config, laid out with RX/TX elements this big */
+	u32 mram_cfg_vals[MRAM_CFG_LEN];
+	u32 elem_size;
 };
 
 struct m_can_classdev *m_can_class_allocate_dev(struct device *dev);
