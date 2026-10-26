@@ -6037,7 +6037,7 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_CRASH_INJECT         "gEnableForceTargetAssert"
 #define CFG_ENABLE_CRASH_INJECT_MIN     (0)
 #define CFG_ENABLE_CRASH_INJECT_MAX     (1)
-#define CFG_ENABLE_CRASH_INJECT_DEFAULT (0)
+#define CFG_ENABLE_CRASH_INJECT_DEFAULT (1)
 
 #ifdef FEATURE_WLAN_FORCE_SAP_SCC
 /*
