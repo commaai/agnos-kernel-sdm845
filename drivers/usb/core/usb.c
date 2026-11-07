@@ -376,6 +376,8 @@ static char *usb_devnode(struct device *dev,
 	struct usb_device *usb_dev;
 
 	usb_dev = to_usb_device(dev);
+	if (mode)
+		*mode = 0664;
 	return kasprintf(GFP_KERNEL, "bus/usb/%03d/%03d",
 			 usb_dev->bus->busnum, usb_dev->devnum);
 }
