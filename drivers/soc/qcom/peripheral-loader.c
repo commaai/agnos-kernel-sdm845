@@ -945,6 +945,42 @@ static int pil_notify_aop(struct pil_desc *desc, char *status)
 /* Synchronize request_firmware() with suspend */
 static DECLARE_RWSEM(pil_pm_rwsem);
 
+struct pil_load_work {
+	struct work_struct work;
+	struct pil_desc *desc;
+	int ret;
+};
+
+static void pil_load_segs_work(struct work_struct *work)
+{
+	struct pil_load_work *load = container_of(work, struct pil_load_work,
+						  work);
+	struct pil_seg *seg;
+
+	list_for_each_entry(seg, &load->desc->priv->segs, list) {
+		load->ret = pil_load_seg(load->desc, seg);
+		if (load->ret)
+			return;
+	}
+}
+
+/*
+ * Load the segments, in order, from a worker. Loaded in the caller, a signal
+ * to it interrupts the firmware reads halfway through, after the subsystem's
+ * boot loader has locked its memory, and the error path out of that leaves the
+ * subsystem in a state the next boot hangs the SoC on.
+ */
+static int pil_load_segs(struct pil_desc *desc)
+{
+	struct pil_load_work load = { .desc = desc };
+
+	INIT_WORK_ONSTACK(&load.work, pil_load_segs_work);
+	queue_work(system_unbound_wq, &load.work);
+	flush_work(&load.work);
+	destroy_work_on_stack(&load.work);
+	return load.ret;
+}
+
 /**
  * pil_boot() - Load a peripheral image into memory and boot it
  * @desc: descriptor from pil_desc_init()
@@ -957,7 +993,6 @@ int pil_boot(struct pil_desc *desc)
 	char fw_name[30];
 	const struct pil_mdt *mdt;
 	const struct elf32_hdr *ehdr;
-	struct pil_seg *seg;
 	const struct firmware *fw;
 	struct pil_priv *priv = desc->priv;
 	bool mem_protect = false;
@@ -1066,11 +1101,9 @@ int pil_boot(struct pil_desc *desc)
 	}
 
 	trace_pil_event("before_load_seg", desc);
-	list_for_each_entry(seg, &desc->priv->segs, list) {
-		ret = pil_load_seg(desc, seg);
-		if (ret)
-			goto err_deinit_image;
-	}
+	ret = pil_load_segs(desc);
+	if (ret)
+		goto err_deinit_image;
 
 	if (desc->subsys_vmid > 0) {
 		trace_pil_event("before_reclaim_mem", desc);
