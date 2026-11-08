@@ -215,3 +215,13 @@ int sched_boost(void)
 {
 	return sysctl_sched_boost;
 }
+
+/*
+ * Boot on the big cluster: until userspace is up, the serial work in init runs ~2.5x
+ * faster there. boot.sh turns this off as soon as it starts.
+ */
+static int __init sched_boost_at_boot(void)
+{
+	return sched_set_boost(FULL_THROTTLE_BOOST);
+}
+late_initcall_sync(sched_boost_at_boot);
