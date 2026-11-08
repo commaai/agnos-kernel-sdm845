@@ -544,7 +544,7 @@ static int icnss_assign_msa_perm_all(struct icnss_priv *priv,
 {
 	int ret;
 	int i;
-	enum icnss_msa_perm old_perm;
+	enum icnss_msa_perm old_perm[QMI_WLFW_MAX_NUM_MEMORY_REGIONS_V01];
 
 	if (priv->nr_mem_region > QMI_WLFW_MAX_NUM_MEMORY_REGIONS_V01) {
 		icnss_pr_err("Invalid memory region len %d\n",
@@ -553,7 +553,7 @@ static int icnss_assign_msa_perm_all(struct icnss_priv *priv,
 	}
 
 	for (i = 0; i < priv->nr_mem_region; i++) {
-		old_perm = priv->mem_region[i].perm;
+		old_perm[i] = priv->mem_region[i].perm;
 		ret = icnss_assign_msa_perm(&priv->mem_region[i], new_perm);
 		if (ret)
 			goto err_unmap;
@@ -562,8 +562,10 @@ static int icnss_assign_msa_perm_all(struct icnss_priv *priv,
 	return 0;
 
 err_unmap:
+	/* each region goes back to what it had, and remembers it */
 	for (i--; i >= 0; i--) {
-		icnss_assign_msa_perm(&priv->mem_region[i], old_perm);
+		if (!icnss_assign_msa_perm(&priv->mem_region[i], old_perm[i]))
+			priv->mem_region[i].perm = old_perm[i];
 	}
 	return ret;
 }
