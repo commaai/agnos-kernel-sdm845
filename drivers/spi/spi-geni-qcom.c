@@ -1059,6 +1059,16 @@ static int spi_geni_transfer_one(struct spi_master *spi,
 	if (mas->cur_xfer_mode != GSI_DMA) {
 		reinit_completion(&mas->xfer_done);
 		setup_fifo_xfer(xfer, mas, slv->mode, spi);
+		/* a FIFO transfer takes a few us, a realtime pump spins
+		 * instead of sleeping until the IRQ
+		 */
+		if (spi->rt && mas->cur_xfer_mode == FIFO_MODE) {
+			ktime_t end = ktime_add_us(ktime_get(), 100);
+
+			while (!completion_done(&mas->xfer_done) &&
+			       ktime_before(ktime_get(), end))
+				cpu_relax();
+		}
 		timeout = wait_for_completion_timeout(&mas->xfer_done,
 					msecs_to_jiffies(SPI_XFER_TIMEOUT_MS));
 		if (!timeout) {
