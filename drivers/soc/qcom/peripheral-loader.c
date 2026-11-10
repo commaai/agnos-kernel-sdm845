@@ -137,6 +137,7 @@ struct pil_priv {
 	int id;
 	int unvoted_flag;
 	size_t region_size;
+	bool region_shared;
 };
 
 static int pil_do_minidump(struct pil_desc *desc, void *ramdump_dev)
@@ -960,8 +961,7 @@ int pil_boot(struct pil_desc *desc)
 	struct pil_seg *seg;
 	const struct firmware *fw;
 	struct pil_priv *priv = desc->priv;
-	bool mem_protect = false;
-	bool hyp_assign = false;
+	bool keep_region = false;
 
 	ret = pil_notify_aop(desc, "on");
 	if (ret < 0) {
@@ -1044,16 +1044,23 @@ int pil_boot(struct pil_desc *desc)
 		 * In case of modem ssr, we need to assign memory back to linux.
 		 * This is not true after cold boot since linux already owns it.
 		 * Also for secure boot devices, modem memory has to be released
-		 * after MBA is booted
+		 * after MBA is booted. A load that failed leaves the memory
+		 * with the modem too, shared with linux if it got that far.
 		 */
 		trace_pil_event("before_assign_mem", desc);
-		if (desc->modem_ssr) {
+		if (priv->region_shared) {
+			pil_reclaim_mem(desc, priv->region_start,
+				(priv->region_end - priv->region_start),
+				VMID_HLOS);
+			priv->region_shared = false;
+		} else if (desc->modem_ssr) {
 			ret = pil_assign_mem_to_linux(desc, priv->region_start,
 				(priv->region_end - priv->region_start));
 			if (ret)
 				pil_err(desc, "Failed to assign to linux, ret- %d\n",
 								ret);
 		}
+		desc->modem_ssr = false;
 		ret = pil_assign_mem_to_subsys_and_linux(desc,
 				priv->region_start,
 				(priv->region_end - priv->region_start));
@@ -1062,7 +1069,7 @@ int pil_boot(struct pil_desc *desc)
 								ret);
 			goto err_deinit_image;
 		}
-		hyp_assign = true;
+		priv->region_shared = true;
 	}
 
 	trace_pil_event("before_load_seg", desc);
@@ -1082,24 +1089,19 @@ int pil_boot(struct pil_desc *desc)
 							desc->name, ret);
 			goto err_deinit_image;
 		}
-		hyp_assign = false;
+		priv->region_shared = false;
+		desc->modem_ssr = true;
 	}
 
 	trace_pil_event("before_auth_reset", desc);
 	ret = desc->ops->auth_and_reset(desc);
 	if (ret) {
 		pil_err(desc, "Failed to bring out of reset(rc:%d)\n", ret);
-		goto err_auth_and_reset;
+		goto err_deinit_image;
 	}
 	trace_pil_event("reset_done", desc);
 	pil_info(desc, "Brought out of reset\n");
 	desc->modem_ssr = false;
-err_auth_and_reset:
-	if (ret && desc->subsys_vmid > 0) {
-		pil_assign_mem_to_linux(desc, priv->region_start,
-				(priv->region_end - priv->region_start));
-		mem_protect = true;
-	}
 err_deinit_image:
 	if (ret && desc->ops->deinit_image)
 		desc->ops->deinit_image(desc);
@@ -1112,14 +1114,17 @@ release_fw:
 out:
 	up_read(&pil_pm_rwsem);
 	if (ret) {
-		if (priv->region) {
-			if (desc->subsys_vmid > 0 && !mem_protect &&
-					hyp_assign) {
-				pil_reclaim_mem(desc, priv->region_start,
-					(priv->region_end -
-						priv->region_start),
-					VMID_HLOS);
-			}
+		/*
+		 * Memory the modem was given stays with it. Take it back here
+		 * and the next boot hangs the whole SoC as soon as it takes
+		 * its metadata back from the modem. The next boot takes the
+		 * region back once the MBA is up, like after a shutdown.
+		 */
+		if (desc->subsys_vmid > 0 &&
+		    (priv->region_shared || desc->modem_ssr))
+			keep_region = true;
+
+		if (priv->region && !keep_region) {
 			if (desc->clear_fw_region && priv->region_start)
 				pil_clear_segment(desc);
 			dma_free_attrs(desc->dev, priv->region_size,
