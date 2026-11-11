@@ -924,14 +924,14 @@ static void m_can_coalescing_update(struct m_can_classdev *cdev, u32 ir)
 		enable_rx_timer = true;
 		new_interrupts &= ~IR_RF0N;
 	}
-	if (cdev->tx_coalesce_usecs_irq > 0 && (ir & (IR_TEFN | IR_TEFW))) {
+	if (cdev->tx_coalesce_usecs_irq > 0 && (ir & IR_TC)) {
 		enable_tx_timer = true;
-		new_interrupts &= ~IR_TEFN;
+		new_interrupts &= ~IR_TC;
 	}
 	if (!enable_rx_timer && !hrtimer_active(&cdev->hrtimer))
 		new_interrupts |= IR_RF0N;
 	if (!enable_tx_timer && !hrtimer_active(&cdev->hrtimer))
-		new_interrupts |= IR_TEFN;
+		new_interrupts |= IR_TC;
 
 	m_can_interrupt_enable(cdev, new_interrupts);
 	if (enable_rx_timer | enable_tx_timer)
@@ -1009,16 +1009,17 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 			can_led_event(dev, CAN_LED_EVENT_TX);
 			netif_wake_queue(dev);
 		}
-	} else  {
+	} else if (cdev->is_peripheral) {
+		/* the TX work frees the sent elements' echo skbs */
+		if (ir & IR_TC)
+			queue_work(cdev->tx_wq, &cdev->tx_work);
+	} else {
 		if (ir & IR_TEFN) {
 			/* New TX FIFO Element arrived */
 			m_can_echo_tx_event(dev);
 			can_led_event(dev, CAN_LED_EVENT_TX);
-			if (cdev->is_peripheral)
-				/* the TX work wakes the queue */
-				queue_work(cdev->tx_wq, &cdev->tx_work);
-			else if (netif_queue_stopped(dev) &&
-				 !m_can_tx_fifo_full(cdev))
+			if (netif_queue_stopped(dev) &&
+			    !m_can_tx_fifo_full(cdev))
 				netif_wake_queue(dev);
 		}
 	}
@@ -1280,15 +1281,21 @@ static void m_can_chip_config(struct net_device *dev)
 		m_can_write(cdev, M_CAN_IE, IR_ALL_INT);
 
 	/* every interrupt costs bus accesses on peripherals, so don't take
-	 * the ones that aren't handled: TX complete, TX FIFO empty, timestamp
-	 * wraparound, the FIFOs full and the unused RX FIFO 1/buffers
+	 * the ones that aren't handled: TX FIFO empty, timestamp wraparound,
+	 * the FIFOs full, the unused RX FIFO 1/buffers and TX events, TC
+	 * and the TX FIFO get index say what's sent
 	 */
 	if (cdev->is_peripheral) {
 		cdev->active_interrupts = 0;
 		m_can_interrupt_enable(cdev, m_can_read(cdev, M_CAN_IE) &
-				       ~(IR_TC | IR_TCF | IR_TFE | IR_TSW |
-					 IR_HPM | IR_TEFF | IR_RF0F | IR_RF1N |
-					 IR_RF1W | IR_RF1F | IR_RF1L | IR_DRX));
+				       ~(IR_TCF | IR_TFE | IR_TSW | IR_HPM |
+					 IR_TEFN | IR_TEFW | IR_TEFF | IR_TEFL |
+					 IR_RF0F | IR_RF1N | IR_RF1W | IR_RF1F |
+					 IR_RF1L | IR_DRX));
+		m_can_write(cdev, M_CAN_TXBTIE,
+			    GENMASK(cdev->mcfg[MRAM_TXB].num - 1, 0));
+		cdev->tx_get = 0;
+		cdev->tx_inflight = 0;
 	}
 
 	/* route all interrupts to INT0 */
@@ -1687,9 +1694,15 @@ static void m_can_tx_work_queue(struct work_struct *ws)
 	putidx = (txfqs & TXFQS_TFQPI_MASK) >> TXFQS_TFQPI_SHIFT;
 	start = putidx;
 
-	/* an element's echo skb is freed when its TX event is handled */
-	while (free && !cdev->can.echo_skb[putidx] &&
-	       (skb = skb_dequeue(&cdev->tx_skbs))) {
+	/* the FIFO sends in order, so the elements it freed are the oldest */
+	while (cdev->tx_inflight > num - free) {
+		dev->stats.tx_bytes += can_get_echo_skb(dev, cdev->tx_get);
+		dev->stats.tx_packets++;
+		cdev->tx_get = (cdev->tx_get + 1) % num;
+		cdev->tx_inflight--;
+	}
+
+	while (free && (skb = skb_dequeue(&cdev->tx_skbs))) {
 		u32 *elem = &buf[n * words];
 
 		cf = (struct canfd_frame *)skb->data;
@@ -1700,11 +1713,7 @@ static void m_can_tx_work_queue(struct work_struct *ws)
 		if (cf->can_id & CAN_RTR_FLAG)
 			elem[0] |= TX_BUF_RTR;
 
-		/* the put index is the message marker, to find the echo skb
-		 * when the TX event comes back
-		 */
-		elem[1] = ((putidx << TX_BUF_MM_SHIFT) & TX_BUF_MM_MASK) |
-			  (can_len2dlc(cf->len) << 16) | TX_BUF_EFC;
+		elem[1] = can_len2dlc(cf->len) << 16;
 		if (can_is_canfd_skb(skb)) {
 			elem[1] |= TX_BUF_FDF;
 			if (cf->flags & CANFD_BRS)
@@ -1719,6 +1728,7 @@ static void m_can_tx_work_queue(struct work_struct *ws)
 		putidx = (putidx + 1) % num;
 		free--;
 		n++;
+		cdev->tx_inflight++;
 
 		if (putidx == 0 || (n + 1) * words > ARRAY_SIZE(buf)) {
 			cdev->ops->write_fifo(cdev, cdev->mcfg[MRAM_TXB].off +

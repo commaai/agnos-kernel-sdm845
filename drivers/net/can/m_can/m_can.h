@@ -87,6 +87,7 @@ struct m_can_classdev {
 	struct sk_buff *tx_skb;
 	/* peripherals: frames waiting for the TX work */
 	struct sk_buff_head tx_skbs;
+	u32 tx_get, tx_inflight;
 
 	/* peripherals: interrupt coalescing, set with ethtool -C */
 	struct hrtimer hrtimer;
