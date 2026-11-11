@@ -82,10 +82,8 @@ struct m_can_classdev {
 	struct clk *hclk;
 	struct clk *cclk;
 
-	struct workqueue_struct *tx_wq;
-	struct work_struct tx_work;
 	struct sk_buff *tx_skb;
-	/* peripherals: frames waiting for the TX work */
+	/* peripherals: frames waiting for the IRQ thread */
 	struct sk_buff_head tx_skbs;
 	u32 tx_get, tx_inflight;
 

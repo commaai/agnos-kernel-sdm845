@@ -419,7 +419,6 @@ static void m_can_clean(struct net_device *net)
 		/* the frames in flight are gone, free their echo skbs, or
 		 * their FIFO elements can't be used again
 		 */
-		cancel_work_sync(&cdev->tx_work);
 		for (i = 0; i < cdev->can.echo_skb_max; i++)
 			can_free_echo_skb(net, i);
 		net->stats.tx_errors += skb_queue_len(&cdev->tx_skbs);
@@ -953,6 +952,11 @@ static enum hrtimer_restart m_can_coalescing_timer(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
+static void m_can_tx_peripheral(struct m_can_classdev *cdev);
+
+/* on peripherals this thread also sends, so a lower priority thread can't hold
+ * the bus
+ */
 static irqreturn_t m_can_isr(int irq, void *dev_id)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
@@ -970,6 +974,11 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 		m_can_coalescing_update(cdev, ir);
 
 	if (!ir) {
+		/* woken to send */
+		if (cdev->is_peripheral && !skb_queue_empty(&cdev->tx_skbs)) {
+			m_can_tx_peripheral(cdev);
+			return IRQ_HANDLED;
+		}
 		/* the level IRQ of a peripheral can also be its own, clear
 		 * those too or it never deasserts
 		 */
@@ -1010,9 +1019,8 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 			netif_wake_queue(dev);
 		}
 	} else if (cdev->is_peripheral) {
-		/* the TX work frees the sent elements' echo skbs */
-		if (ir & IR_TC)
-			queue_work(cdev->tx_wq, &cdev->tx_work);
+		if ((ir & IR_TC) || !skb_queue_empty(&cdev->tx_skbs))
+			m_can_tx_peripheral(cdev);
 	} else {
 		if (ir & IR_TEFN) {
 			/* New TX FIFO Element arrived */
@@ -1325,8 +1333,8 @@ static int m_can_set_mode(struct net_device *dev, enum can_mode mode)
 
 	switch (mode) {
 	case CAN_MODE_START:
-		/* on peripherals the IRQ thread and the TX work access the
-		 * device too, keep them out while it's reconfigured
+		/* on peripherals the IRQ thread accesses the device too, keep
+		 * it out while it's reconfigured
 		 */
 		if (cdev->is_peripheral) {
 			netif_tx_disable(dev);
@@ -1514,7 +1522,6 @@ static int m_can_close(struct net_device *dev)
 		/* nothing else may access the device while it's stopped */
 		hrtimer_cancel(&cdev->hrtimer);
 		free_irq(dev->irq, dev);
-		cancel_work_sync(&cdev->tx_work);
 	}
 
 	m_can_stop(dev);
@@ -1524,8 +1531,6 @@ static int m_can_close(struct net_device *dev)
 
 	if (cdev->is_peripheral) {
 		cdev->tx_skb = NULL;
-		destroy_workqueue(cdev->tx_wq);
-		cdev->tx_wq = NULL;
 		skb_queue_purge(&cdev->tx_skbs);
 	}
 
@@ -1671,10 +1676,8 @@ static netdev_tx_t m_can_tx_handler(struct m_can_classdev *cdev)
 /* peripherals: write the queued frames to the TX FIFO, consecutive elements
  * at once, and request them all with one TXBAR write
  */
-static void m_can_tx_work_queue(struct work_struct *ws)
+static void m_can_tx_peripheral(struct m_can_classdev *cdev)
 {
-	struct m_can_classdev *cdev = container_of(ws, struct m_can_classdev,
-						tx_work);
 	struct net_device *dev = cdev->net;
 	u32 words = cdev->elem_size / 4, num = cdev->mcfg[MRAM_TXB].num;
 	u32 buf[M_CAN_FIFO_BATCH_WORDS];
@@ -1764,13 +1767,13 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
 			return NETDEV_TX_OK;
 		}
 
-		/* register access can sleep, so the TX work writes the frames,
-		 * a TX FIFO's worth at a time
+		/* register access can sleep, so the IRQ thread writes the
+		 * frames, a TX FIFO's worth at a time
 		 */
 		skb_queue_tail(&cdev->tx_skbs, skb);
 		if (skb_queue_len(&cdev->tx_skbs) >= cdev->can.echo_skb_max)
 			netif_stop_queue(dev);
-		queue_work(cdev->tx_wq, &cdev->tx_work);
+		irq_wake_thread(dev->irq, dev);
 	} else {
 		cdev->tx_skb = skb;
 		return m_can_tx_handler(cdev);
@@ -1799,15 +1802,6 @@ static int m_can_open(struct net_device *dev)
 	if (cdev->is_peripheral) {
 		cdev->tx_skb = NULL;
 		skb_queue_head_init(&cdev->tx_skbs);
-		cdev->tx_wq = alloc_workqueue("mcan_wq",
-					      WQ_FREEZABLE | WQ_MEM_RECLAIM, 0);
-		if (!cdev->tx_wq) {
-			err = -ENOMEM;
-			goto out_wq_fail;
-		}
-
-		INIT_WORK(&cdev->tx_work, m_can_tx_work_queue);
-
 		hrtimer_init(&cdev->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		cdev->hrtimer.function = m_can_coalescing_timer;
 		err = request_threaded_irq(dev->irq, NULL, m_can_isr,
@@ -1836,9 +1830,6 @@ static int m_can_open(struct net_device *dev)
 	return 0;
 
 exit_irq_fail:
-	if (cdev->is_peripheral)
-		destroy_workqueue(cdev->tx_wq);
-out_wq_fail:
 	close_candev(dev);
 exit_disable_clks:
 	m_can_clk_stop(cdev);
