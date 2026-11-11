@@ -1897,9 +1897,45 @@ static int m_can_set_coalesce(struct net_device *dev,
 	return 0;
 }
 
+/* the message RAM split per bus, one that mostly sends needs a deeper TX FIFO */
+static void m_can_get_ringparam(struct net_device *dev,
+				struct ethtool_ringparam *ring)
+{
+	struct m_can_classdev *cdev = netdev_priv(dev);
+
+	ring->rx_max_pending = M_CAN_RXF_MAX;
+	ring->tx_max_pending = M_CAN_TXB_MAX;
+	ring->rx_pending = cdev->mram_cfg_vals[3];
+	ring->tx_pending = cdev->mram_cfg_vals[7];
+}
+
+static int m_can_set_ringparam(struct net_device *dev,
+			       struct ethtool_ringparam *ring)
+{
+	struct m_can_classdev *cdev = netdev_priv(dev);
+	u32 vals[MRAM_CFG_LEN], elem_size = cdev->elem_size, end;
+
+	if (cdev->can.state != CAN_STATE_STOPPED)
+		return -EBUSY;
+	memcpy(vals, cdev->mram_cfg_vals, sizeof(vals));
+	vals[3] = ring->rx_pending;
+	vals[6] = ring->tx_pending;
+	vals[7] = ring->tx_pending;
+	cdev->elem_size = M_CAN_ELEMENT_SIZE(CANFD_MAX_DLEN);
+	end = m_can_of_parse_mram(cdev, vals, 1);
+	if (ring->rx_pending && ring->tx_pending && end <= cdev->mram_end)
+		memcpy(cdev->mram_cfg_vals, vals, sizeof(vals));
+	m_can_of_parse_mram(cdev, cdev->mram_cfg_vals, 1);
+	cdev->elem_size = elem_size;
+	return cdev->mram_cfg_vals[3] == ring->rx_pending &&
+	       cdev->mram_cfg_vals[7] == ring->tx_pending ? 0 : -EINVAL;
+}
+
 static const struct ethtool_ops m_can_ethtool_ops = {
 	.get_coalesce = m_can_get_coalesce,
 	.set_coalesce = m_can_set_coalesce,
+	.get_ringparam = m_can_get_ringparam,
+	.set_ringparam = m_can_set_ringparam,
 };
 
 static int register_m_can_dev(struct net_device *dev)
@@ -2038,7 +2074,7 @@ struct m_can_classdev *m_can_class_allocate_dev(struct device *dev)
 	memcpy(class_dev->mram_cfg_vals, mram_config_vals,
 	       sizeof(mram_config_vals));
 	class_dev->elem_size = M_CAN_ELEMENT_SIZE(CANFD_MAX_DLEN);
-	m_can_of_parse_mram(class_dev, mram_config_vals, 1);
+	class_dev->mram_end = m_can_of_parse_mram(class_dev, mram_config_vals, 1);
 	class_dev->can.echo_skb_max = class_dev->mcfg[MRAM_TXB].num;
 out:
 	return class_dev;

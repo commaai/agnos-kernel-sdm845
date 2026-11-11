@@ -115,6 +115,7 @@ struct m_can_classdev {
 	struct mram_cfg mcfg[MRAM_CFG_NUM];
 	/* the DT's message RAM config, laid out with RX/TX elements this big */
 	u32 mram_cfg_vals[MRAM_CFG_LEN];
+	u32 mram_end;
 	u32 elem_size;
 };
 
