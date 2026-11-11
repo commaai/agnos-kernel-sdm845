@@ -283,8 +283,10 @@ enum m_can_reg {
 /* RX FIFO, RX buffer and TX buffer elements: ID, DLC and the data field */
 #define M_CAN_ELEMENT_SIZE(data_len)	(8 + (data_len))
 
-/* the most words to read or write at once, a run of FIFO elements */
-#define M_CAN_FIFO_BATCH_WORDS	64
+/* the most words to read or write at once, whole CAN FD elements that fit a
+ * one byte transfer length
+ */
+#define M_CAN_FIFO_BATCH_WORDS	252
 
 /* the most FIFO elements the registers can configure */
 #define M_CAN_RXF_MAX		64
