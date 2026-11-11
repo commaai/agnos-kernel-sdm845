@@ -12,6 +12,7 @@
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/freezer.h>
+#include <linux/hrtimer.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/clk.h>
@@ -86,6 +87,15 @@ struct m_can_classdev {
 	struct sk_buff *tx_skb;
 	/* peripherals: frames waiting for the TX work */
 	struct sk_buff_head tx_skbs;
+
+	/* peripherals: interrupt coalescing, set with ethtool -C */
+	struct hrtimer hrtimer;
+	ktime_t irq_timer_wait;
+	u32 active_interrupts;
+	u32 rx_max_coalesced_frames_irq;
+	u32 rx_coalesce_usecs_irq;
+	u32 tx_max_coalesced_frames_irq;
+	u32 tx_coalesce_usecs_irq;
 
 	struct can_bittiming_const *bit_timing;
 	struct can_bittiming_const *data_timing;

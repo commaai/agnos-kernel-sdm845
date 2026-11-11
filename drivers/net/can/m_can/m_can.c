@@ -903,6 +903,56 @@ static void m_can_echo_tx_event(struct net_device *dev)
 	}
 }
 
+static void m_can_interrupt_enable(struct m_can_classdev *cdev, u32 interrupts)
+{
+	if (cdev->active_interrupts == interrupts)
+		return;
+	m_can_write(cdev, M_CAN_IE, interrupts);
+	cdev->active_interrupts = interrupts;
+}
+
+/* peripherals: handle a batch of frames at the watermark or when the timer runs
+ * out, one set of bus accesses per batch
+ */
+static void m_can_coalescing_update(struct m_can_classdev *cdev, u32 ir)
+{
+	u32 new_interrupts = cdev->active_interrupts;
+	bool enable_rx_timer = false;
+	bool enable_tx_timer = false;
+
+	if (cdev->rx_coalesce_usecs_irq > 0 && (ir & (IR_RF0N | IR_RF0W))) {
+		enable_rx_timer = true;
+		new_interrupts &= ~IR_RF0N;
+	}
+	if (cdev->tx_coalesce_usecs_irq > 0 && (ir & (IR_TEFN | IR_TEFW))) {
+		enable_tx_timer = true;
+		new_interrupts &= ~IR_TEFN;
+	}
+	if (!enable_rx_timer && !hrtimer_active(&cdev->hrtimer))
+		new_interrupts |= IR_RF0N;
+	if (!enable_tx_timer && !hrtimer_active(&cdev->hrtimer))
+		new_interrupts |= IR_TEFN;
+
+	m_can_interrupt_enable(cdev, new_interrupts);
+	if (enable_rx_timer | enable_tx_timer)
+		hrtimer_start(&cdev->hrtimer, cdev->irq_timer_wait,
+			      HRTIMER_MODE_REL);
+}
+
+static enum hrtimer_restart m_can_coalescing_timer(struct hrtimer *timer)
+{
+	struct m_can_classdev *cdev = container_of(timer, struct m_can_classdev,
+						   hrtimer);
+
+	if (cdev->can.state == CAN_STATE_BUS_OFF ||
+	    cdev->can.state == CAN_STATE_STOPPED)
+		return HRTIMER_NORESTART;
+
+	irq_wake_thread(cdev->net->irq, cdev->net);
+
+	return HRTIMER_NORESTART;
+}
+
 static irqreturn_t m_can_isr(int irq, void *dev_id)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
@@ -911,6 +961,14 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 	u32 ir;
 
 	ir = m_can_read(cdev, M_CAN_IR);
+
+	/* ACK all irqs */
+	if (ir & IR_ALL_INT)
+		m_can_write(cdev, M_CAN_IR, ir);
+
+	if (cdev->is_peripheral)
+		m_can_coalescing_update(cdev, ir);
+
 	if (!ir) {
 		/* the level IRQ of a peripheral can also be its own, clear
 		 * those too or it never deasserts
@@ -922,10 +980,6 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	/* ACK all irqs */
-	if (ir & IR_ALL_INT)
-		m_can_write(cdev, M_CAN_IR, ir);
-
 	if (cdev->ops->clear_interrupts)
 		cdev->ops->clear_interrupts(cdev);
 
@@ -934,7 +988,7 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 	 * - state change IRQ
 	 * - bus error IRQ and bus error reporting
 	 */
-	if ((ir & IR_RF0N) || (ir & IR_ERR_ALL_30X)) {
+	if (ir & (IR_RF0N | IR_RF0W | IR_ERR_ALL_30X)) {
 		cdev->irqstatus = ir;
 		if (!cdev->is_peripheral) {
 			m_can_disable_all_interrupts(cdev);
@@ -1165,6 +1219,7 @@ static void m_can_chip_config(struct net_device *dev)
 
 	/* rx fifo configuration, blocking mode, fifo size 1 */
 	m_can_write(cdev, M_CAN_RXF0C,
+		    (cdev->rx_max_coalesced_frames_irq << RXFC_FWM_SHIFT) |
 		    (cdev->mcfg[MRAM_RXF0].num << RXFC_FS_SHIFT) |
 		     cdev->mcfg[MRAM_RXF0].off);
 
@@ -1226,13 +1281,15 @@ static void m_can_chip_config(struct net_device *dev)
 
 	/* every interrupt costs bus accesses on peripherals, so don't take
 	 * the ones that aren't handled: TX complete, TX FIFO empty, timestamp
-	 * wraparound, the FIFO watermarks/full and the unused RX FIFO 1/buffers
+	 * wraparound, the FIFOs full and the unused RX FIFO 1/buffers
 	 */
-	if (cdev->is_peripheral)
-		m_can_write(cdev, M_CAN_IE, m_can_read(cdev, M_CAN_IE) &
-			    ~(IR_TC | IR_TCF | IR_TFE | IR_TSW | IR_HPM |
-			      IR_TEFW | IR_TEFF | IR_RF0W | IR_RF0F |
-			      IR_RF1N | IR_RF1W | IR_RF1F | IR_RF1L | IR_DRX));
+	if (cdev->is_peripheral) {
+		cdev->active_interrupts = 0;
+		m_can_interrupt_enable(cdev, m_can_read(cdev, M_CAN_IE) &
+				       ~(IR_TC | IR_TCF | IR_TFE | IR_TSW |
+					 IR_HPM | IR_TEFF | IR_RF0F | IR_RF1N |
+					 IR_RF1W | IR_RF1F | IR_RF1L | IR_DRX));
+	}
 
 	/* route all interrupts to INT0 */
 	m_can_write(cdev, M_CAN_ILS, ILS_ALL_INT0);
@@ -1266,6 +1323,7 @@ static int m_can_set_mode(struct net_device *dev, enum can_mode mode)
 		 */
 		if (cdev->is_peripheral) {
 			netif_tx_disable(dev);
+			hrtimer_cancel(&cdev->hrtimer);
 			disable_irq(dev->irq);
 		}
 		m_can_clean(dev);
@@ -1447,6 +1505,7 @@ static int m_can_close(struct net_device *dev)
 		napi_disable(&cdev->napi);
 	} else {
 		/* nothing else may access the device while it's stopped */
+		hrtimer_cancel(&cdev->hrtimer);
 		free_irq(dev->irq, dev);
 		cancel_work_sync(&cdev->tx_work);
 	}
@@ -1739,6 +1798,8 @@ static int m_can_open(struct net_device *dev)
 
 		INIT_WORK(&cdev->tx_work, m_can_tx_work_queue);
 
+		hrtimer_init(&cdev->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		cdev->hrtimer.function = m_can_coalescing_timer;
 		err = request_threaded_irq(dev->irq, NULL, m_can_isr,
 					   IRQF_ONESHOT,
 					   dev->name, dev);
@@ -1781,10 +1842,64 @@ static const struct net_device_ops m_can_netdev_ops = {
 	.ndo_change_mtu = can_change_mtu,
 };
 
+static int m_can_get_coalesce(struct net_device *dev,
+			      struct ethtool_coalesce *ec)
+{
+	struct m_can_classdev *cdev = netdev_priv(dev);
+
+	ec->rx_max_coalesced_frames_irq = cdev->rx_max_coalesced_frames_irq;
+	ec->rx_coalesce_usecs_irq = cdev->rx_coalesce_usecs_irq;
+	ec->tx_max_coalesced_frames_irq = cdev->tx_max_coalesced_frames_irq;
+	ec->tx_coalesce_usecs_irq = cdev->tx_coalesce_usecs_irq;
+
+	return 0;
+}
+
+/* the watermarks are written when the device starts */
+static int m_can_set_coalesce(struct net_device *dev,
+			      struct ethtool_coalesce *ec)
+{
+	struct m_can_classdev *cdev = netdev_priv(dev);
+
+	if (cdev->can.state != CAN_STATE_STOPPED)
+		return -EBUSY;
+	if (ec->rx_max_coalesced_frames_irq > cdev->mcfg[MRAM_RXF0].num ||
+	    ec->tx_max_coalesced_frames_irq > cdev->mcfg[MRAM_TXB].num)
+		return -EINVAL;
+	if ((ec->rx_max_coalesced_frames_irq == 0) !=
+	    (ec->rx_coalesce_usecs_irq == 0) ||
+	    (ec->tx_max_coalesced_frames_irq == 0) !=
+	    (ec->tx_coalesce_usecs_irq == 0))
+		return -EINVAL;
+	/* one timer for both */
+	if (ec->rx_coalesce_usecs_irq && ec->tx_coalesce_usecs_irq &&
+	    ec->rx_coalesce_usecs_irq != ec->tx_coalesce_usecs_irq)
+		return -EINVAL;
+
+	cdev->rx_max_coalesced_frames_irq = ec->rx_max_coalesced_frames_irq;
+	cdev->rx_coalesce_usecs_irq = ec->rx_coalesce_usecs_irq;
+	cdev->tx_max_coalesced_frames_irq = ec->tx_max_coalesced_frames_irq;
+	cdev->tx_coalesce_usecs_irq = ec->tx_coalesce_usecs_irq;
+	cdev->irq_timer_wait = ns_to_ktime((cdev->rx_coalesce_usecs_irq ?:
+					    cdev->tx_coalesce_usecs_irq) *
+					   NSEC_PER_USEC);
+
+	return 0;
+}
+
+static const struct ethtool_ops m_can_ethtool_ops = {
+	.get_coalesce = m_can_get_coalesce,
+	.set_coalesce = m_can_set_coalesce,
+};
+
 static int register_m_can_dev(struct net_device *dev)
 {
+	struct m_can_classdev *cdev = netdev_priv(dev);
+
 	dev->flags |= IFF_ECHO;	/* we support local echo */
 	dev->netdev_ops = &m_can_netdev_ops;
+	if (cdev->is_peripheral)
+		dev->ethtool_ops = &m_can_ethtool_ops;
 
 	return register_candev(dev);
 }
