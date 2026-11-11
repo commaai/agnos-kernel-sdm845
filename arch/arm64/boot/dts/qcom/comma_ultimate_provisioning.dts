@@ -137,6 +137,7 @@
 
 &qupv3_se0_spi {
   status = "ok";
+  qcom,rt;
   pinctrl-names = "default", "sleep";
   pinctrl-0 = <&qupv3_se0_spi_active &can_cs_active>;
   pinctrl-1 = <&qupv3_se0_spi_sleep &can_cs_sleep>;
