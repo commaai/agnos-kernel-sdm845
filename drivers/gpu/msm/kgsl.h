@@ -236,6 +236,8 @@ struct kgsl_memdesc {
 	struct page **pages;
 	unsigned int page_count;
 	unsigned int cur_bindings;
+	/* Spinlock protecting memdesc gpuaddr assignment */
+	spinlock_t lock;
 };
 
 /*
@@ -271,6 +273,7 @@ struct kgsl_memdesc {
  * @work: Work struct used to schedule a kgsl_mem_entry_put in atomic contexts
  * @bind_lock: Lock for sparse memory bindings
  * @bind_tree: RB Tree for sparse memory bindings
+ * @map_count: Count how many vmas this object is mapped in
  */
 struct kgsl_mem_entry {
 	struct kref refcount;
@@ -284,6 +287,7 @@ struct kgsl_mem_entry {
 	struct work_struct work;
 	spinlock_t bind_lock;
 	struct rb_root bind_tree;
+	atomic_t map_count;
 };
 
 struct kgsl_device_private;
