@@ -187,7 +187,6 @@ struct qpnp_vadc_chip {
 	int				max_channels_available;
 	bool				vadc_iadc_sync_lock;
 	u8				id;
-	struct work_struct		trigger_completion_work;
 	bool				vadc_poll_eoc;
 	bool				vadc_recalib_check;
 	u8				revision_ana_minor;
@@ -782,17 +781,6 @@ static int32_t qpnp_vadc_read_status(struct qpnp_vadc_chip *vadc, int mode_sel)
 	return 0;
 }
 
-static void qpnp_vadc_work(struct work_struct *work)
-{
-	struct qpnp_vadc_chip *vadc = container_of(work,
-			struct qpnp_vadc_chip, trigger_completion_work);
-
-	if (qpnp_vadc_is_valid(vadc) < 0)
-		return;
-
-	complete(&vadc->adc->adc_rslt_completion);
-}
-
 static void qpnp_vadc_low_thr_fn(struct work_struct *work)
 {
 	struct qpnp_vadc_chip *vadc = container_of(work,
@@ -821,7 +809,8 @@ static irqreturn_t qpnp_vadc_isr(int irq, void *dev_id)
 {
 	struct qpnp_vadc_chip *vadc = dev_id;
 
-	schedule_work(&vadc->trigger_completion_work);
+	if (!qpnp_vadc_is_valid(vadc))
+		complete(&vadc->adc->adc_rslt_completion);
 
 	return IRQ_HANDLED;
 }
@@ -2704,8 +2693,6 @@ static int qpnp_vadc_probe(struct platform_device *pdev)
 		pr_err("qpnp adc ana_minor rev read failed with %d\n", rc);
 		goto err_setup;
 	}
-
-	INIT_WORK(&vadc->trigger_completion_work, qpnp_vadc_work);
 
 	vadc->vadc_recalib_check = of_property_read_bool(node,
 						"qcom,vadc-recalib-check");
