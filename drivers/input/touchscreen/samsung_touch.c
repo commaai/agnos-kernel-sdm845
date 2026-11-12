@@ -229,6 +229,8 @@ static int ss_handle_coordinate_event(struct ss_ts_data *ts, uint8_t *event)
             (event_coord->ttype_3_2 << 2 | event_coord->ttype_1_0),
             event_coord->major,
             event_coord->minor,
+			event_coord->wx,
+			event_coord->wy,
             event_coord->ewx,
             event_coord->ewy
         );
@@ -283,7 +285,11 @@ static int ss_handle_one_event(struct ss_ts_data *ts, uint8_t *event)
         case SS_EVENT_COORDINATE_WET:
             dev_warn(&ts->client->dev, "%s: wet coordinate event handler not implemented!\n", __func__);
             return SS_STOP;
-    }
+	default:
+		return SS_STOP;
+	}
+
+	return SS_STOP;
 }
 
 static irqreturn_t ss_ts_irq_handler(int irq, void *dev_id)
@@ -418,17 +424,17 @@ static int ss_exit_boot_mode(struct ss_ts_data *ts)
 {
     int ret = 0;
     int boot_status = 0, protocol_id;
-    uint8_t firmware_password[2] = {0x55, 0xAC};
     boot_status = ss_get_boot_status(ts);
     if(boot_status < 0) return boot_status;
 
     if(boot_status != SS_BOOT_STATUS_APP){
         // Software reset
         protocol_id = ss_get_protocol_id(ts);
-        if(IS_ERR(protocol_id)){
-            dev_err(&ts->client->dev, "%s: couldn't read protocol ID: %d\n", __func__, protocol_id);
-            return protocol_id;
-        }
+	if (protocol_id < 0) {
+		dev_err(&ts->client->dev, "%s: couldn't read protocol ID: %d\n",
+			__func__, protocol_id);
+		return protocol_id;
+	}
 
         ret = ss_write(ts, (protocol_id == SS_PROTOCOL_APP) ? SS_SW_RESET_APP_CMD : SS_SW_RESET_BOOT_CMD, NULL, 0);
         if(ret < 0){
@@ -483,7 +489,7 @@ static int ss_power_init(struct ss_ts_data *ts)
         goto err;
     }
 
-    if (of_property_read_bool(&ts->client->dev.of_node, "invert-vdd")) {
+	if (of_property_read_bool(ts->client->dev.of_node, "invert-vdd")) {
         ret = regulator_disable(ts->vdd);
     } else {
         ret = regulator_enable(ts->vdd);
@@ -530,8 +536,8 @@ static int ss_flash_memory(struct ss_ts_data *ts, uint32_t addr, uint8_t *data, 
         return -EINVAL;
     }
 
-    ret = ss_erase_pages(ts, start_page, num_pages);
-    if(IS_ERR(ret)){
+	ret = ss_erase_pages(ts, start_page, num_pages);
+	if (ret < 0) {
         dev_err(&ts->client->dev, "%s: failed to erase pages: %d\n", __func__, ret);
         goto err;
     }
@@ -547,7 +553,8 @@ static int ss_flash_memory(struct ss_ts_data *ts, uint32_t addr, uint8_t *data, 
 
         // Append data (zero padded)
         memset(&buf[2], 0, SS_PAGE_SIZE);
-        data_len = min(SS_PAGE_SIZE, (len - (i * SS_PAGE_SIZE)));
+		data_len = min_t(uint32_t, SS_PAGE_SIZE,
+				 len - (i * SS_PAGE_SIZE));
         memcpy(&buf[2], (data + (i * SS_PAGE_SIZE)), data_len);
 
         // Append checksum
@@ -555,10 +562,12 @@ static int ss_flash_memory(struct ss_ts_data *ts, uint32_t addr, uint8_t *data, 
 
         // Write the page
         ret = ss_write_bulk(ts, SS_FLASH_WRITE_CMD, buf, sizeof(buf));
-        if(IS_ERR(ret)){
-            dev_err(&ts->client->dev, "%s: failed to write page %d: %d\n", __func__, page_index, ret);
-            goto err;
-        }
+		if (ret < 0) {
+			dev_err(&ts->client->dev,
+				"%s: failed to write page %d: %d\n",
+				__func__, page_index, ret);
+			goto err;
+		}
         msleep(5);
     }
     dev_info(&ts->client->dev, "%s: flashed pages: 0x%x - 0x%x\n", __func__, start_page, start_page + num_pages);
@@ -567,7 +576,7 @@ err:
     return ret;
 }
 
-static int ss_flash_firmware(struct ss_ts_data *ts, struct firmware *fw)
+static int ss_flash_firmware(struct ss_ts_data *ts, const struct firmware *fw)
 {
     int ret = 0;
     uint32_t i;
@@ -593,14 +602,16 @@ static int ss_flash_firmware(struct ss_ts_data *ts, struct firmware *fw)
         }
 
         // Flash chunk
-        ret = ss_flash_memory(ts, chunk_header->addr, data_ptr, chunk_header->size);
-        if(IS_ERR(ret)){
-            return ret;
-        }
+		ret = ss_flash_memory(ts, chunk_header->addr, data_ptr,
+				      chunk_header->size);
+		if (ret < 0)
+			return ret;
         data_ptr += chunk_header->size;
 
         // TODO: check that flashed pages match
     }
+
+	return 0;
 }
 
 static int ss_enable_sensing(struct ss_ts_data *ts)
@@ -616,7 +627,7 @@ static int ss_enable_sensing(struct ss_ts_data *ts)
     return 0;
 }
 
-static char ss_color_cal_calculate_checksum(char *dat)
+static char ss_color_cal_calculate_checksum(const char *dat)
 {
     int i = 0;
     char res = SS_COLOR_CAL_MAGIC;
@@ -666,10 +677,12 @@ static ssize_t ss_color_cal_store(struct device *dev, struct device_attribute *a
     struct ss_ts_data *ts = dev_get_drvdata(dev);
     char data[SS_COLOR_CAL_SIZE + 2];
 
-    if(size != SS_COLOR_CAL_SIZE){
-        dev_err(&ts->client->dev, "%s: expected data of length %d, got length %d\n", __func__, SS_COLOR_CAL_SIZE, size);
-        return -EINVAL;
-    }
+	if (size != SS_COLOR_CAL_SIZE) {
+		dev_err(&ts->client->dev,
+			"%s: expected data of length %d, got length %zu\n",
+			__func__, SS_COLOR_CAL_SIZE, size);
+		return -EINVAL;
+	}
 
     if(ss_color_cal_calculate_checksum(buf) != buf[SS_COLOR_CAL_SIZE - 1]){
         dev_err(&ts->client->dev, "%s: wrong checksum value\n", __func__);
@@ -716,7 +729,7 @@ static const struct attribute_group ss_attr_group = {
 static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct ss_ts_data *ts;
-    struct firmware *fw;
+	const struct firmware *fw;
 	int error, boot_status;
     char test;
 
@@ -735,11 +748,10 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 	ts->client = client;
 	i2c_set_clientdata(client, ts);
 
-    // Init regulator
-    error = ss_power_init(ts);
-    if(IS_ERR(error)) {
-        return error;
-    }
+	/* Init regulator */
+	error = ss_power_init(ts);
+	if (error)
+		return error;
 
 	ts->interrupt_gpio = devm_gpiod_get(&client->dev, "interrupt", GPIOD_IN);
 	if (IS_ERR(ts->interrupt_gpio)) {
@@ -847,18 +859,19 @@ static int ss_ts_probe(struct i2c_client *client, const struct i2c_device_id *id
 		return error;
 	}
 
+	error = input_register_device(ts->input);
+	if (error) {
+		dev_err(&client->dev,
+			"failed to register input device: %d\n", error);
+		return error;
+	}
+
 	error = devm_request_threaded_irq(&client->dev, client->irq,
 					  NULL, ss_ts_irq_handler,
 					  IRQF_ONESHOT,
 					  client->name, ts);
 	if (error) {
 		dev_err(&client->dev, "failed to request IRQ: %d\n", error);
-		return error;
-	}
-
-	error = input_register_device(ts->input);
-	if (error) {
-		dev_err(&client->dev, "failed to register input device: %d\n", error);
 		return error;
 	}
 
@@ -889,7 +902,7 @@ static const struct of_device_id ss_ts_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, ss_ts_dt_ids);
 
 static const struct i2c_device_id ss_ts_id[] = {
-	{ SS_I2C_NAME,	0 },
+	{ "samsung_i2c_ts", 0 },
 	{ /* sentinel */  }
 };
 MODULE_DEVICE_TABLE(i2c, ss_ts_id);
@@ -898,6 +911,7 @@ static struct i2c_driver ss_ts_driver = {
 	.driver = {
 		.name	= SS_I2C_NAME,
 		.of_match_table = of_match_ptr(ss_ts_dt_ids),
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe		= ss_ts_probe,
     .remove     = ss_ts_remove,

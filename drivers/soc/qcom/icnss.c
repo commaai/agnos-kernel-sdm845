@@ -4643,6 +4643,8 @@ static int icnss_probe(struct platform_device *pdev)
 	INIT_WORK(&priv->qmi_recv_msg_work, icnss_qmi_wlfw_clnt_notify_work);
 	INIT_LIST_HEAD(&priv->event_list);
 
+	penv = priv;
+
 	ret = qmi_svc_event_notifier_register(WLFW_SERVICE_ID_V01,
 					      WLFW_SERVICE_VERS_V01,
 					      WLFW_SERVICE_INS_ID_V01,
@@ -4661,13 +4663,12 @@ static int icnss_probe(struct platform_device *pdev)
 		icnss_pr_err("Failed to init platform device wakeup source, err = %d\n",
 			     ret);
 
-	penv = priv;
-
 	icnss_pr_info("Platform driver probed successfully\n");
 
 	return 0;
 
 out_destroy_wq:
+	penv = NULL;
 	destroy_workqueue(priv->event_wq);
 out_smmu_deinit:
 	icnss_smmu_deinit(priv);
@@ -4848,6 +4849,7 @@ static struct platform_driver icnss_driver = {
 		.pm = &icnss_pm_ops,
 		.owner = THIS_MODULE,
 		.of_match_table = icnss_dt_match,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
 
