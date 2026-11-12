@@ -137,6 +137,7 @@
 
 &qupv3_se0_spi {
   status = "ok";
+  qcom,rt;
   pinctrl-names = "default", "sleep";
   pinctrl-0 = <&qupv3_se0_spi_active &can_cs_active>;
   pinctrl-1 = <&qupv3_se0_spi_sleep &can_cs_sleep>;
@@ -160,8 +161,8 @@
     pinctrl-names = "default";
     pinctrl-0 = <&can0_int_default>;
     reset-gpios = <&tlmm 33 GPIO_ACTIVE_HIGH>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
-    spi-max-frequency = <10000000>;
+    bosch,mram-cfg = <0x0 0 0 24 0 0 4 4>;
+    spi-max-frequency = <16000000>;
   };
 
   can1: can@1 {
@@ -174,8 +175,8 @@
     interrupts = <49 IRQ_TYPE_LEVEL_LOW>;
     pinctrl-names = "default";
     pinctrl-0 = <&can1_int_default>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
-    spi-max-frequency = <10000000>;
+    bosch,mram-cfg = <0x0 0 0 24 0 0 4 4>;
+    spi-max-frequency = <16000000>;
   };
 
   can2: can@2 {
@@ -188,8 +189,8 @@
     interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
     pinctrl-names = "default";
     pinctrl-0 = <&can2_int_default>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
-    spi-max-frequency = <10000000>;
+    bosch,mram-cfg = <0x0 0 0 24 0 0 4 4>;
+    spi-max-frequency = <16000000>;
   };
 
   can3: can@3 {
@@ -202,8 +203,8 @@
     interrupts = <32 IRQ_TYPE_LEVEL_LOW>;
     pinctrl-names = "default";
     pinctrl-0 = <&can3_int_default>;
-    bosch,mram-cfg = <0x0 0 0 16 0 0 8 8>;
-    spi-max-frequency = <10000000>;
+    bosch,mram-cfg = <0x0 0 0 24 0 0 4 4>;
+    spi-max-frequency = <16000000>;
   };
 };
 

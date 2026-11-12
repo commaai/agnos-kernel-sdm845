@@ -12,6 +12,7 @@
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/freezer.h>
+#include <linux/hrtimer.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/clk.h>
@@ -81,11 +82,19 @@ struct m_can_classdev {
 	struct clk *hclk;
 	struct clk *cclk;
 
-	struct workqueue_struct *tx_wq;
-	struct work_struct tx_work;
 	struct sk_buff *tx_skb;
-	/* peripherals: frames waiting for the TX work */
+	/* peripherals: frames waiting for the IRQ thread */
 	struct sk_buff_head tx_skbs;
+	u32 tx_get, tx_inflight;
+
+	/* peripherals: interrupt coalescing, set with ethtool -C */
+	struct hrtimer hrtimer;
+	ktime_t irq_timer_wait;
+	u32 active_interrupts;
+	u32 rx_max_coalesced_frames_irq;
+	u32 rx_coalesce_usecs_irq;
+	u32 tx_max_coalesced_frames_irq;
+	u32 tx_coalesce_usecs_irq;
 
 	struct can_bittiming_const *bit_timing;
 	struct can_bittiming_const *data_timing;
@@ -104,7 +113,10 @@ struct m_can_classdev {
 	struct mram_cfg mcfg[MRAM_CFG_NUM];
 	/* the DT's message RAM config, laid out with RX/TX elements this big */
 	u32 mram_cfg_vals[MRAM_CFG_LEN];
+	u32 mram_end;
 	u32 elem_size;
+	/* a CAN FD element's data field, 0 for the full 64 bytes */
+	u32 fd_data_len;
 };
 
 struct m_can_classdev *m_can_class_allocate_dev(struct device *dev);

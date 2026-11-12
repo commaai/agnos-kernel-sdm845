@@ -133,8 +133,8 @@ struct tcan4x5x_priv {
 	u32 *spi_rx_buf;
 };
 
-/* the header and up to 64 words, the most m_can accesses at once */
-#define TCAN4X5X_SPI_BUF_WORDS (1 + 64)
+/* the header and up to 252 words, the most m_can accesses at once */
+#define TCAN4X5X_SPI_BUF_WORDS (1 + 252)
 
 static struct can_bittiming_const tcan4x5x_bittiming_const = {
 	.name = DEVICE_NAME,
