@@ -197,8 +197,7 @@ static void hyn_ts_reset(struct hyn_ts_data *ts)
 static int hyn_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct hyn_ts_data *ts;
-    struct firmware *fw;
-	int error, boot_status;
+	int error;
 
     dev_info(&client->dev, "HYNITRON PANEL probe\n");
 
@@ -231,6 +230,8 @@ static int hyn_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		return error;
 	}
 
+	hyn_ts_reset(ts);
+
 	ts->input = devm_input_allocate_device(&client->dev);
 	if (!ts->input) {
 		dev_err(&client->dev, "failed to allocate input device\n");
@@ -251,18 +252,19 @@ static int hyn_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		return error;
 	}
 
+	error = input_register_device(ts->input);
+	if (error) {
+		dev_err(&client->dev,
+			"failed to register input device: %d\n", error);
+		return error;
+	}
+
 	error = devm_request_threaded_irq(&client->dev, client->irq,
 					  NULL, hyn_ts_irq_handler,
 					  IRQF_ONESHOT,
 					  client->name, ts);
 	if (error) {
 		dev_err(&client->dev, "failed to request IRQ: %d\n", error);
-		return error;
-	}
-
-	error = input_register_device(ts->input);
-	if (error) {
-		dev_err(&client->dev, "failed to register input device: %d\n", error);
 		return error;
 	}
 
@@ -285,7 +287,7 @@ static const struct of_device_id hyn_ts_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, hyn_ts_dt_ids);
 
 static const struct i2c_device_id hyn_ts_id[] = {
-	{ HYN_I2C_NAME,	0 },
+	{ "hynitron_i2c_ts", 0 },
 	{ /* sentinel */  }
 };
 MODULE_DEVICE_TABLE(i2c, hyn_ts_id);
@@ -294,6 +296,7 @@ static struct i2c_driver hyn_ts_driver = {
 	.driver = {
 		.name	= HYN_I2C_NAME,
 		.of_match_table = of_match_ptr(hyn_ts_dt_ids),
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe		= hyn_ts_probe,
     .remove     = hyn_ts_remove,

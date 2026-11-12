@@ -3272,7 +3272,11 @@ long kgsl_ioctl_gpumem_get_info(struct kgsl_device_private *dev_priv,
 	param->flags = (unsigned int) entry->memdesc.flags;
 	param->size = (size_t) entry->memdesc.size;
 	param->mmapsize = (size_t) kgsl_memdesc_footprint(&entry->memdesc);
-	param->useraddr = entry->memdesc.useraddr;
+	/*
+	 * Entries can have multiple user mappings so there is no
+	 * single address we can report.
+	 */
+	param->useraddr = 0;
 
 	kgsl_mem_entry_put(entry);
 	return result;
@@ -4000,7 +4004,11 @@ long kgsl_ioctl_gpuobj_info(struct kgsl_device_private *dev_priv,
 	param->flags = entry->memdesc.flags;
 	param->size = entry->memdesc.size;
 	param->va_len = kgsl_memdesc_footprint(&entry->memdesc);
-	param->va_addr = (uint64_t) entry->memdesc.useraddr;
+	/*
+	 * Entries can have multiple user mappings so there is no
+	 * single address we can report.
+	 */
+	param->va_addr = 0;
 
 	kgsl_mem_entry_put(entry);
 	return 0;
@@ -4103,8 +4111,12 @@ static void kgsl_gpumem_vm_open(struct vm_area_struct *vma)
 {
 	struct kgsl_mem_entry *entry = vma->vm_private_data;
 
-	if (kgsl_mem_entry_get(entry) == 0)
+	if (kgsl_mem_entry_get(entry) == 0) {
 		vma->vm_private_data = NULL;
+		return;
+	}
+
+	atomic_inc(&entry->map_count);
 }
 
 static int
@@ -4133,7 +4145,13 @@ kgsl_gpumem_vm_close(struct vm_area_struct *vma)
 	if (!entry)
 		return;
 
-	entry->memdesc.useraddr = 0;
+	/*
+	 * Remove useraddr tracking once all the mappings have gone away
+	 * to prevent UAF on concurrent shared VMAs (CVE-2021-1905).
+	 */
+	if (!atomic_dec_return(&entry->map_count))
+		entry->memdesc.useraddr = 0;
+
 	kgsl_mem_entry_put(entry);
 }
 
@@ -4172,11 +4190,6 @@ get_mmap_entry(struct kgsl_process_private *private,
 		}
 	}
 
-	if (entry->memdesc.useraddr != 0) {
-		ret = -EBUSY;
-		goto err_put;
-	}
-
 	if (kgsl_memdesc_use_cpu_map(&entry->memdesc)) {
 		if (len != kgsl_memdesc_footprint(&entry->memdesc)) {
 			ret = -ERANGE;
@@ -4205,19 +4218,39 @@ static unsigned long _gpu_set_svm_region(struct kgsl_process_private *private,
 {
 	int ret;
 
+	/*
+	 * Protect access to the gpuaddr here to prevent multiple vmas from
+	 * trying to map a SVM region at the same time
+	 */
+	spin_lock(&entry->memdesc.lock);
+
+	if (entry->memdesc.gpuaddr) {
+		spin_unlock(&entry->memdesc.lock);
+		return (unsigned long)-EBUSY;
+	}
+
+	entry->memdesc.gpuaddr = (uint64_t)addr;
+	spin_unlock(&entry->memdesc.lock);
+
 	ret = kgsl_mmu_set_svm_region(private->pagetable, (uint64_t) addr,
 		(uint64_t) size);
 
-	if (ret != 0)
-		return ret;
+	if (ret != 0) {
+		spin_lock(&entry->memdesc.lock);
+		entry->memdesc.gpuaddr = 0;
+		spin_unlock(&entry->memdesc.lock);
+		return (unsigned long)ret;
+	}
 
-	entry->memdesc.gpuaddr = (uint64_t) addr;
 	entry->memdesc.pagetable = private->pagetable;
 
 	ret = kgsl_mmu_map(private->pagetable, &entry->memdesc);
 	if (ret) {
 		kgsl_mmu_put_gpuaddr(&entry->memdesc);
-		return ret;
+		spin_lock(&entry->memdesc.lock);
+		entry->memdesc.gpuaddr = 0;
+		spin_unlock(&entry->memdesc.lock);
+		return (unsigned long)ret;
 	}
 
 	kgsl_memfree_purge(private->pagetable, entry->memdesc.gpuaddr,
@@ -4280,6 +4313,9 @@ static unsigned long _search_range(struct kgsl_process_private *private,
 		result = _gpu_set_svm_region(private, entry, cpu, len);
 		if (!IS_ERR_VALUE(result))
 			break;
+
+		if ((long)result == -EBUSY)
+			return -EBUSY;
 
 		trace_kgsl_mem_unmapped_area_collision(entry, cpu, len);
 
@@ -4498,6 +4534,7 @@ static int kgsl_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_file = file;
 
 	entry->memdesc.useraddr = vma->vm_start;
+	atomic_inc(&entry->map_count);
 
 	trace_kgsl_mem_mmap(entry);
 	return 0;

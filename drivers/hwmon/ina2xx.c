@@ -502,6 +502,7 @@ MODULE_DEVICE_TABLE(i2c, ina2xx_id);
 static struct i2c_driver ina2xx_driver = {
 	.driver = {
 		.name	= "ina2xx",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe		= ina2xx_probe,
 	.id_table	= ina2xx_id,

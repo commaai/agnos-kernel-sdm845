@@ -1381,6 +1381,20 @@ static int skb_can_shift(const struct sk_buff *skb)
 	return !skb_headlen(skb) && skb_is_nonlinear(skb);
 }
 
+int tcp_skb_shift(struct sk_buff *to, struct sk_buff *from,
+		  int pcount, int shiftlen)
+{
+	/* Ensure that transferring payload does not overflow 16-bit
+	 * GSO segment counters or maximum safe payload bounds.
+	 */
+	if ((to->len + shiftlen) > 0xffff * TCP_MIN_GSO_SIZE)
+		return 0;
+	if ((tcp_skb_pcount(to) + pcount) > 0xffff)
+		return 0;
+
+	return skb_shift(to, from, shiftlen);
+}
+
 /* Try collapsing SACK blocks spanning across multiple skbs to a single
  * skb.
  */
@@ -1489,7 +1503,7 @@ static struct sk_buff *tcp_shift_skb_data(struct sock *sk, struct sk_buff *skb,
 	if (!after(TCP_SKB_CB(skb)->seq + len, tp->snd_una))
 		goto fallback;
 
-	if (!skb_shift(prev, skb, len))
+	if (!tcp_skb_shift(prev, skb, pcount, len))
 		goto fallback;
 	if (!tcp_shifted_skb(sk, skb, state, pcount, len, mss, dup_sack))
 		goto out;
@@ -1508,7 +1522,7 @@ static struct sk_buff *tcp_shift_skb_data(struct sock *sk, struct sk_buff *skb,
 		goto out;
 
 	len = skb->len;
-	if (skb_shift(prev, skb, len)) {
+	if (tcp_skb_shift(prev, skb, tcp_skb_pcount(skb), len)) {
 		pcount += tcp_skb_pcount(skb);
 		tcp_shifted_skb(sk, skb, state, tcp_skb_pcount(skb), len, mss, 0);
 	}
