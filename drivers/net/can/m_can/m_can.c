@@ -237,10 +237,6 @@ enum m_can_reg {
 #define RXFS_FGI_MASK	0x3f00
 #define RXFS_FFL_MASK	0x7f
 
-/* Rx Buffer / FIFO Element Size Configuration (RXESC) */
-#define M_CAN_RXESC_8BYTES	0x0
-#define M_CAN_RXESC_64BYTES	0x777
-
 /* Tx Buffer Configuration(TXBC) */
 #define TXBC_NDTB_SHIFT		16
 #define TXBC_NDTB_MASK		(0x3f << TXBC_NDTB_SHIFT)
@@ -255,10 +251,6 @@ enum m_can_reg {
 #define TXFQS_TFGI_MASK		(0x1f << TXFQS_TFGI_SHIFT)
 #define TXFQS_TFFL_SHIFT	0
 #define TXFQS_TFFL_MASK		(0x3f << TXFQS_TFFL_SHIFT)
-
-/* Tx Buffer Element Size Configuration(TXESC) */
-#define TXESC_TBDS_8BYTES	0x0
-#define TXESC_TBDS_64BYTES	0x7
 
 /* Tx Event FIFO Configuration (TXEFC) */
 #define TXEFC_EFS_SHIFT		16
@@ -282,6 +274,17 @@ enum m_can_reg {
 #define TXE_ELEMENT_SIZE	8
 /* RX FIFO, RX buffer and TX buffer elements: ID, DLC and the data field */
 #define M_CAN_ELEMENT_SIZE(data_len)	(8 + (data_len))
+
+static u32 m_can_fd_data_len(struct m_can_classdev *cdev)
+{
+	return cdev->fd_data_len ?: CANFD_MAX_DLEN;
+}
+
+/* RXESC/TXESC code of a data field size: 8, 12, 16, 20, 24, 32, 48, 64 */
+static u32 m_can_data_size_code(u32 len)
+{
+	return len <= 24 ? (len - 8) / 4 : len == 32 ? 5 : len == 48 ? 6 : 7;
+}
 
 /* the most words to read or write at once, whole CAN FD elements that fit a
  * one byte transfer length
@@ -431,6 +434,7 @@ static void m_can_clean(struct net_device *net)
 /* receive the RX FIFO element in elem */
 static void m_can_read_fifo(struct net_device *dev, const u32 *elem)
 {
+	struct m_can_classdev *cdev = netdev_priv(dev);
 	struct net_device_stats *stats = &dev->stats;
 	struct canfd_frame *cf;
 	struct sk_buff *skb;
@@ -449,6 +453,13 @@ static void m_can_read_fifo(struct net_device *dev, const u32 *elem)
 		cf->len = can_dlc2len((dlc >> 16) & 0x0F);
 	else
 		cf->len = get_can_dlc((dlc >> 16) & 0x0F);
+
+	/* the M_CAN keeps only what fits the element */
+	if (cf->len > cdev->elem_size - 8) {
+		stats->rx_length_errors++;
+		kfree_skb(skb);
+		return;
+	}
 
 	if (id & RX_BUF_XTD)
 		cf->can_id = (id & CAN_EFF_MASK) | CAN_EFF_FLAG;
@@ -1179,7 +1190,7 @@ static void m_can_chip_config(struct net_device *dev)
 	 * enough for peripherals to read and write a run of them at once
 	 */
 	small = cdev->is_peripheral && !(cdev->can.ctrlmode & CAN_CTRLMODE_FD);
-	cdev->elem_size = M_CAN_ELEMENT_SIZE(CANFD_MAX_DLEN);
+	cdev->elem_size = M_CAN_ELEMENT_SIZE(m_can_fd_data_len(cdev));
 	end = m_can_of_parse_mram(cdev, cdev->mram_cfg_vals, 1);
 	if (small) {
 		/* and four of them take less room than a CAN FD element, so
@@ -1196,7 +1207,7 @@ static void m_can_chip_config(struct net_device *dev)
 
 	/* RX Buffer/FIFO Element Size */
 	m_can_write(cdev, M_CAN_RXESC,
-		    small ? M_CAN_RXESC_8BYTES : M_CAN_RXESC_64BYTES);
+		    m_can_data_size_code(cdev->elem_size - 8) * 0x111);
 
 	/* Accept Non-matching Frames Into FIFO 0 */
 	m_can_write(cdev, M_CAN_GFC, 0x0);
@@ -1213,8 +1224,7 @@ static void m_can_chip_config(struct net_device *dev)
 	}
 
 	/* TX Buffer Element Size */
-	m_can_write(cdev, M_CAN_TXESC,
-		    small ? TXESC_TBDS_8BYTES : TXESC_TBDS_64BYTES);
+	m_can_write(cdev, M_CAN_TXESC, m_can_data_size_code(cdev->elem_size - 8));
 
 	/* TX Event FIFO */
 	if (cdev->version == 30) {
@@ -1711,6 +1721,11 @@ static void m_can_tx_peripheral(struct m_can_classdev *cdev)
 		u32 *elem = &buf[n * words];
 
 		cf = (struct canfd_frame *)skb->data;
+		if (cf->len > cdev->elem_size - 8) {
+			dev->stats.tx_dropped++;
+			kfree_skb(skb);
+			continue;
+		}
 		if (cf->can_id & CAN_EFF_FLAG)
 			elem[0] = (cf->can_id & CAN_EFF_MASK) | TX_BUF_XTD;
 		else
@@ -1905,8 +1920,10 @@ static void m_can_get_ringparam(struct net_device *dev,
 static int m_can_set_ringparam(struct net_device *dev,
 			       struct ethtool_ringparam *ring)
 {
+	static const u32 lens[] = { 64, 48, 32, 24, 20, 16, 12, 8 };
 	struct m_can_classdev *cdev = netdev_priv(dev);
-	u32 vals[MRAM_CFG_LEN], elem_size = cdev->elem_size, end;
+	u32 vals[MRAM_CFG_LEN], elem_size = cdev->elem_size;
+	int i;
 
 	if (cdev->can.state != CAN_STATE_STOPPED)
 		return -EBUSY;
@@ -1914,10 +1931,19 @@ static int m_can_set_ringparam(struct net_device *dev,
 	vals[3] = ring->rx_pending;
 	vals[6] = ring->tx_pending;
 	vals[7] = ring->tx_pending;
-	cdev->elem_size = M_CAN_ELEMENT_SIZE(CANFD_MAX_DLEN);
-	end = m_can_of_parse_mram(cdev, vals, 1);
-	if (ring->rx_pending && ring->tx_pending && end <= cdev->mram_end)
+	/* CAN FD elements with the biggest data field the ring still fits,
+	 * a bus of short frames gets deeper FIFOs and moves less over SPI
+	 */
+	for (i = 0; i < ARRAY_SIZE(lens); i++) {
+		cdev->elem_size = M_CAN_ELEMENT_SIZE(lens[i]);
+		if (m_can_of_parse_mram(cdev, vals, 1) <= cdev->mram_end)
+			break;
+	}
+	if (ring->rx_pending && ring->tx_pending && i < ARRAY_SIZE(lens)) {
 		memcpy(cdev->mram_cfg_vals, vals, sizeof(vals));
+		cdev->fd_data_len = lens[i];
+	}
+	cdev->elem_size = M_CAN_ELEMENT_SIZE(m_can_fd_data_len(cdev));
 	m_can_of_parse_mram(cdev, cdev->mram_cfg_vals, 1);
 	cdev->elem_size = elem_size;
 	return cdev->mram_cfg_vals[3] == ring->rx_pending &&

@@ -115,6 +115,8 @@ struct m_can_classdev {
 	u32 mram_cfg_vals[MRAM_CFG_LEN];
 	u32 mram_end;
 	u32 elem_size;
+	/* a CAN FD element's data field, 0 for the full 64 bytes */
+	u32 fd_data_len;
 };
 
 struct m_can_classdev *m_can_class_allocate_dev(struct device *dev);
