@@ -1606,7 +1606,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	int ret;
 	tDot11fAssocRequest *frm;
 	uint16_t caps;
-	uint8_t *frame;
+	uint8_t *frame, *rsnx_ie = NULL;
 	tSirRetStatus sir_status;
 	tLimMlmAssocCnf assoc_cnf;
 	uint32_t bytes = 0, payload, status;
@@ -1614,7 +1614,9 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	void *packet;
 	QDF_STATUS qdf_status;
 	uint16_t add_ie_len, assoc_ack_status;
-	uint8_t *add_ie;
+	uint16_t rsnx_ie_len = 0;
+	uint8_t *add_ie = NULL;
+	const uint8_t *rsnx;
 	uint8_t *wps_ie = NULL;
 	uint8_t power_caps = false;
 	uint8_t tx_flag = 0;
@@ -1645,12 +1647,27 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 		return;
 	}
 	add_ie_len = pe_session->pLimJoinReq->addIEAssoc.length;
-	add_ie = pe_session->pLimJoinReq->addIEAssoc.addIEdata;
+	if (add_ie_len) {
+		add_ie = qdf_mem_malloc(add_ie_len);
+		if (!add_ie) {
+			pe_err("Unable to allocate additional IE buffer");
+			qdf_mem_free(mlm_assoc_req);
+			return;
+		}
+		/*
+		 * IE stripping below must not modify the shared join request:
+		 * a PMF comeback retry needs the original additional IEs.
+		 */
+		qdf_mem_copy(add_ie,
+			     pe_session->pLimJoinReq->addIEAssoc.addIEdata,
+			     add_ie_len);
+	}
 
 	frm = qdf_mem_malloc(sizeof(tDot11fAssocRequest));
 	if (NULL == frm) {
 		pe_err("Unable to allocate memory");
 		qdf_mem_free(mlm_assoc_req);
+		qdf_mem_free(add_ie);
 		return;
 	}
 	qdf_mem_set((uint8_t *) frm, sizeof(tDot11fAssocRequest), 0);
@@ -1914,6 +1931,36 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	}
 
 	/*
+	 * Copy RSNXE without changing the shared join request, which is reused
+	 * for PMF comeback retries. dot11f skips this unknown IE.
+	 */
+	rsnx = wlan_cfg_get_ie_ptr(add_ie, add_ie_len, WLAN_ELEMID_RSNXE,
+				   ONE_BYTE);
+	if (rsnx) {
+		tSirBssDescription *bss_descr;
+
+		bss_descr = &pe_session->pLimJoinReq->bssDescription;
+		/* Do not send RSNXE to an AP that does not advertise it. */
+		if (wlan_cfg_get_ie_ptr((uint8_t *)bss_descr->ieFields,
+				lim_get_ielen_from_bss_description(bss_descr),
+				WLAN_ELEMID_RSNXE, ONE_BYTE)) {
+			rsnx_ie_len = rsnx[1] + 2;
+			if (rsnx_ie_len > add_ie_len - (rsnx - add_ie)) {
+				pe_err("Invalid RSNXE length: %d", rsnx_ie_len);
+				goto end;
+			}
+			rsnx_ie = qdf_mem_malloc(rsnx_ie_len);
+			if (!rsnx_ie) {
+				pe_err("Unable to allocate RSNXE buffer");
+				goto end;
+			}
+			qdf_mem_copy(rsnx_ie, rsnx, rsnx_ie_len);
+		} else {
+			pe_debug("Skip RSNXE: AP does not advertise it");
+		}
+	}
+
+	/*
 	 * Do unpack to populate the add_ie buffer to frm structure
 	 * before packing the frm structure. In this way, the IE ordering
 	 * which the latest 802.11 spec mandates is maintained.
@@ -1938,8 +1985,8 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 			status);
 	}
 
-	bytes = payload + sizeof(tSirMacMgmtHdr) +
-			aes_block_size_len;
+	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
+		rsnx_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -1977,6 +2024,14 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 		goto end;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Assoc request pack warning (0x%08x)", status);
+	}
+
+	/* Include RSNXE before FILS encryption and saving the request IEs. */
+	if (rsnx_ie && rsnx_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     rsnx_ie, rsnx_ie_len);
+		payload += rsnx_ie_len;
+		pe_debug("RSNXE added to association request");
 	}
 
 	if (pe_session->assocReq != NULL) {
@@ -2052,8 +2107,10 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	}
 
 end:
+	qdf_mem_free(rsnx_ie);
 	/* Free up buffer allocated for mlm_assoc_req */
 	qdf_mem_free(mlm_assoc_req);
+	qdf_mem_free(add_ie);
 	mlm_assoc_req = NULL;
 	qdf_mem_free(frm);
 	return;

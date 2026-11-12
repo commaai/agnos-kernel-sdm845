@@ -25,6 +25,11 @@ config WLAN_FEATURE_11W
 	bool "Enable the WLAN 802.11w Protected Management Frames feature"
 	default n
 
+config WLAN_FEATURE_SAE
+	bool "Enable WPA3-Personal SAE (external auth) support"
+	depends on QCA_CLD_WLAN
+	default n
+
 config WLAN_FEATURE_LPSS
 	bool "Enable the WLAN LPSS feature"
 	default n

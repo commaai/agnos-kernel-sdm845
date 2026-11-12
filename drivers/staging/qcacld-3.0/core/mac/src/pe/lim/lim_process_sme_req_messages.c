@@ -2063,6 +2063,7 @@ static void __lim_process_sme_reassoc_req(tpAniSirGlobal mac_ctx,
 	tpSirSmeJoinReq reassoc_req = NULL;
 	tLimMlmReassocReq *mlm_reassoc_req;
 	tSirResultCodes ret_code = eSIR_SME_SUCCESS;
+	tSirRetStatus sir_status;
 	tpPESession session_entry = NULL;
 	uint8_t session_id;
 	uint8_t sme_session_id;
@@ -2090,6 +2091,28 @@ static void __lim_process_sme_reassoc_req(tpAniSirGlobal mac_ctx,
 
 		ret_code = eSIR_SME_INVALID_PARAMETERS;
 		goto end;
+	}
+
+	/*
+	 * The roamed indication reports only SSID and RSN request IEs.
+	 * Omit RSNXE so the request matches EAPOL message 2/4.
+	 */
+	if (wlan_cfg_get_ie_ptr(reassoc_req->addIEAssoc.addIEdata,
+				reassoc_req->addIEAssoc.length,
+				WLAN_ELEMID_RSNXE, ONE_BYTE)) {
+		pe_debug("Strip RSNXE: roamed indication cannot report it");
+		sir_status = lim_strip_ie(mac_ctx,
+					reassoc_req->addIEAssoc.addIEdata,
+					&reassoc_req->addIEAssoc.length,
+					WLAN_ELEMID_RSNXE, ONE_BYTE,
+					NULL, 0, NULL, 0);
+		if (eSIR_SUCCESS != sir_status) {
+			pe_err("Failed to strip RSNXE: %d", sir_status);
+			ret_code = sir_status == eSIR_MEM_ALLOC_FAILED ?
+				eSIR_SME_RESOURCES_UNAVAILABLE :
+				eSIR_SME_INVALID_PARAMETERS;
+			goto end;
+		}
 	}
 
 	session_entry = pe_find_session_by_bssid(mac_ctx,
