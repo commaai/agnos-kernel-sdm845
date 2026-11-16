@@ -10,6 +10,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/interrupt.h>
 #include <linux/iopoll.h>
 #include <linux/slab.h>
 #include <uapi/media/cam_isp.h>
@@ -440,7 +441,8 @@ static int cam_ife_csid_path_reset(struct cam_ife_csid_hw *csid_hw,
 	struct cam_isp_resource_node        *res;
 	struct cam_ife_csid_reg_offset      *csid_reg;
 	uint32_t  reset_strb_addr, reset_strb_val, val, id;
-	struct completion  *complete;
+	uint32_t  irq_status_addr, irq_clear_addr, status;
+	void __iomem *base;
 
 	csid_reg = csid_hw->csid_info->csid_reg;
 	soc_info = &csid_hw->hw_info->soc_info;
@@ -472,7 +474,8 @@ static int cam_ife_csid_path_reset(struct cam_ife_csid_hw *csid_hw,
 		}
 
 		reset_strb_addr = csid_reg->ipp_reg->csid_ipp_rst_strobes_addr;
-		complete = &csid_hw->csid_ipp_complete;
+		irq_status_addr = csid_reg->ipp_reg->csid_ipp_irq_status_addr;
+		irq_clear_addr = csid_reg->ipp_reg->csid_ipp_irq_clear_addr;
 
 		/* Enable path reset done interrupt */
 		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
@@ -492,8 +495,8 @@ static int cam_ife_csid_path_reset(struct cam_ife_csid_hw *csid_hw,
 
 		reset_strb_addr =
 			csid_reg->rdi_reg[id]->csid_rdi_rst_strobes_addr;
-		complete =
-			&csid_hw->csid_rdin_complete[id];
+		irq_status_addr = csid_reg->rdi_reg[id]->csid_rdi_irq_status_addr;
+		irq_clear_addr = csid_reg->rdi_reg[id]->csid_rdi_irq_clear_addr;
 
 		/* Enable path reset done interrupt */
 		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
@@ -503,30 +506,40 @@ static int cam_ife_csid_path_reset(struct cam_ife_csid_hw *csid_hw,
 			csid_reg->rdi_reg[id]->csid_rdi_irq_mask_addr);
 	}
 
-	init_completion(complete);
 	reset_strb_val = csid_reg->cmn_reg->path_rst_stb_all;
+	base = soc_info->reg_map[0].mem_base;
 
-	/* Enable the Test gen before reset */
-	cam_io_w_mb(1,	csid_hw->hw_info->soc_info.reg_map[0].mem_base +
-		csid_reg->tpg_reg->csid_tpg_ctrl_addr);
+	/*
+	 * An IRQ_CMD write that lands while the path reset is in progress
+	 * makes the CSID drop the path's reset done status, so the reset
+	 * never completes. The CSID IRQ handler ends with an IRQ_CMD write,
+	 * and during a flush it can be running for an error raised just
+	 * before the path was stopped. Keep it out: reset with the CSID IRQ
+	 * disabled (disable_irq() also waits for a running handler) and poll
+	 * for the done status instead of waiting for the IRQ.
+	 */
+	disable_irq(soc_info->irq_line->start);
+
+	cam_io_w_mb(CSID_PATH_INFO_RST_DONE, base + irq_clear_addr);
+	cam_io_w_mb(1, base + csid_reg->cmn_reg->csid_irq_cmd_addr);
 
 	/* Reset the corresponding ife csid path */
-	cam_io_w_mb(reset_strb_val, soc_info->reg_map[0].mem_base +
-				reset_strb_addr);
+	cam_io_w_mb(reset_strb_val, base + reset_strb_addr);
 
-	rc = wait_for_completion_timeout(complete,
-		msecs_to_jiffies(IFE_CSID_TIMEOUT));
-	if (rc <= 0) {
-		CAM_ERR(CAM_ISP, "CSID:%d Res id %d fail rc = %d",
-			 csid_hw->hw_intf->hw_idx,
-			res->res_id,  rc);
-		if (rc == 0)
-			rc = -ETIMEDOUT;
+	rc = readl_poll_timeout(base + irq_status_addr, status,
+		status & CSID_PATH_INFO_RST_DONE,
+		CAM_IFE_CSID_TIMEOUT_SLEEP_US, CAM_IFE_CSID_TIMEOUT_ALL_US);
+
+	cam_io_w_mb(CSID_PATH_INFO_RST_DONE, base + irq_clear_addr);
+	cam_io_w_mb(1, base + csid_reg->cmn_reg->csid_irq_cmd_addr);
+
+	enable_irq(soc_info->irq_line->start);
+
+	if (rc) {
+		CAM_ERR(CAM_ISP, "CSID:%d Res id %d reset fail rc = %d",
+			 csid_hw->hw_intf->hw_idx, res->res_id, rc);
+		rc = -ETIMEDOUT;
 	}
-
-	/* Disable Test Gen after reset*/
-	cam_io_w_mb(0, soc_info->reg_map[0].mem_base +
-		csid_reg->tpg_reg->csid_tpg_ctrl_addr);
 
 end:
 	return rc;
