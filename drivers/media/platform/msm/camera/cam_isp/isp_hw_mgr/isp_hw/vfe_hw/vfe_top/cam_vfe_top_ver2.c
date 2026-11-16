@@ -418,10 +418,6 @@ int cam_vfe_top_reset(void *device_priv,
 	soc_info = top_priv->common_data.soc_info;
 	reg_common = top_priv->common_data.common_reg;
 
-	/* Mask All the IRQs except RESET */
-	cam_io_w_mb((1 << 31),
-		CAM_SOC_GET_REG_MAP_START(soc_info, VFE_CORE_BASE_IDX) + 0x5C);
-
 	/* Reset HW */
 	cam_io_w_mb(reset_reg_val,
 		CAM_SOC_GET_REG_MAP_START(soc_info, VFE_CORE_BASE_IDX) +
