@@ -1428,12 +1428,14 @@ static int __cam_isp_ctx_flush_req_in_top_state(
 		ctx->hw_mgr_intf->hw_stop(ctx->hw_mgr_intf->hw_mgr_priv,
 				&stop_args);
 		CAM_DBG(CAM_ISP, "try to reset hw");
-		/* Reset hw */
+		/*
+		 * Reset hw. Start it again even if the reset failed: a
+		 * context left stopped gets no more SOFs to trigger another
+		 * flush, and its next stop would stop it twice.
+		 */
 		reset_args.ctxt_to_hw_map = ctx_isp->hw_ctx;
-		rc = ctx->hw_mgr_intf->hw_reset(ctx->hw_mgr_intf->hw_mgr_priv,
+		ctx->hw_mgr_intf->hw_reset(ctx->hw_mgr_intf->hw_mgr_priv,
 			&reset_args);
-		if (rc)
-			goto end;
 
 		spin_lock_bh(&ctx->lock);
 		CAM_DBG(CAM_ISP, "ctx id:%d try to flush wait list",
